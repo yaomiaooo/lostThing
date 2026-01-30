@@ -28,8 +28,16 @@ def add_item(request):
             'msg': '请求方法不允许'
         })
 
+    # 2. 获取当前登录用户（从 session）
+    user_id = request.session.get('user_id')
+    if not user_id:
+        return JsonResponse({
+            'code': 401,
+            'msg': '未登录，请先登录'
+        })
+
     try:
-        # 2. 解析前端传来的 JSON 数据
+        # 3. 解析前端传来的 JSON 数据
         body = json.loads(request.body.decode('utf-8'))
     except Exception:
         return JsonResponse({
@@ -37,7 +45,7 @@ def add_item(request):
             'msg': '请求数据不是合法的 JSON'
         })
 
-    # 3. 从 JSON 中取参数（参数名严格按接口文档）
+    # 4. 从 JSON 中取参数
     item_category = body.get('itemCategory')     # 1=失物，2=招领
     item_type = body.get('itemType')             # 分类 ID
     name = body.get('name')
@@ -49,7 +57,7 @@ def add_item(request):
     contact_name = body.get('contactName')
     contact_phone = body.get('contactPhone')
 
-    # 4. 最基本的参数校验（先保证不为空）
+    # 5. 最基本的参数校验
     if not all([
         item_category,
         item_type,
@@ -65,9 +73,9 @@ def add_item(request):
         })
 
     try:
-        # 5. 创建并保存 Item 对象
+        # 6. 创建并保存 Item 对象
         item = Item.objects.create(
-            user_id=1,                 # 先写死，后面接登录系统再改
+            user_id=user_id,            # 使用当前登录用户
             item_category=item_category,
             item_type=item_type,
             name=name,
@@ -89,7 +97,7 @@ def add_item(request):
             'error': str(e)
         })
 
-    # 6. 返回成功结果
+    # 7. 返回成功结果
     return JsonResponse({
         'code': 200,
         'msg': '发布成功',
@@ -97,6 +105,7 @@ def add_item(request):
             'itemId': item.id
         }
     })
+
 
 
 @require_GET
@@ -229,22 +238,40 @@ def audit_item(request):
     URL: POST /api/item/audit
     """
 
+    # ===== 0. 登录校验 =====
+    user_id = request.session.get('user_id')
+    role = request.session.get('role')
+
+    if not user_id:
+        return JsonResponse({
+            "code": 401,
+            "msg": "未登录"
+        })
+
+    # 只允许管理员角色
+    # 3 = 失物招领管理员，4 = 系统管理员
+    if role not in [3, 4]:
+        return JsonResponse({
+            "code": 403,
+            "msg": "无权限操作"
+        })
+
     try:
-        # 1. 解析前端传来的 JSON 数据
+        # 1. 解析 JSON
         body = json.loads(request.body.decode("utf-8"))
 
         item_id = body.get("itemId")
         status = body.get("status")
         reject_reason = body.get("rejectReason", "")
 
-        # 2. 参数校验（非常重要）
+        # 2. 参数校验
         if not item_id or not status:
             return JsonResponse({
                 "code": 400,
                 "msg": "参数缺失"
             })
 
-        # 3. 查询物品是否存在
+        # 3. 查询物品
         try:
             item = Item.objects.get(id=item_id)
         except Item.DoesNotExist:
@@ -253,21 +280,19 @@ def audit_item(request):
                 "msg": "物品不存在"
             })
 
-        # 4. 只允许审核通过(2) 或 驳回(5)
+        # 4. 状态校验
         if status not in [2, 5]:
             return JsonResponse({
                 "code": 400,
                 "msg": "非法的审核状态"
             })
 
-        # 5. 更新审核相关字段
+        # 5. 更新审核信息
         item.current_status = status
         item.audit_time = timezone.now()
+        item.audit_user_id = user_id   # 来自 session
 
-        # ⚠️ 这里先写死审核人 ID（后面你做登录后再改）
-        item.audit_user_id = 1
-
-        # 6. 如果是驳回，必须填写驳回原因
+        # 6. 驳回必须写原因
         if status == 5:
             if not reject_reason:
                 return JsonResponse({
@@ -276,7 +301,6 @@ def audit_item(request):
                 })
             item.reject_reason = reject_reason
 
-        # 7. 保存到数据库
         item.save()
 
         return JsonResponse({
@@ -291,6 +315,7 @@ def audit_item(request):
             "error": str(e)
         })
 
+
 @csrf_exempt
 def add_claim(request):
     """
@@ -298,7 +323,16 @@ def add_claim(request):
     URL: POST /api/claim
     """
 
-    # 1. 只允许 POST 请求
+    # ===== 0. 登录校验 =====
+    user_id = request.session.get("user_id")
+
+    if not user_id:
+        return JsonResponse({
+            "code": 401,
+            "msg": "未登录"
+        })
+
+    # 1. 只允许 POST
     if request.method != 'POST':
         return JsonResponse({
             "code": 405,
@@ -306,7 +340,7 @@ def add_claim(request):
         })
 
     try:
-        # 2. 解析 JSON 请求体
+        # 2. 解析 JSON
         data = json.loads(request.body.decode('utf-8'))
         item_id = data.get('itemId')
         proof_feature = data.get('proofFeature')
@@ -327,19 +361,21 @@ def add_claim(request):
                 "msg": "物品不存在"
             })
 
-
-        # ⚠️ 重点：临时写死认领用户 ID
-        claim_user_id = 1   # 先假设用户 1 提交认领
+        # 只允许“审核通过”的物品被认领
+        if item.current_status != 2:
+            return JsonResponse({
+                "code": 400,
+                "msg": "该物品当前不可认领"
+            })
 
         # 5. 创建认领申请
         Claim.objects.create(
             item_id=item_id,
-            claim_user_id=claim_user_id,  # ✅ 关键字段
+            claim_user_id=user_id,     # 当前登录用户
             proof_feature=proof_feature,
-            status=0
+            status=0                   # 0 = 待审核
         )
 
-        # 6. 返回成功结果
         return JsonResponse({
             "code": 200,
             "msg": "认领申请提交成功"
