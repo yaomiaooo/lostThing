@@ -196,3 +196,39 @@ def change_password(request):
             "code": 1,
             "msg": f"服务器错误: {str(e)}"
         })
+
+@csrf_exempt
+def logout_user(request):
+    """
+    6.3.4 用户退出登录
+    URL: POST /api/user/logout
+    """
+    if request.method != 'POST':
+        return JsonResponse({
+            "code": 1,
+            "msg": "只支持 POST 请求"
+        })
+
+    try:
+        # 解析请求体（可选）
+        body = json.loads(request.body.decode('utf-8'))
+        user_id = body.get('userId')
+
+        # 当前阶段：不维护服务器登录状态
+        # 这里不做任何数据库操作
+
+        return JsonResponse({
+            "code": 0,
+            "msg": "退出成功"
+        })
+
+    except json.JSONDecodeError:
+        return JsonResponse({
+            "code": 1,
+            "msg": "请求体不是合法 JSON"
+        })
+    except Exception as e:
+        return JsonResponse({
+            "code": 1,
+            "msg": f"服务器错误: {str(e)}"
+        })
