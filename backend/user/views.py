@@ -5,6 +5,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
 from .models import User
+from django.contrib.auth.hashers import check_password
 
 @csrf_exempt
 def login_user(request):
@@ -44,14 +45,13 @@ def login_user(request):
         except User.DoesNotExist:
             return JsonResponse({"code": 1, "msg": "用户不存在", "data": None})
 
-        # 如果密码是明文存储
-        if password != user.password:
-            return JsonResponse({"code": 1, "msg": "密码错误", "data": None})
-
-        # # 如果密码是哈希存储，使用 check_password 验证
-        # from django.contrib.auth.hashers import check_password
-        # if not check_password(password, user.password):
+        # # 如果密码是明文存储
+        # if password != user.password:
         #     return JsonResponse({"code": 1, "msg": "密码错误", "data": None})
+
+        # 如果密码是哈希存储，使用 check_password 验证
+        if not check_password(password, user.password):
+            return JsonResponse({"code": 1, "msg": "密码错误", "data": None})
 
         # 登录成功，更新最后登录时间
         user.last_login_time = timezone.now()
