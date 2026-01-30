@@ -22,6 +22,6 @@ urlpatterns = [
     path('admin/', admin.site.urls),
 
     path('api/item', include('items.urls')),    # 物品管理接口
-    path('api/user/', include('user.urls')),    # 用户登录接口
+    path('api/user', include('user.urls')),    # 用户接口
 ]
 
