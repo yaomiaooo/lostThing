@@ -29,19 +29,23 @@
           <div class="login-form">
             <!-- 输入框（手绘边框） -->
             <div class="input-group">
-              <span class="input-icon">📚</span>
-              <input
-                v-model="form.username"
-                type="text"
-                placeholder="请输入学号 / 工号"
-                class="handwrite-input"
-                @focus="onInputFocus"
-                @blur="onInputBlur"
-              />
-            </div>
+            <span class="input-icon">
+              <img src="/login/登录.svg" alt="用户" class="icon-svg" />
+            </span>
+            <input
+              v-model="form.username"
+              type="text"
+              placeholder="请输入学号 / 工号"
+              class="handwrite-input"
+              @focus="onInputFocus"
+              @blur="onInputBlur"
+            />
+          </div>
 
             <div class="input-group">
-              <span class="input-icon">🔑</span>
+              <span class="input-icon">
+                <img src="/login/密码.svg" alt="密码" class="icon-svg" />
+              </span>
               <input
                 v-model="form.password"
                 type="password"
@@ -64,7 +68,9 @@
               class="handwrite-btn"
               :class="{ 'btn-loading': loading }"
             >
-              <span v-if="loading" class="loading-spinner">⏳</span>
+               <span v-if="loading" class="loading-spinner">
+                <img src="/login/载入.svg" alt="加载中" class="loading-svg" />
+              </span>
               <span v-else>登录</span>
             </button>
           </div>
@@ -244,7 +250,7 @@ const handleLogin = async () => {
   -webkit-perspective: 1000;
 }
 
-/* 右侧登录卡片容器 - 占据右侧50%全屏 */
+/* 修改 .login-card-container 的布局方式 */
 .login-card-container {
   position: absolute;
   top: 0;
@@ -252,20 +258,27 @@ const handleLogin = async () => {
   width: 50%;
   height: 100vh;
   z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   overflow: hidden;
+  /* 移除flex，使用其他方式居中 */
 }
 
 .login-card-wrapper {
+  position: absolute;  /* 改为绝对定位 */
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
   opacity: 0;
   transform: translateX(100px);
   transition: all 0.9s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   will-change: opacity, transform;
+  /* 内部使用flex确保内容居中 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
+
+
 
 /* 页面整体淡入效果 */
 .fade-in {
@@ -328,7 +341,7 @@ const handleLogin = async () => {
   left: 30%;
   width: 40%;
   height: 4px;
-  background: linear-gradient(90deg, #667eea, #764ba2);
+  background: linear-gradient(to right, #f38181, #f77d5f);
   border-radius: 2px;
   opacity: 0.8;
 }
@@ -362,6 +375,16 @@ const handleLogin = async () => {
   color: rgba(166, 124, 82, 0.8);
   z-index: 2;
   transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-svg {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  filter: brightness(0.8);
 }
 
 /* 输入框 - 放大 */
@@ -396,7 +419,7 @@ const handleLogin = async () => {
   background: rgba(255, 255, 255, 0.35);
   backdrop-filter: blur(15px);
   -webkit-backdrop-filter: blur(15px);
-  border-color: rgba(102, 126, 234, 0.7);
+  border-color: rgba(243,129,129,1.00);
   box-shadow: 
     0 0 0 3px rgba(102, 126, 234, 0.15),
     0 8px 20px rgba(0, 0, 0, 0.1);
@@ -404,7 +427,7 @@ const handleLogin = async () => {
 }
 
 .handwrite-input:focus + .input-icon {
-  color: #667eea;
+  color: #f77d5f;
   transform: translateY(-50%) scale(1.1);
 }
 
@@ -494,8 +517,16 @@ const handleLogin = async () => {
 }
 
 .btn-loading .loading-spinner {
-  display: inline-block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   animation: spin 1.2s linear infinite;
+}
+
+.loading-svg {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
 }
 
 @keyframes spin {
