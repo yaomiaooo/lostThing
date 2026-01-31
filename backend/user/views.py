@@ -12,13 +12,16 @@ from django.contrib.auth.hashers import check_password, make_password
 @csrf_exempt
 def login_user(request):
     """
-    6.3.1 用户登录接口
-    URL: POST /api/user/login
+    用户登录接口
+    POST /api/user/login
+
     前端传参：
     {
         "username": "2023123456",
-        "password": "123456"
+        "password": "123456",
+        "loginType": "user"   // user / item_admin / system_admin
     }
+
     返回：
     {
         "code": 0,
@@ -27,41 +30,94 @@ def login_user(request):
             "id": 1,
             "username": "2023123456",
             "realName": "齐司礼",
-            "role": 1
+            "role": 1,
+            "firstLogin": false
         }
     }
     """
+
+    # 1. 仅允许 POST
     if request.method != 'POST':
-        return JsonResponse({"code": 1, "msg": "只支持 POST 请求", "data": None})
+        return JsonResponse({
+            "code": 1,
+            "msg": "只支持 POST 请求",
+            "data": None
+        })
 
     try:
+        # 2. 解析请求体
         body = json.loads(request.body.decode('utf-8'))
         username = body.get('username')
         password = body.get('password')
+        login_type = body.get('loginType')
 
+        # 3. 基础参数校验
         if not username or not password:
-            return JsonResponse({"code": 1, "msg": "用户名和密码不能为空", "data": None})
+            return JsonResponse({
+                "code": 1,
+                "msg": "用户名和密码不能为空",
+                "data": None
+            })
 
+        if not login_type:
+            return JsonResponse({
+                "code": 1,
+                "msg": "请选择登录身份",
+                "data": None
+            })
+
+        # 4. 查询用户
         try:
             user = User.objects.get(username=username)
         except User.DoesNotExist:
-            return JsonResponse({"code": 1, "msg": "用户不存在", "data": None})
+            return JsonResponse({
+                "code": 1,
+                "msg": "用户不存在",
+                "data": None
+            })
 
-        # 密码是哈希存储，使用 check_password 验证
+        # 5. 校验密码（哈希）
         if not check_password(password, user.password):
-            return JsonResponse({"code": 1, "msg": "密码错误", "data": None})
+            return JsonResponse({
+                "code": 1,
+                "msg": "密码错误",
+                "data": None
+            })
 
-        # ================== 关键：写入 session ==================
+        # 6. 登录身份 → role 映射（核心安全逻辑）
+        LOGIN_TYPE_ROLE_MAP = {
+            "user": [1, 2],          # 学生 / 老师
+            "item_admin": [3],       # 失物招领管理员
+            "system_admin": [4]      # 系统管理员
+        }
+
+        allowed_roles = LOGIN_TYPE_ROLE_MAP.get(login_type)
+
+        if not allowed_roles:
+            return JsonResponse({
+                "code": 1,
+                "msg": "非法登录身份",
+                "data": None
+            })
+
+        if user.role not in allowed_roles:
+            return JsonResponse({
+                "code": 1,
+                "msg": "当前账号无权以该身份登录",
+                "data": None
+            })
+
+        # 7. 写入 session（登录态）
         request.session['user_id'] = user.id
         request.session['username'] = user.username
         request.session['role'] = user.role
-        request.session.set_expiry(60 * 60 * 2)  # 2 小时过期（可选）
-        # ========================================================
+        request.session.set_expiry(60 * 60 * 2)  # 2 小时
 
-        # 登录成功，更新最后登录时间
+        # 8. 更新最后登录时间
         user.last_login_time = timezone.now()
         user.save()
 
+        # 9. 返回数据
         data = {
             "id": user.id,
             "username": user.username,
@@ -70,13 +126,24 @@ def login_user(request):
             "firstLogin": user.first_login
         }
 
-        return JsonResponse({"code": 0, "msg": "success", "data": data})
+        return JsonResponse({
+            "code": 0,
+            "msg": "success",
+            "data": data
+        })
 
     except json.JSONDecodeError:
-        return JsonResponse({"code": 1, "msg": "请求体不是合法的 JSON", "data": None})
+        return JsonResponse({
+            "code": 1,
+            "msg": "请求体不是合法的 JSON",
+            "data": None
+        })
     except Exception as e:
-        return JsonResponse({"code": 1, "msg": f"服务器错误: {str(e)}", "data": None})
-
+        return JsonResponse({
+            "code": 1,
+            "msg": f"服务器错误: {str(e)}",
+            "data": None
+        })
 
 @csrf_exempt
 def get_user_info(request):
