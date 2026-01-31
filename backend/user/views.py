@@ -111,6 +111,8 @@ def login_user(request):
         request.session['user_id'] = user.id
         request.session['username'] = user.username
         request.session['role'] = user.role
+        request.session['firstLogin'] = user.first_login
+        
         request.session.set_expiry(60 * 60 * 2)  # 2 小时
 
         # 8. 更新最后登录时间
@@ -171,7 +173,7 @@ def get_user_info(request):
             "data": None
         })
 
-    user_id = request.GET.get('id')
+    user_id = request.session.get('user_id')
     if not user_id:
         return JsonResponse({
             "code": 1,
