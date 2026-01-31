@@ -258,7 +258,12 @@ const router = useRouter()
 
 /* ================= 用户信息 ================= */
 const user = ref({
-  realName: '加载中...'
+  id: 0,
+  username: '',
+  realName: '加载中...',
+  phone: '',
+  role: 0,
+  status: 0
 })
 
 /* ================= 物品推荐 ================= */
