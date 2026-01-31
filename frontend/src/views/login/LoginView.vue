@@ -8,6 +8,8 @@
         class="background-image"
         :class="{ 'background-loaded': backgroundLoaded }"
       />
+      <!-- 预渲染的毛玻璃背景层 -->
+      <div class="glass-layer" :class="{ 'glass-layer-visible': glassLayerVisible }"></div>
     </div>
 
     <!-- 右侧登录卡片 -->
@@ -92,23 +94,27 @@ const backgroundLoaded = ref(false)
 const cardLoaded = ref(false)
 const fadeIn = ref(false)
 const isInputFocused = ref(false)
+const glassLayerVisible = ref(false)
 
 // 页面加载后触发入场动画
 onMounted(() => {
+  // 立即显示毛玻璃层（无延迟）
+  glassLayerVisible.value = true
+  
   // 背景淡入
   setTimeout(() => {
     backgroundLoaded.value = true
-  }, 100)
+  }, 50)
   
   // 整体淡入
   setTimeout(() => {
     fadeIn.value = true
-  }, 300)
+  }, 150)
   
-  // 卡片滑入
+  // 卡片滑入（但毛玻璃效果已经预先渲染）
   setTimeout(() => {
     cardLoaded.value = true
-  }, 500)
+  }, 200)
 })
 
 /** 输入框聚焦处理 */
@@ -174,7 +180,7 @@ const handleLogin = async () => {
   height: 100vh;
   position: relative;
   overflow: hidden;
-  background: #fce38a; /* 备用背景色，防止图片加载失败 */
+  background: #fce38a;
 }
 
 /* 背景图片容器 */
@@ -202,6 +208,42 @@ const handleLogin = async () => {
   transform: scale(1);
 }
 
+/* 预渲染的毛玻璃层 - 解决backdrop-filter延迟问题 */
+.glass-layer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 50%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
+  border-left: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 
+    -15px 0 40px rgba(0, 0, 0, 0.15),
+    inset 1px 0 0 rgba(255, 255, 255, 0.1);
+  opacity: 0;
+  transform: translateX(100px);
+  transition: all 0.3s ease-out;
+  pointer-events: none;
+  will-change: opacity, transform;
+}
+
+.glass-layer-visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* 优化：硬件加速 */
+.glass-layer {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  perspective: 1000;
+  -webkit-perspective: 1000;
+}
+
 /* 右侧登录卡片容器 - 占据右侧50%全屏 */
 .login-card-container {
   position: absolute;
@@ -222,6 +264,7 @@ const handleLogin = async () => {
   opacity: 0;
   transform: translateX(100px);
   transition: all 0.9s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  will-change: opacity, transform;
 }
 
 /* 页面整体淡入效果 */
@@ -235,19 +278,13 @@ const handleLogin = async () => {
   opacity: 1;
 }
 
-/* 登录卡片 - 占据整个右侧区域 */
+/* 登录卡片 - 透明背景，毛玻璃效果由glass-layer提供 */
 .login-card {
   width: 100%;
   height: 100%;
   padding: 80px 70px;
-  background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(25px);
-  -webkit-backdrop-filter: blur(25px);
+  background: transparent;
   border-radius: 0;
-  border-left: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 
-    -15px 0 40px rgba(0, 0, 0, 0.15),
-    inset 1px 0 0 rgba(255, 255, 255, 0.1);
   transition: all 0.4s ease;
   display: flex;
   flex-direction: column;
@@ -255,35 +292,16 @@ const handleLogin = async () => {
   align-items: center;
 }
 
-/* 卡片悬停效果 */
+/* 移除卡片的毛玻璃相关样式，改为透明背景 */
 .login-card:hover {
-  background: rgba(255, 255, 255, 0.18);
-  box-shadow: 
-    0 25px 50px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25),
-    0 0 0 1px rgba(255, 255, 255, 0.15);
+  background: transparent;
+  box-shadow: none;
   transform: translateY(-2px);
 }
 
-/* 流光效果 */
+/* 移除卡片的流光效果 */
 .login-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.1),
-    transparent
-  );
-  transition: left 1.2s ease;
-}
-
-.login-card:hover::before {
-  left: 100%;
+  content: none;
 }
 
 /* 标题区域 - 放大 */
@@ -348,7 +366,7 @@ const handleLogin = async () => {
 
 /* 输入框 - 放大 */
 .handwrite-input {
-  width: 100%;
+  width: 83%;
   height: 60px;
   padding: 0 20px 0 60px;
   border-radius: 12px;
@@ -362,13 +380,16 @@ const handleLogin = async () => {
   font-family: "Comic Sans MS", cursive;
   color: #a67c52;
   font-weight: 500;
+  /* 硬件加速优化 */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  will-change: background, backdrop-filter, transform;
 }
 
 .handwrite-input::placeholder {
   color: rgba(166, 124, 82, 0.6);
   font-family: "Comic Sans MS", cursive;
 }
-
 
 /* 输入框聚焦效果 - 毛玻璃透明度变化 */
 .handwrite-input:focus {
@@ -379,7 +400,7 @@ const handleLogin = async () => {
   box-shadow: 
     0 0 0 3px rgba(102, 126, 234, 0.15),
     0 8px 20px rgba(0, 0, 0, 0.1);
-  transform: translateY(-1px);
+  transform: translateY(-1px) translateZ(0);
 }
 
 .handwrite-input:focus + .input-icon {
@@ -400,16 +421,17 @@ const handleLogin = async () => {
   font-family: "Comic Sans MS", cursive;
   position: relative;
   animation: shake 0.4s ease;
+  /* 硬件加速 */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  will-change: transform;
 }
-
-
 
 @keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-5px); }
-  75% { transform: translateX(5px); }
+  0%, 100% { transform: translateX(0) translateZ(0); }
+  25% { transform: translateX(-5px) translateZ(0); }
+  75% { transform: translateX(5px) translateZ(0); }
 }
-
 
 /* 登录按钮 - 放大 */
 .handwrite-btn {
@@ -429,6 +451,10 @@ const handleLogin = async () => {
   margin-top: 10px;
   letter-spacing: 1px;
   box-shadow: 0 4px 15px rgba(247, 125, 95, 0.3);
+  /* 硬件加速 */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  will-change: transform, box-shadow;
 }
 
 .handwrite-btn::before {
@@ -446,7 +472,7 @@ const handleLogin = async () => {
 }
 
 .handwrite-btn:hover {
-  transform: translateY(-3px);
+  transform: translateY(-3px) translateZ(0);
   box-shadow: 0 8px 25px rgba(247, 125, 95, 0.4);
   background: linear-gradient(to right, #f77d5f, #f38181);
 }
@@ -456,7 +482,7 @@ const handleLogin = async () => {
 }
 
 .handwrite-btn:active {
-  transform: translateY(-1px);
+  transform: translateY(-1px) translateZ(0);
   box-shadow: 0 4px 15px rgba(247, 125, 95, 0.3);
 }
 
@@ -472,7 +498,6 @@ const handleLogin = async () => {
   animation: spin 1.2s linear infinite;
 }
 
-
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
@@ -483,9 +508,23 @@ const handleLogin = async () => {
   .login-card-container {
     width: 55%;
   }
+  
+  .glass-layer {
+    width: 55%;
+  }
 }
 
 @media (max-width: 768px) {
+  .background-container {
+    width: 100%;
+  }
+  
+  .glass-layer {
+    width: 100%;
+    border-left: none;
+    box-shadow: none;
+  }
+  
   .login-card-container {
     width: 100%;
     padding: 20px;
@@ -501,6 +540,20 @@ const handleLogin = async () => {
   
   .handwrite-title {
     font-size: 28px;
+  }
+  
+  .sub-title {
+    font-size: 14px;
+  }
+  
+  .handwrite-input {
+    height: 52px;
+    font-size: 16px;
+  }
+  
+  .handwrite-btn {
+    height: 56px;
+    font-size: 18px;
   }
 }
 </style>
