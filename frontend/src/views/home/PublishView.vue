@@ -120,7 +120,7 @@
                     :disabled="submitting || !categoryTree.length"
                     @change="onFirstCategoryChange"
                     >
-                    <option value="">请选择一级分类</option>
+                    
                     <option 
                         v-for="cat in firstCategories" 
                         :key="cat.id"
@@ -140,7 +140,7 @@
                     :disabled="submitting || !selectedFirstCategory"
                     @change="onSecondCategoryChange"
                     >
-                    <option value="">请选择二级分类</option>
+                 
                     <option 
                         v-for="cat in secondCategories" 
                         :key="cat.id"
@@ -197,7 +197,7 @@
                       :disabled="submitting || !locationTree.length"
                       @change="onCampusChange"
                     >
-                      <option value="">请选择校区</option>
+                     
                       <option 
                         v-for="campus in campuses" 
                         :key="campus.id"
@@ -217,7 +217,7 @@
                       :disabled="submitting || !selectedCampus"
                       @change="onAreaChange"
                     >
-                      <option value="">请选择区域</option>
+                      
                       <option 
                         v-for="area in areas" 
                         :key="area.id"
@@ -237,7 +237,7 @@
                       :disabled="submitting || !selectedArea"
                       @change="onLocationChange"
                     >
-                      <option value="">请选择具体地点</option>
+                      
                       <option 
                         v-for="location in locations" 
                         :key="location.id"
@@ -308,7 +308,7 @@
                 <div v-if="formErrors.feature" class="error-message">
                   {{ formErrors.feature }}
                 </div>
-                <div class="input-hint">请详细描述，不少于10个字符，不超过1000字符</div>
+                <div class="input-hint">请详细描述，不少于2个字符，不超过1000字符</div>
               </div>
             </div>
 
@@ -973,8 +973,8 @@ function validateForm(): boolean {
   if (!formData.feature.trim()) {
     formErrors.feature = '请输入特征描述'
     isValid = false
-  } else if (formData.feature.trim().length < 10) {
-    formErrors.feature = '特征描述至少需要10个字符'
+  } else if (formData.feature.trim().length < 2) {
+    formErrors.feature = '特征描述至少需要2个字符'
     isValid = false
   } else if (formData.feature.trim().length > 1000) {
     formErrors.feature = '特征描述不能超过1000个字符'
