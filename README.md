@@ -339,27 +339,29 @@
 
 #### （2）物品信息表（item）
 
-| 字段名            | 字段类型          | 是否主键 | 字段说明                                                                |
-| -------------- | ------------- | ---- | ------------------------------------------------------------------- |
-| id             | BIGINT        | 是    | 自增主键                                                                |
-| user_id        | BIGINT        | 否    | 发布人 ID（关联 user 表 id）                                                |
-| item_type      | TINYINT       | 否    | 物品类型（关联 category 表 id）                                              |
-| item_category  | TINYINT       | 否    | 信息类型：1 - 失物，2 - 招领                                                  |
-| name           | VARCHAR(50)   | 否    | 物品名称                                                                |
-| location_id    | BIGINT        | 否    | 丢失 / 拾取地点 ID（关联 location 表 id）                                      |
-| happen_time    | DATETIME      | 否    | 丢失 / 拾取时间                                                           |
-| feature        | TEXT          | 否    | 物品特征描述                                                              |
-| reward_amount  | DECIMAL(10,2) | 否    | 悬赏金额（仅失物信息有效，默认 0.00）                                               |
-| reward_desc    | VARCHAR(200)  | 否    | 悬赏说明（仅失物信息有效）                                                       |
-| contact_name   | VARCHAR(20)   | 否    | 联系人姓名                                                               |
-| contact_phone  | VARCHAR(11)   | 否    | 联系人电话                                                               |
-| current_status | TINYINT       | 否    | 当前状态：1 - 待审核，2 - 已通过，3 - 已匹配，4 - 已认领，5 - 已驳回，6 - 已取消，7 - 已归档，8 - 无效 |
-| reject_reason  | VARCHAR(200)  | 否    | 驳回原因（仅状态为 5 时有效）                                                    |
-| archive_desc   | VARCHAR(200)  | 否    | 归档处理说明（仅状态为 7 时有效）                                                  |
-| create_time    | DATETIME      | 否    | 创建时间                                                                |
-| update_time    | DATETIME      | 否    | 更新时间                                                                |
-| audit_user_id  | BIGINT        | 否    | 审核人 ID（关联 user 表 id，仅状态≥2 时有效）                                      |
-| audit_time     | DATETIME      | 否    | 审核时间（仅状态≥2 时有效）                                                     |
+| 字段名             | 字段类型          | 是否主键 | 字段说明                                                |
+| --------------- | ------------- | ---- | --------------------------------------------------- |
+| id              | BIGINT        | 是    | 自增主键                                                |
+| user_id         | BIGINT        | 否    | 发布人 ID（关联 user 表 id）                                |
+| item_type       | BIGINT        | 否    | 物品分类 ID（关联 category 表 id，如证件、电子设备等）                 |
+| item_category   | TINYINT       | 否    | 信息类型：1 - 失物，2 - 招领                                  |
+| name            | VARCHAR(50)   | 否    | 物品名称                                                |
+| location_id     | BIGINT        | 否    | 丢失 / 拾取的标准地点 ID（关联 location 表 id，用于筛选）              |
+| location_detail | VARCHAR(255)  | 否    | 具体地点描述（如“健行楼 A 楼一楼”“操场跑道内侧”等，自由填写）                  |
+| happen_time     | DATETIME      | 否    | 丢失 / 拾取时间                                           |
+| feature         | TEXT          | 否    | 物品特征描述                                              |
+| reward_amount   | DECIMAL(10,2) | 否    | 悬赏金额（仅失物信息有效，默认 0.00）                               |
+| reward_desc     | VARCHAR(200)  | 否    | 悬赏说明（仅失物信息有效）                                       |
+| contact_name    | VARCHAR(20)   | 否    | 联系人姓名                                               |
+| contact_phone   | VARCHAR(11)   | 否    | 联系人电话                                               |
+| current_status  | TINYINT       | 否    | 当前状态：1-待审核，2-已通过，3-已匹配，4-已认领，5-已驳回，6-已取消，7-已归档，8-无效 |
+| reject_reason   | VARCHAR(200)  | 否    | 驳回原因（仅状态为 5 时有效）                                    |
+| archive_desc    | VARCHAR(200)  | 否    | 归档处理说明（仅状态为 7 时有效）                                  |
+| audit_user_id   | BIGINT        | 否    | 审核人 ID（关联 user 表 id，仅状态 ≥2 时有效）                     |
+| audit_time      | DATETIME      | 否    | 审核时间（仅状态 ≥2 时有效）                                    |
+| create_time     | DATETIME      | 否    | 创建时间                                                |
+| update_time     | DATETIME      | 否    | 更新时间                                                |
+
 
 #### （3）物品图片表（item_image）
 
@@ -367,10 +369,11 @@
 | ----------- | ------------ | ---- | ------------------------------ |
 | id          | BIGINT       | 是    | 自增主键                           |
 | item_id     | BIGINT       | 否    | 关联物品 ID（关联 item 表 id）          |
-| image_url   | VARCHAR(255) | 否    | 图片存储路径（绝对路径或云存储 URL）           |
-| image_type  | TINYINT      | 否    | 图片类型：1 - 失物图片，2 - 招领图片         |
-| sort        | TINYINT      | 否    | 图片排序（1 - 主图，2 - 辅图 1，3 - 辅图 2） |
-| create_time | DATETIME     | 否    | 上传时间                           |
+| image_data  | LONGBLOB     | 否    | 图片二进制数据（存储图片的二进制内容）         |
+| image_url   | VARCHAR(255) | 否    | 原始文件名（可为空）                     |
+| image_type  | SMALLINT     | 否    | 图片类型：1 - 失物图片，2 - 招领图片         |
+| sort        | SMALLINT     | 否    | 图片排序                           |
+| create_time | DATETIME     | 否    | 上传时间（自动添加）                     |
 
 #### （4）物品状态历史表（item_status_history）
 

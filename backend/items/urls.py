@@ -19,4 +19,7 @@ urlpatterns = [
 
     # 6.4.5 认领物品
     path('/claim', views.add_claim),
+
+    # 6.4.6 上传物品图片（图片存 MySQL）
+    path('/image/upload', views.upload_item_image),
 ]

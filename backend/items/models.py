@@ -12,7 +12,7 @@ class Item(models.Model):
     )
 
     # 物品类型（关联 category 表 id）
-    item_type = models.SmallIntegerField(
+    item_type = models.BigIntegerField(   
         verbose_name="物品类型ID"
     )
 
@@ -30,6 +30,14 @@ class Item(models.Model):
     # 丢失 / 拾取地点 ID（关联 location 表 id）
     location_id = models.BigIntegerField(
         verbose_name="地点ID"
+    )
+
+    # 具体地点描述（自由填写）
+    location_detail = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        verbose_name="具体地点描述"
     )
 
     # 丢失 / 拾取时间
@@ -120,34 +128,34 @@ class Item(models.Model):
     class Meta:
         db_table = "item"
         verbose_name = "物品信息"
-        verbose_name_plural = "物品信息" 
+        verbose_name_plural = "物品信息"
 
 
 class ItemImage(models.Model):
-    """
-    物品图片表（item_image）
-    """
+    item_id = models.BigIntegerField(verbose_name="物品ID")
 
-    item_id = models.BigIntegerField(
-        verbose_name="物品ID"
+    image_data = models.BinaryField(
+        verbose_name="图片二进制数据"
     )
 
     image_url = models.CharField(
         max_length=255,
-        verbose_name="图片地址"
+        null=True,
+        blank=True,
+        verbose_name="原始文件名"
     )
 
     image_type = models.SmallIntegerField(
-        verbose_name="图片类型"
+        verbose_name="图片类型：1-失物，2-招领"
     )
 
     sort = models.SmallIntegerField(
-        verbose_name="排序"
+        verbose_name="图片排序"
     )
 
     create_time = models.DateTimeField(
         auto_now_add=True,
-        verbose_name="创建时间"
+        verbose_name="上传时间"
     )
 
     class Meta:

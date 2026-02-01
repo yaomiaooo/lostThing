@@ -12,7 +12,11 @@ from django.core.paginator import Paginator
 
 from django.views.decorators.http import require_POST
 
-from .models import Item, Location, Claim
+from .models import Item, Location, Claim, Category,ItemStatusHistory,ItemImage
+
+from django.db import transaction
+from django.utils.dateparse import parse_datetime
+
 
 @csrf_exempt
 def add_item(request):
@@ -28,7 +32,7 @@ def add_item(request):
             'msg': '请求方法不允许'
         })
 
-    # 2. 获取当前登录用户（从 session）
+    # 2. 获取当前登录用户
     user_id = request.session.get('user_id')
     if not user_id:
         return JsonResponse({
@@ -36,8 +40,8 @@ def add_item(request):
             'msg': '未登录，请先登录'
         })
 
+    # 3. 解析 JSON 数据
     try:
-        # 3. 解析前端传来的 JSON 数据
         body = json.loads(request.body.decode('utf-8'))
     except Exception:
         return JsonResponse({
@@ -45,19 +49,20 @@ def add_item(request):
             'msg': '请求数据不是合法的 JSON'
         })
 
-    # 4. 从 JSON 中取参数
-    item_category = body.get('itemCategory')     # 1=失物，2=招领
-    item_type = body.get('itemType')             # 分类 ID
+    # 4. 获取参数（与数据库字段一一对应）
+    item_category = body.get('itemCategory')       # 1=失物，2=招领
+    item_type = body.get('itemType')               # category.id
     name = body.get('name')
     location_id = body.get('locationId')
+    location_detail = body.get('locationDetail', '')
     happen_time = body.get('happenTime')
-    feature = body.get('feature')
+    feature = body.get('feature', '')
     reward_amount = body.get('rewardAmount', 0)
     reward_desc = body.get('rewardDesc', '')
     contact_name = body.get('contactName')
     contact_phone = body.get('contactPhone')
 
-    # 5. 最基本的参数校验
+    # 5. 必填参数校验
     if not all([
         item_category,
         item_type,
@@ -72,21 +77,34 @@ def add_item(request):
             'msg': '缺少必要参数'
         })
 
+    # 6. 校验 item_category 合法性
+    if item_category not in [1, 2]:
+        return JsonResponse({
+            'code': 400,
+            'msg': 'itemCategory 参数非法'
+        })
+
+    # 7. 业务规则：招领信息不能有悬赏
+    if item_category == 2:
+        reward_amount = 0
+        reward_desc = ''
+
+    # 8. 创建 Item 对象
     try:
-        # 6. 创建并保存 Item 对象
         item = Item.objects.create(
-            user_id=user_id,            # 使用当前登录用户
-            item_category=item_category,
+            user_id=user_id,
             item_type=item_type,
+            item_category=item_category,
             name=name,
             location_id=location_id,
+            location_detail=location_detail,
             happen_time=happen_time,
             feature=feature,
             reward_amount=reward_amount,
             reward_desc=reward_desc,
             contact_name=contact_name,
             contact_phone=contact_phone,
-            current_status=1,           # 1 = 待审核
+            current_status=1,          # 1 = 待审核
             create_time=timezone.now(),
             update_time=timezone.now()
         )
@@ -97,7 +115,7 @@ def add_item(request):
             'error': str(e)
         })
 
-    # 7. 返回成功结果
+    # 9. 返回结果
     return JsonResponse({
         'code': 200,
         'msg': '发布成功',
@@ -105,6 +123,8 @@ def add_item(request):
             'itemId': item.id
         }
     })
+
+
 
 
 
@@ -387,3 +407,58 @@ def add_claim(request):
             "msg": "服务器错误",
             "error": str(e)
         })
+
+@csrf_exempt
+def upload_item_image(request):
+    """
+    6.4.6 上传物品图片（图片存 MySQL）
+    URL: /api/item/image/upload
+    """
+
+    if request.method != 'POST':
+        return JsonResponse({'code': 405, 'msg': '请求方法不允许'})
+
+    # 登录校验
+    user_id = request.session.get('user_id')
+    if not user_id:
+        return JsonResponse({'code': 401, 'msg': '未登录'})
+
+    # 参数
+    item_id = request.POST.get('itemId')
+    image_type = request.POST.get('imageType')
+    sort = request.POST.get('sort', 1)
+    file = request.FILES.get('file')
+
+    if not all([item_id, image_type, file]):
+        return JsonResponse({'code': 400, 'msg': '缺少必要参数'})
+
+    # 校验物品是否存在
+    if not Item.objects.filter(id=item_id).exists():
+        return JsonResponse({'code': 404, 'msg': '物品不存在'})
+
+    try:
+        # 读取图片二进制
+        image_bytes = file.read()
+
+        item_image = ItemImage.objects.create(
+            item_id=item_id,
+            image_data=image_bytes,
+            image_url=file.name,   # 保存原始文件名（可选）
+            image_type=int(image_type),
+            sort=int(sort)
+        )
+
+    except Exception as e:
+        return JsonResponse({
+            'code': 500,
+            'msg': '图片上传失败',
+            'error': str(e)
+        })
+
+    return JsonResponse({
+        'code': 200,
+        'msg': '图片上传成功',
+        'data': {
+            'imageId': item_image.id
+        }
+    })
