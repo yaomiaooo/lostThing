@@ -22,4 +22,10 @@ urlpatterns = [
 
     # 6.4.6 上传物品图片（图片存 MySQL）
     path('/image/upload', views.upload_item_image),
+
+    # 6.4.7 获取分类树
+    path('/category/tree', views.get_category_tree),
+
+    # 6.4.8 获取地点树
+    path('/location/tree', views.get_location_tree),
 ]

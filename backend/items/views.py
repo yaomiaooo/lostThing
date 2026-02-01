@@ -480,3 +480,94 @@ def upload_item_image(request):
             'imageId': item_image.id
         }
     })
+
+
+
+
+
+def build_category_tree(data_list, parent_id=0):
+    """
+    递归构建分类树
+    """
+    tree = []
+    for item in data_list:
+        if item["parent_id"] == parent_id:
+            children = build_category_tree(data_list, item["id"])
+            if children:
+                item["children"] = children
+            tree.append(item)
+    return tree
+
+
+def get_category_tree(request):
+    """
+    获取分类树
+    GET /api/item/category/tree
+    """
+    if request.method != "GET":
+        return JsonResponse({
+            "code": 405,
+            "msg": "请求方式不允许"
+        })
+
+    # 1. 查询所有启用分类
+    qs = Category.objects.filter(status=1).order_by("-sort").values(
+        "id",
+        "name",
+        "parent_id"
+    )
+
+    category_list = list(qs)
+
+    # 2. 构建树
+    tree = build_category_tree(category_list, parent_id=0)
+
+    return JsonResponse({
+        "code": 200,
+        "msg": "success",
+        "data": tree
+    })
+
+
+def build_location_tree(data_list, parent_id=0):
+    """
+    递归构建地点树
+    """
+    tree = []
+    for item in data_list:
+        if item["parent_id"] == parent_id:
+            children = build_location_tree(data_list, item["id"])
+            if children:
+                item["children"] = children
+            tree.append(item)
+    return tree
+
+
+def get_location_tree(request):
+    """
+    获取地点树
+    GET /api/item/location/tree
+    """
+    if request.method != "GET":
+        return JsonResponse({
+            "code": 405,
+            "msg": "请求方式不允许"
+        })
+
+    # 1. 查询所有启用地点
+    qs = Location.objects.filter(status=1).order_by("-sort").values(
+        "id",
+        "name",
+        "parent_id"
+    )
+
+    location_list = list(qs)
+
+    # 2. 构建树
+    tree = build_location_tree(location_list, parent_id=0)
+
+    return JsonResponse({
+        "code": 200,
+        "msg": "success",
+        "data": tree
+    })
