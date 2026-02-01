@@ -1,14 +1,9 @@
 <template>
   <div class="home-page">
-    <!-- 背景图片 -->
+    <!-- 纯色背景 -->
     <div class="background-container">
-      <img 
-        src="/login/login_background.png" 
-        alt="首页背景" 
-        class="background-image background-loaded"
-      />
-      <!-- 毛玻璃背景层 -->
-      <div class="glass-layer-full glass-layer-visible"></div>
+      <!-- 背景层 -->
+      <div class="solid-background"></div>
     </div>
 
     <!-- 整体布局：左侧导航 + 右侧主内容 -->
@@ -660,10 +655,9 @@ function setFilter(filter: string) {
   min-height: 100vh;
   position: relative;
   overflow: hidden;
-  background: #fce38a;
 }
 
-/* 背景图片容器 */
+/* 背景容器 */
 .background-container {
   position: fixed;
   top: 0;
@@ -674,27 +668,16 @@ function setFilter(filter: string) {
   overflow: hidden;
 }
 
-.background-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  opacity: 1;
-  transform: scale(1);
-}
-
-/* 全屏毛玻璃层 */
-.glass-layer-full {
+/* 纯色背景层 */
+.solid-background {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  /* background: #E3D2A1; */
+  background: #f8f3d4;
   pointer-events: none;
-  will-change: backdrop-filter;
 }
 
 /* 整体布局：左侧导航 + 右侧主内容 */
@@ -713,10 +696,7 @@ function setFilter(filter: string) {
   position: fixed;
   top: 0;
   left: 0;
-  background: rgba(255, 255, 255, 0.25);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-right: 1.6px solid rgba(166, 124, 82, 0.2);
+  background: transparent;
   /* 进一步增加内边距 */
   padding: 24px;
   display: flex;
@@ -728,11 +708,9 @@ function setFilter(filter: string) {
 
 /* 左侧用户信息区域 */
 .user-info-container {
-  background: rgba(255, 255, 255, 0.3);
-  backdrop-filter: blur(10px);
+  /* background: rgba(255, 255, 255, 0.15); */
   border-radius: 12.8px;
   padding: 16px;
-  border: 1.6px solid rgba(166, 124, 82, 0.15);
   margin-bottom: 12px;
   display: flex;
   align-items: center;
@@ -808,7 +786,7 @@ function setFilter(filter: string) {
   justify-content: flex-start;
   gap: 16px;
   cursor: pointer;
-  padding: 14.4px 50px;
+  padding: 14.4px 10px;
   border-radius: 12.8px;
   transition: all 0.3s ease;
   font-family: "Comic Sans MS", cursive;
@@ -820,12 +798,12 @@ function setFilter(filter: string) {
 }
 
 .left-nav-btn.active {
-  background: rgba(243, 129, 129, 0.2);
+  background: rgba(243, 129, 129, 0.15);
   font-weight: 600;
 }
 
 .left-nav-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.15);
   transform: translateX(5px);
 }
 
@@ -851,14 +829,14 @@ function setFilter(filter: string) {
 
 /* 左侧中间：公告栏 */
 .left-notice-card {
-  background: rgba(255, 255, 255, 0.35);
-  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.15);
   border-radius: 14.4px;
   padding: 16px;
-  border: 1.6px solid rgba(166, 124, 82, 0.25);
-  margin: 8px 0;
+  margin: 15px 0;
+  border: 1.6px solid rgba(166, 124, 82, 0.2);
   display: flex;
   flex-direction: column;
+  width: 85%;
   /* 高度自适应设置 */
   max-height: 300px; /* 限制最大高度 */
   min-height: 96px; /* 确保最小高度 */
@@ -941,6 +919,7 @@ function setFilter(filter: string) {
 
 .logout-btn {
   background: linear-gradient(to right, #f38181, #f77d5f);
+  width: 75%;
 }
 
 /* 右侧主内容区：自适应宽度，避开左侧导航 */
@@ -1004,10 +983,10 @@ function setFilter(filter: string) {
   height: 54.4px;
   padding: 0 24px 0 56px;
   border-radius: 27.2px;
-  border: 1.6px solid rgba(166, 124, 82, 0.3);
+  border: 1.6px solid rgba(166, 124, 82, 0.4);
   font-size: 17.6px;
   outline: none;
-  background: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.35);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   transition: all 0.3s ease;
@@ -1022,7 +1001,7 @@ function setFilter(filter: string) {
 
 .search-input:focus {
   border-color: rgba(243, 129, 129, 0.7);
-  background: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.45);
   backdrop-filter: blur(15px);
   box-shadow: 0 0 0 3px rgba(243, 129, 129, 0.15);
 }
@@ -1033,9 +1012,9 @@ function setFilter(filter: string) {
   align-items: center;
   gap: 6.4px;
   padding: 9.6px 16px;
-  border: 1.6px solid rgba(166, 124, 82, 0.3);
+  border: 1.6px solid rgba(166, 124, 82, 0.4);
   border-radius: 22.4px;
-  background: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.35);
   backdrop-filter: blur(10px);
   color: #a67c52;
   font-family: "Comic Sans MS", cursive;
@@ -1132,8 +1111,8 @@ function setFilter(filter: string) {
 }
 
 .option-btn.active {
-  border-color: #ff3852;
-  background: #ff3852;
+  border-color: #f37f75;
+  background: #f37f75;
   color: white;
 }
 
@@ -1173,8 +1152,8 @@ function setFilter(filter: string) {
 }
 
 .collapse-btn {
-  border-color: #ff3852;
-  background: #ff3852;
+  border-color: #f37f75;
+  background: #f37f75;
   color: white;
   font-size: 16px;
 }
@@ -1185,11 +1164,11 @@ function setFilter(filter: string) {
 
 /* 筛选标签栏 */
 .filter-section {
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.25);
   backdrop-filter: blur(15px);
   border-radius: 20px;
   padding: 20px 25px;
-  border: 2px solid rgba(166, 124, 82, 0.15);
+  border: 2px solid rgba(166, 124, 82, 0.2);
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
   margin-bottom: 25px;
 }
