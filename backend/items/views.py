@@ -17,6 +17,10 @@ from .models import Item, Location, Claim, Category,ItemStatusHistory,ItemImage
 from django.db import transaction
 from django.utils.dateparse import parse_datetime
 
+from datetime import datetime
+
+
+
 
 @csrf_exempt
 def add_item(request):
@@ -55,6 +59,7 @@ def add_item(request):
     name = body.get('name')
     location_id = body.get('locationId')
     location_detail = body.get('locationDetail', '')
+    pickup_location = body.get('pickupLocation', '')   # 新增：领取地点
     happen_time = body.get('happenTime')
     feature = body.get('feature', '')
     reward_amount = body.get('rewardAmount', 0)
@@ -84,12 +89,23 @@ def add_item(request):
             'msg': 'itemCategory 参数非法'
         })
 
-    # 7. 业务规则：招领信息不能有悬赏
+    # 7. 解析时间（前端一般传字符串）
+    try:
+        # 示例格式：2026-02-01 14:30:00
+        happen_time = datetime.strptime(happen_time, '%Y-%m-%d %H:%M:%S')
+    except Exception:
+        return JsonResponse({
+            'code': 400,
+            'msg': 'happenTime 时间格式错误，应为 YYYY-MM-DD HH:MM:SS'
+        })
+
+    # 8. 业务规则
+    # 招领信息不能有悬赏
     if item_category == 2:
         reward_amount = 0
         reward_desc = ''
 
-    # 8. 创建 Item 对象
+    # 9. 创建 Item 对象
     try:
         item = Item.objects.create(
             user_id=user_id,
@@ -98,13 +114,14 @@ def add_item(request):
             name=name,
             location_id=location_id,
             location_detail=location_detail,
+            pickup_location=pickup_location,   # 新增字段
             happen_time=happen_time,
             feature=feature,
             reward_amount=reward_amount,
             reward_desc=reward_desc,
             contact_name=contact_name,
             contact_phone=contact_phone,
-            current_status=1,          # 1 = 待审核
+            current_status=1,                  # 1 = 待审核
             create_time=timezone.now(),
             update_time=timezone.now()
         )
@@ -115,7 +132,7 @@ def add_item(request):
             'error': str(e)
         })
 
-    # 9. 返回结果
+    # 10. 返回结果
     return JsonResponse({
         'code': 200,
         'msg': '发布成功',
@@ -123,6 +140,7 @@ def add_item(request):
             'itemId': item.id
         }
     })
+
 
 
 

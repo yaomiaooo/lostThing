@@ -40,6 +40,14 @@ class Item(models.Model):
         verbose_name="具体地点描述"
     )
 
+    # 领取地点说明（如：保卫处、宿管办公室）
+    pickup_location = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        verbose_name="领取地点"
+    )
+
     # 丢失 / 拾取时间
     happen_time = models.DateTimeField(
         verbose_name="发生时间"
