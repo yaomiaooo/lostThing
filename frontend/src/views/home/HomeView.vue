@@ -23,7 +23,7 @@
           </div>
           <div class="user-text">
             <div class="user-nickname">{{ user.realName }}</div>
-            <div class="user-subtitle">欢迎回来</div>
+            <div class="user-subtitle">欢迎回来^_^</div>
           </div>
         </div>
 
@@ -805,9 +805,10 @@ function setFilter(filter: string) {
   border: none;
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 16px;
   cursor: pointer;
-  padding: 14.4px 25.6px;
+  padding: 14.4px 50px;
   border-radius: 12.8px;
   transition: all 0.3s ease;
   font-family: "Comic Sans MS", cursive;
@@ -845,7 +846,7 @@ function setFilter(filter: string) {
 }
 
 .left-nav-btn .nav-text {
-  flex: 1;
+  font-size: 20px;
 }
 
 /* 左侧中间：公告栏 */
@@ -1070,18 +1071,18 @@ function setFilter(filter: string) {
   position: absolute;
   top: 100%;
   right: 0;
-  width: 90%;
-  max-width: 600px;
+  width: 85%;
+  max-width: 500px;
   background: white;
-  border-radius: 16px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
-  margin-top: 10px;
+  border-radius: 14px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+  margin-top: 8px;
   z-index: 100;
   overflow: hidden;
 }
 
 .panel-header {
-  padding: 20px 24px 16px;
+  padding: 16px 20px 12px;
   border-bottom: 1px solid #f0f0f0;
 }
 
@@ -1094,7 +1095,7 @@ function setFilter(filter: string) {
 }
 
 .filter-group {
-  padding: 20px 24px;
+  padding: 16px 20px;
   border-bottom: 1px solid #f0f0f0;
 }
 
@@ -1109,7 +1110,7 @@ function setFilter(filter: string) {
 .option-buttons {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 
 .option-btn {
@@ -1137,7 +1138,7 @@ function setFilter(filter: string) {
 }
 
 .panel-footer {
-  padding: 16px 24px 20px;
+  padding: 12px 20px 16px;
 }
 
 .footer-divider {
