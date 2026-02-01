@@ -93,7 +93,6 @@
                     }"
                     @click="changePublishType(type.value)"
                   >
-                    <span class="type-icon">{{ type.icon }}</span>
                     <span class="type-label">{{ type.label }}</span>
                     <span class="type-desc">{{ type.desc }}</span>
                   </button>
@@ -635,13 +634,11 @@ const publishTypes = [
     value: 1,
     label: '失物',
     desc: '寻找丢失物品',
-    icon: '🔍'
   },
   {
     value: 2,
     label: '招领',
     desc: '寻找失主',
-    icon: '🏷️'
   }
 ]
 
@@ -1513,6 +1510,7 @@ function goToDetail() {
 .type-option {
   flex: 1;
   min-width: 200px;
+  max-height: 100px;
   padding: 25px 20px;
   border: 2px solid rgba(166, 124, 82, 0.3);
   border-radius: 16px;
@@ -1551,7 +1549,7 @@ function goToDetail() {
 
 .type-label {
   font-family: "Comic Sans MS", cursive;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 600;
   color: #a67c52;
 }
