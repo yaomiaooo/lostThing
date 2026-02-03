@@ -145,33 +145,34 @@ def add_item(request):
 
 
 
-
 @require_GET
 def get_item_list(request):
     """
     6.4.2 物品列表查询
     URL: GET /api/item/list
-
-    查询参数（URL）：
-    - itemCategory: 1=失物，2=招领
-    - itemType: 分类ID
-    - locationId: 地点ID
-    - page: 页码（默认 1）
-    - size: 每页条数（默认 10）
     """
 
-    # ========= 1. 获取查询参数 =========
+    # ========= 1. 获取参数 =========
     item_category = request.GET.get('itemCategory')
     item_type = request.GET.get('itemType')
     location_id = request.GET.get('locationId')
+    status = request.GET.get('status')  # 关键参数
 
-    page = request.GET.get('page', 1)
-    size = request.GET.get('size', 10)
+    page = int(request.GET.get('page', 1))
+    size = int(request.GET.get('size', 10))
 
-    # ========= 2. 查询数据库（基础查询） =========
+    # ========= 2. 基础查询 =========
     queryset = Item.objects.all().order_by('-create_time')
 
-    # ========= 3. 按条件过滤 =========
+    # ========= 3. 状态过滤逻辑 =========
+    if status:
+        if status != 'all':
+            queryset = queryset.filter(current_status=status)
+    else:
+        # 普通用户默认：只看审核通过
+        queryset = queryset.filter(current_status=2)
+
+    # ========= 4. 其他筛选 =========
     if item_category:
         queryset = queryset.filter(item_category=item_category)
 
@@ -181,15 +182,14 @@ def get_item_list(request):
     if location_id:
         queryset = queryset.filter(location_id=location_id)
 
-    # ========= 4. 分页处理 =========
+    # ========= 5. 分页 =========
     paginator = Paginator(queryset, size)
     page_obj = paginator.get_page(page)
 
-    # ========= 5. 组装返回数据 =========
+    # ========= 6. 返回数据 =========
     data_list = []
 
     for item in page_obj:
-        # 查询地点名称（如果存在）
         location_name = ""
         if item.location_id:
             location = Location.objects.filter(id=item.location_id).first()
@@ -205,9 +205,10 @@ def get_item_list(request):
             "locationName": location_name,
             "happenTime": item.happen_time.strftime('%Y-%m-%d %H:%M:%S'),
             "rewardAmount": float(item.reward_amount),
+            "currentStatus": item.current_status,  # ⭐ 必须返回
+            "createTime": item.create_time.strftime('%Y-%m-%d %H:%M:%S'),
         })
 
-    # ========= 6. 返回统一 JSON =========
     return JsonResponse({
         "code": 200,
         "msg": "ok",

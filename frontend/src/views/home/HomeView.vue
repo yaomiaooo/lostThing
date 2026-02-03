@@ -173,9 +173,27 @@
         <!-- 筛选标签栏 -->
         <section class="filter-section">
           <div class="filter-tabs">
-            <button class="filter-tab active" @click="setFilter('all')">全部</button>
-            <button class="filter-tab" @click="setFilter('lost')">失物</button>
-            <button class="filter-tab" @click="setFilter('found')">招领</button>
+            <button 
+              class="filter-tab" 
+              :class="{ active: currentFilter === 'all' }"
+              @click="setFilter('all')"
+            >
+              全部
+            </button>
+            <button 
+              class="filter-tab" 
+              :class="{ active: currentFilter === 'lost' }"
+              @click="setFilter('lost')"
+            >
+              失物
+            </button>
+            <button 
+              class="filter-tab" 
+              :class="{ active: currentFilter === 'found' }"
+              @click="setFilter('found')"
+            >
+              招领
+            </button>
           </div>
         </section>
 
@@ -271,18 +289,10 @@ const user = ref({
   status: 0
 })
 
-/* ================= 物品推荐 ================= */
-const lostItems = ref<any[]>([])
-const foundItems = ref<any[]>([])
+/* ================= 物品数据 ================= */
+const allItems = ref<any[]>([]) // 所有物品数据
 const currentFilter = ref('all')
 const searchKeyword = ref('')
-const originalLostItems = ref<any[]>([])
-const originalFoundItems = ref<any[]>([])
-const allItems = ref<any[]>([]) // 所有物品数据
-
-/* ================= 物品详情卡片 ================= */
-const showItemDetail = ref(false)
-const currentItemId = ref<number>()
 
 /* ================= 筛选功能 ================= */
 const showFilterPanel = ref(false)
@@ -306,9 +316,7 @@ const locations = [
   { value: '教学楼', label: '教学楼' },
   { value: '宿舍楼', label: '宿舍楼' },
   { value: '食堂', label: '食堂' },
-  { value: '运动场', label: '运动场' },
-  { value: '实验室', label: '实验室' },
-  { value: '校门口', label: '校门口' }
+  { value: '运动场', label: '运动场' }
 ]
 
 const timeRanges = [
@@ -326,23 +334,22 @@ const itemStatuses = [
   { value: '3', label: '已完成' }
 ]
 
-// 计算属性：过滤后的物品列表
+/* ================= 计算属性：过滤后的物品列表 ================= */
 const filteredLostItems = computed(() => {
-  let items = [...allItems.value].filter(item => item.itemType === 1)
+  let items = allItems.value.filter(item => item.itemCategory === 1) // 使用 itemCategory 字段
   
   // 应用搜索关键词
   if (searchKeyword.value.trim()) {
     const keyword = searchKeyword.value.toLowerCase().trim()
     items = items.filter(item => 
       item.name?.toLowerCase().includes(keyword) ||
-      item.locationName?.toLowerCase().includes(keyword) ||
-      item.feature?.toLowerCase().includes(keyword)
+      item.locationName?.toLowerCase().includes(keyword)
     )
   }
   
   // 应用筛选条件
   if (filterParams.value.itemType) {
-    items = items.filter(item => item.itemType === parseInt(filterParams.value.itemType))
+    items = items.filter(item => item.itemCategory === parseInt(filterParams.value.itemType))
   }
   
   if (filterParams.value.location) {
@@ -351,30 +358,29 @@ const filteredLostItems = computed(() => {
   
   // 根据当前筛选器类型过滤
   if (currentFilter.value === 'lost') {
-    return items.slice(0, 8)
+    return items
   } else if (currentFilter.value === 'found') {
     return []
   } else {
-    return items.slice(0, 8)
+    return items
   }
 })
 
 const filteredFoundItems = computed(() => {
-  let items = [...allItems.value].filter(item => item.itemType === 2)
+  let items = allItems.value.filter(item => item.itemCategory === 2) // 使用 itemCategory 字段
   
   // 应用搜索关键词
   if (searchKeyword.value.trim()) {
     const keyword = searchKeyword.value.toLowerCase().trim()
     items = items.filter(item => 
       item.name?.toLowerCase().includes(keyword) ||
-      item.locationName?.toLowerCase().includes(keyword) ||
-      item.feature?.toLowerCase().includes(keyword)
+      item.locationName?.toLowerCase().includes(keyword)
     )
   }
   
   // 应用筛选条件
   if (filterParams.value.itemType) {
-    items = items.filter(item => item.itemType === parseInt(filterParams.value.itemType))
+    items = items.filter(item => item.itemCategory === parseInt(filterParams.value.itemType))
   }
   
   if (filterParams.value.location) {
@@ -383,20 +389,35 @@ const filteredFoundItems = computed(() => {
   
   // 根据当前筛选器类型过滤
   if (currentFilter.value === 'found') {
-    return items.slice(0, 8)
+    return items
   } else if (currentFilter.value === 'lost') {
     return []
   } else {
-    return items.slice(0, 8)
+    return items
   }
 })
 
-/** 筛选面板切换 */
+/* ================= 时间格式化 ================= */
+const currentTime = computed(() => {
+  const now = new Date()
+  return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
+})
+
+function formatTime(timeStr: string) {
+  if (!timeStr) return ''
+  const date = new Date(timeStr)
+  const month = date.getMonth() + 1
+  const day = date.getDate()
+  const hours = date.getHours()
+  const minutes = date.getMinutes()
+  return `${month}月${day}日 ${hours}:${minutes.toString().padStart(2, '0')}`
+}
+
+/* ================= 筛选功能方法 ================= */
 const toggleFilterPanel = () => {
   showFilterPanel.value = !showFilterPanel.value
 }
 
-/** 筛选条件切换 */
 const toggleFilter = (type: string, value: string) => {
   if (filterParams.value[type as keyof typeof filterParams.value] === value) {
     filterParams.value[type as keyof typeof filterParams.value] = ''
@@ -405,7 +426,6 @@ const toggleFilter = (type: string, value: string) => {
   }
 }
 
-/** 重置筛选 */
 const resetFilters = () => {
   filterParams.value = {
     itemType: '',
@@ -416,7 +436,7 @@ const resetFilters = () => {
   searchKeyword.value = ''
 }
 
-/** 搜索处理 - 使用防抖优化 */
+/* ================= 搜索处理 ================= */
 let searchTimer: any = null
 const handleSearch = () => {
   clearTimeout(searchTimer)
@@ -430,7 +450,7 @@ watch(filterParams, () => {
   // 筛选参数变化时，计算属性会自动重新计算
 }, { deep: true })
 
-/* ================= 左侧上半区核心导航 ================= */
+/* ================= 左侧导航栏 ================= */
 const navItems = reactive([
   {
     name: '发现',
@@ -464,11 +484,17 @@ const navItems = reactive([
   }
 ])
 
+/* ================= 物品详情卡片 ================= */
+const showItemDetail = ref(false)
+const currentItemId = ref<number>()
+
+/* ================= 生命周期 ================= */
 onMounted(() => {
   loadUser()
   loadItems()
 })
 
+/* ================= 数据加载 ================= */
 async function loadUser() {
   try {
     const res = await axios.get('/api/user/info')
@@ -492,15 +518,15 @@ async function loadUser() {
 async function loadItems() {
   try {
     const res = await axios.get('/api/item/list')
+    console.log('物品列表接口返回:', res.data)
+    
     if (res.data.code === 200) {
       const list = res.data.data.list
       allItems.value = list
       
-      // 初始化失物和招领列表
-      lostItems.value = list.filter((i: any) => i.itemType === 1).slice(0, 8)
-      foundItems.value = list.filter((i: any) => i.itemType === 2).slice(0, 8)
-      originalLostItems.value = [...lostItems.value]
-      originalFoundItems.value = [...foundItems.value]
+      console.log('失物数量:', list.filter((i: any) => i.itemCategory === 1).length)
+      console.log('招领数量:', list.filter((i: any) => i.itemCategory === 2).length)
+      console.log('所有物品:', list)
     }
   } catch (error) {
     console.error('加载物品列表失败:', error)
@@ -510,8 +536,8 @@ async function loadItems() {
         itemId: 1, 
         name: '校园卡（张三）', 
         locationName: '图书馆三楼自习区', 
-        itemType: 1,
         itemCategory: 1,
+        itemType: 101,
         happenTime: '2025-03-01 14:00:00',
         rewardAmount: 50,
         feature: '内有学生证和身份证'
@@ -520,8 +546,8 @@ async function loadItems() {
         itemId: 2, 
         name: '黑色雨伞', 
         locationName: '教学楼A栋门口', 
-        itemType: 1,
-        itemCategory: 2,
+        itemCategory: 1,
+        itemType: 201,
         happenTime: '2025-03-01 10:30:00',
         rewardAmount: 20,
         feature: '长柄黑色雨伞'
@@ -530,8 +556,8 @@ async function loadItems() {
         itemId: 3, 
         name: 'AirPods耳机', 
         locationName: '运动场看台', 
-        itemType: 1,
-        itemCategory: 3,
+        itemCategory: 1,
+        itemType: 202,
         happenTime: '2025-03-02 09:15:00',
         rewardAmount: 100,
         feature: '白色，右耳有划痕'
@@ -540,8 +566,8 @@ async function loadItems() {
         itemId: 4, 
         name: '水杯（蓝色）', 
         locationName: '食堂二楼', 
-        itemType: 1,
-        itemCategory: 4,
+        itemCategory: 1,
+        itemType: 301,
         happenTime: '2025-03-02 12:00:00',
         rewardAmount: 0,
         feature: '蓝色保温杯'
@@ -550,8 +576,8 @@ async function loadItems() {
         itemId: 5, 
         name: '钥匙串', 
         locationName: '宿舍楼下', 
-        itemType: 2,
-        itemCategory: 5,
+        itemCategory: 2,
+        itemType: 401,
         happenTime: '2025-03-01 16:45:00',
         rewardAmount: 0,
         feature: '3把钥匙，1个U盘'
@@ -560,8 +586,8 @@ async function loadItems() {
         itemId: 6, 
         name: '笔记本', 
         locationName: '实验室302', 
-        itemType: 2,
-        itemCategory: 6,
+        itemCategory: 2,
+        itemType: 501,
         happenTime: '2025-03-01 14:20:00',
         rewardAmount: 0,
         feature: '黑色笔记本，内有笔记'
@@ -570,8 +596,8 @@ async function loadItems() {
         itemId: 7, 
         name: '校园卡（李四）', 
         locationName: '校门口保安室', 
-        itemType: 2,
-        itemCategory: 1,
+        itemCategory: 2,
+        itemType: 101,
         happenTime: '2025-03-02 08:30:00',
         rewardAmount: 50,
         feature: '学号2023123457'
@@ -580,8 +606,8 @@ async function loadItems() {
         itemId: 8, 
         name: '背包', 
         locationName: '篮球场', 
-        itemType: 2,
-        itemCategory: 7,
+        itemCategory: 2,
+        itemType: 601,
         happenTime: '2025-03-02 15:00:00',
         rewardAmount: 100,
         feature: '黑色双肩包'
@@ -589,14 +615,10 @@ async function loadItems() {
     ]
     
     allItems.value = mockData
-    lostItems.value = mockData.filter(item => item.itemType === 1)
-    foundItems.value = mockData.filter(item => item.itemType === 2)
-    originalLostItems.value = [...lostItems.value]
-    originalFoundItems.value = [...foundItems.value]
   }
 }
 
-/* ================= 路由跳转 ================= */
+/* ================= 路由跳转和操作 ================= */
 function goDetail(id: number) {
   currentItemId.value = id
   showItemDetail.value = true
@@ -609,13 +631,12 @@ function handleDetailClose() {
 
 function handleClaim(itemId: number) {
   console.log('认领物品:', itemId)
-  // 这里可以添加认领逻辑
-  // 例如：router.push('/claim?itemId=' + itemId)
+  goDetail(itemId)
 }
 
 function handleContact(item: any) {
   console.log('联系发布者:', item)
-  // 这里可以添加联系逻辑
+  goDetail(item.itemId)
 }
 
 function goPublish() {
@@ -634,9 +655,12 @@ function goSettings() {
   router.push('/settings')
 }
 
+function setFilter(filter: 'all' | 'lost' | 'found') {
+  currentFilter.value = filter
+}
+
 async function logout() {
   try {
-    // 根据接口文档，退出登录需要调用接口
     const userId = user.value.id
     if (userId) {
       await axios.post('/api/user/logout', { userId })
@@ -644,37 +668,8 @@ async function logout() {
   } catch (error) {
     console.error('退出登录失败:', error)
   } finally {
-    // 清除本地存储
     localStorage.clear()
-    // 跳转到登录页
     router.push('/login')
-  }
-}
-
-/* ================= 筛选切换 ================= */
-function setFilter(filter: string) {
-  currentFilter.value = filter
-  
-  // 更新标签激活状态
-  const tabs = document.querySelectorAll('.filter-tab')
-  tabs.forEach(tab => tab.classList.remove('active'))
-  
-  // 根据filter值设置对应的tab为active
-  let activeIndex = 0
-  switch(filter) {
-    case 'all':
-      activeIndex = 0
-      break
-    case 'lost':
-      activeIndex = 1
-      break
-    case 'found':
-      activeIndex = 2
-      break
-  }
-  
-  if (tabs[activeIndex]) {
-    tabs[activeIndex].classList.add('active')
   }
 }
 </script>
