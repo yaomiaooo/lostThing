@@ -1305,7 +1305,7 @@ async function logout() {
   align-items: center;
   gap: 6.4px;
   font-family: "Comic Sans MS", cursive;
-  font-size: 12.8px;
+  font-size: 16px;
   color: rgba(166, 124, 82, 0.8);
 }
 
