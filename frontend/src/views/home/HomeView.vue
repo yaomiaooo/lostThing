@@ -251,9 +251,9 @@
     </div>
 
     <ItemDetailView
-      v-if="showItemDetail && currentItemId !== undefined"
-      v-model:visible="showItemDetail"
-      :item-id="currentItemId"
+      :visible="showItemDetail"
+      :itemId="currentItemId"
+      @close="handleDetailClose"
     />
   </div>
 </template>
@@ -473,12 +473,9 @@ const navItems = reactive([
 
 /* ================= 物品详情卡片 ================= */
 const showItemDetail = ref(false)
-const currentItemId = ref<number | undefined>(undefined)
+const currentItemId = ref<number | null>(null)
 
-const openDetail = (id: number) => {
-  currentItemId.value = id
-  showItemDetail.value = true
-}
+
 
 
 /* ================= 生命周期 ================= */
@@ -619,7 +616,7 @@ function goDetail(id: number) {
 
 function handleDetailClose() {
   showItemDetail.value = false
-  currentItemId.value = undefined
+  currentItemId.value = null
 }
 
 function handleClaim(itemId: number) {

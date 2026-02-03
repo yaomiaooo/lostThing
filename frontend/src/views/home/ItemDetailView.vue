@@ -1,146 +1,145 @@
 <template>
-  <Transition name="overlay-fade">
-    <div
-      v-if="visible"
-      class="overlay"
-      @click.self="handleClose"
-    >
-      <Transition name="card-zoom">
-        <div
-          v-if="loaded"
-          class="detail-card"
-        >
-          <!-- 关闭按钮 -->
-          <button class="close-btn" @click="handleClose">×</button>
+  <teleport to="body">
+    <transition name="mask-fade">
+      <div v-if="visible" class="detail-mask" @click.self="close">
+        <transition name="card-pop">
+          <div class="detail-card">
+            <!-- 关闭按钮 -->
+            <div class="close-btn" @click="close">×</div>
 
-          <!-- 加载中 -->
-          <div v-if="loading" class="loading">
-            加载中…
-          </div>
+            <!-- 内容区 -->
+            <div v-if="ready" class="card-content">
+              <!-- 左侧图片 -->
+              <div class="left-image">
+                <img
+                  v-if="images.length > 0"
+                  :src="images[0].url"
+                  @load="onImageLoad"
+                />
+                <div v-else class="no-image">暂无图片</div>
+              </div>
 
-          <!-- 内容区 -->
-          <div v-else class="content">
-            <h2 class="title">{{ detail.name }}</h2>
+              <!-- 右侧信息 -->
+              <div class="right-info">
+                <h2 class="title">{{ item.name }}</h2>
 
-            <div class="meta">
-              <span class="tag">
-                {{ detail.itemType === 1 ? '失物' : '招领' }}
-              </span>
-              <span class="tag gray">
-                {{ detail.itemCategory === 1 ? '个人物品' : '其他' }}
-              </span>
-            </div>
+                <div class="info-line">
+                  <span class="label">类型：</span>
+                  <span>{{ item.itemCategory === 1 ? '失物' : '招领' }}</span>
+                </div>
 
-            <div class="info">
-              <div class="row">
-                <label>发生时间</label>
-                <span>{{ detail.happenTime }}</span>
-              </div>
-              <div class="row">
-                <label>特征描述</label>
-                <span>{{ detail.feature || '无' }}</span>
-              </div>
-              <div class="row">
-                <label>悬赏金额</label>
-                <span>{{ detail.rewardAmount ? `¥${detail.rewardAmount}` : '无' }}</span>
-              </div>
-              <div class="row">
-                <label>悬赏说明</label>
-                <span>{{ detail.rewardDesc || '无' }}</span>
-              </div>
-              <div class="row">
-                <label>联系人</label>
-                <span>{{ detail.contactName }}</span>
-              </div>
-              <div class="row">
-                <label>联系电话</label>
-                <span>{{ detail.contactPhone }}</span>
+                <div class="info-line">
+                  <span class="label">地点：</span>
+                  <span>{{ location?.name }} {{ item.locationDetail }}</span>
+                </div>
+
+                <div class="info-line">
+                  <span class="label">时间：</span>
+                  <span>{{ item.happenTime }}</span>
+                </div>
+
+                <div class="info-block">
+                  <span class="label">特征描述：</span>
+                  <p>{{ item.feature }}</p>
+                </div>
+
+                <div class="info-line">
+                  <span class="label">联系人：</span>
+                  <span>{{ item.contactName }} {{ item.contactPhone }}</span>
+                </div>
+
+                <div v-if="item.rewardAmount > 0" class="reward">
+                  悬赏：￥{{ item.rewardAmount }}
+                </div>
               </div>
             </div>
 
-            <!-- 操作区 -->
-            <div class="actions">
-              <button class="primary" @click="handleClaim">
-                我要认领
-              </button>
+            <!-- loading 占位（关键：防止空卡片） -->
+            <div v-else class="loading">
+              加载中…
             </div>
           </div>
-        </div>
-      </Transition>
-    </div>
-  </Transition>
+        </transition>
+      </div>
+    </transition>
+  </teleport>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import axios from 'axios'
 
-/* ========== Props & Emits ========== */
 const props = defineProps<{
-  itemId: number
+  visible: boolean
+  itemId: number | null
 }>()
 
-const emit = defineEmits<{
-  (e: 'close'): void
-}>()
+const emit = defineEmits(['close'])
 
-/* ========== 状态 ========== */
-const visible = ref(true)
-const loading = ref(true)
-const loaded = ref(false)
+const ready = ref(false)
+const item = ref<any>({})
+const location = ref<any>(null)
+const images = ref<any[]>([])
 
-const detail = ref<any>({})
+const close = () => {
+  emit('close')
+}
 
-/* ========== 生命周期 ========== */
-onMounted(() => {
-  fetchDetail()
-})
-
-watch(
-  () => props.itemId,
-  () => {
-    fetchDetail()
-  }
-)
-
-/* ========== 方法 ========== */
-const fetchDetail = async () => {
-  loading.value = true
-  loaded.value = false
+const loadDetail = async () => {
+  if (!props.itemId) return
+  ready.value = false
 
   try {
     const res = await axios.get('/api/item/detail', {
       params: { itemId: props.itemId }
     })
 
-    if (res.data.code === 200) {
-      detail.value = res.data.data
-      loaded.value = true
-    }
-  } finally {
-    loading.value = false
+    const data = res.data.data
+    item.value = data.item
+    location.value = data.location
+    images.value = data.images || []
+
+    ready.value = true
+  } catch (e) {
+    console.error(e)
   }
 }
 
-const handleClose = () => {
-  visible.value = false
-  setTimeout(() => {
-    emit('close')
-  }, 200)
+watch(
+  () => props.itemId,
+  () => {
+    if (props.visible) loadDetail()
+  }
+)
+
+watch(
+  () => props.visible,
+  (v) => {
+    if (v && props.itemId) loadDetail()
+  }
+)
+
+// ESC 关闭
+const onKeydown = (e: KeyboardEvent) => {
+  if (e.key === 'Escape') close()
 }
 
-const handleClaim = async () => {
-  await axios.post('/api/item/claim', {
-    itemId: props.itemId,
-    proofFeature: ''
-  })
-  alert('认领申请已提交')
+onMounted(() => {
+  window.addEventListener('keydown', onKeydown)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeydown)
+})
+
+const onImageLoad = () => {
+  // 图片加载完成后卡片已存在，不会闪
 }
 </script>
 
 <style scoped>
-/* ========== 遮罩层 ========== */
-.overlay {
+/* 遮罩 */
+.detail-mask {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.45);
@@ -150,101 +149,115 @@ const handleClaim = async () => {
   justify-content: center;
 }
 
-/* ========== 卡片 ========== */
+/* 卡片主体 */
 .detail-card {
-  width: 90%;
-  max-width: 560px;
-  max-height: 85vh;
-  background: #fff;
-  border-radius: 16px;
-  padding: 24px;
-  overflow-y: auto;
   position: relative;
+  height: 520px;              /* 高度固定 */
+  max-width: 90vw;
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
 }
 
 /* 关闭按钮 */
 .close-btn {
   position: absolute;
-  top: 12px;
-  right: 16px;
+  right: 14px;
+  top: 10px;
   font-size: 22px;
-  border: none;
-  background: none;
   cursor: pointer;
+  z-index: 10;
 }
 
 /* 内容 */
+.card-content {
+  display: flex;
+  height: 100%;
+}
+
+/* 左图 */
+.left-image {
+  height: 100%;
+  background: #f6f6f6;
+}
+
+.left-image img {
+  height: 100%;
+  width: auto;                /* 宽度随图片 */
+  display: block;
+}
+
+.no-image {
+  width: 300px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #999;
+}
+
+/* 右侧信息 */
+.right-info {
+  width: 360px;
+  padding: 20px;
+  overflow-y: auto;
+}
+
 .title {
-  font-size: 20px;
-  font-weight: 600;
   margin-bottom: 12px;
 }
 
-.meta {
+.info-line {
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.info-block {
+  margin-bottom: 12px;
+}
+
+.label {
+  color: #666;
+  margin-right: 6px;
+}
+
+.reward {
+  margin-top: 10px;
+  color: #e4393c;
+  font-weight: bold;
+}
+
+/* loading */
+.loading {
+  width: 500px;
+  height: 520px;
   display: flex;
-  gap: 8px;
-  margin-bottom: 16px;
+  align-items: center;
+  justify-content: center;
+  color: #999;
 }
 
-.tag {
-  background: #3b82f6;
-  color: #fff;
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 12px;
+/* 动画 */
+.mask-fade-enter-active,
+.mask-fade-leave-active {
+  transition: opacity 0.25s;
 }
-
-.tag.gray {
-  background: #9ca3af;
-}
-
-.info .row {
-  display: flex;
-  margin-bottom: 10px;
-}
-
-.info label {
-  width: 90px;
-  color: #6b7280;
-}
-
-.actions {
-  margin-top: 20px;
-  text-align: right;
-}
-
-.primary {
-  background: #3b82f6;
-  color: white;
-  border: none;
-  padding: 10px 18px;
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-/* ========== 动画 ========== */
-.overlay-fade-enter-active,
-.overlay-fade-leave-active {
-  transition: opacity 0.2s ease;
-}
-
-.overlay-fade-enter-from,
-.overlay-fade-leave-to {
+.mask-fade-enter-from,
+.mask-fade-leave-to {
   opacity: 0;
 }
 
-.card-zoom-enter-active,
-.card-zoom-leave-active {
-  transition: all 0.25s ease;
+.card-pop-enter-active,
+.card-pop-leave-active {
+  transition: all 0.3s ease;
 }
-
-.card-zoom-enter-from {
+.card-pop-enter-from {
+  transform: scale(0.96);
   opacity: 0;
-  transform: scale(0.95) translateY(20px);
 }
-
-.card-zoom-leave-to {
+.card-pop-leave-to {
+  transform: scale(0.96);
   opacity: 0;
-  transform: scale(0.95) translateY(20px);
 }
 </style>
