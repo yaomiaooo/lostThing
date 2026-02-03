@@ -28,4 +28,7 @@ urlpatterns = [
 
     # 6.4.8 获取地点树
     path('/location/tree', views.get_location_tree),
+
+    # 6.4.9 获取物品图片
+    path('/image/<int:image_id>', views.get_item_image),
 ]

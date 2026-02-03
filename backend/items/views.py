@@ -225,16 +225,14 @@ def get_item_detail(request):
     GET /api/item/detail?itemId=1
     """
 
-    # 1. 取参数
     item_id = request.GET.get("itemId")
-
     if not item_id:
         return JsonResponse({
             "code": 400,
             "msg": "缺少 itemId 参数"
         })
 
-    # 2. 查数据库
+    # 1. 查询物品
     try:
         item = Item.objects.get(id=item_id)
     except Item.DoesNotExist:
@@ -243,22 +241,77 @@ def get_item_detail(request):
             "msg": "物品不存在"
         })
 
-    # 3. 返回数据
+    # 2. 查询分类
+    category = Category.objects.filter(id=item.item_type).first()
+
+    # 3. 查询地点
+    location = Location.objects.filter(id=item.location_id).first()
+
+    # 4. 查询图片（不返回二进制）
+    images = ItemImage.objects.filter(
+        item_id=item.id
+    ).order_by("sort")
+
+    image_list = []
+    for img in images:
+        image_list.append({
+            "id": img.id,
+            "url": f"/api/item/image/{img.id}",
+            "type": img.image_type,
+            "sort": img.sort
+        })
+
+    # 5. 查询状态历史
+    histories = ItemStatusHistory.objects.filter(
+        item_id=item.id
+    ).order_by("operate_time")
+
+    history_list = []
+    for h in histories:
+        history_list.append({
+            "oldStatus": h.old_status,
+            "newStatus": h.new_status,
+            "operatorId": h.operator_id,
+            "operatorType": h.operator_type,
+            "reason": h.operate_reason,
+            "operateTime": h.operate_time.strftime("%Y-%m-%d %H:%M:%S")
+        })
+
+    # 6. 组装返回数据
     data = {
-        "id": item.id,
-        "userId": item.user_id,
-        "itemType": item.item_type,
-        "itemCategory": item.item_category,
-        "name": item.name,
-        "locationId": item.location_id,
-        "happenTime": item.happen_time.strftime("%Y-%m-%d %H:%M:%S"),
-        "feature": item.feature,
-        "rewardAmount": float(item.reward_amount),
-        "rewardDesc": item.reward_desc,
-        "contactName": item.contact_name,
-        "contactPhone": item.contact_phone,
-        "currentStatus": item.current_status,
-        "createTime": item.create_time.strftime("%Y-%m-%d %H:%M:%S")
+        "item": {
+            "id": item.id,
+            "userId": item.user_id,
+            "itemType": item.item_type,
+            "itemCategory": item.item_category,
+            "name": item.name,
+            "locationId": item.location_id,
+            "locationDetail": item.location_detail,
+            "pickupLocation": item.pickup_location,
+            "happenTime": item.happen_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "feature": item.feature,
+            "rewardAmount": float(item.reward_amount),
+            "rewardDesc": item.reward_desc,
+            "contactName": item.contact_name,
+            "contactPhone": item.contact_phone,
+            "currentStatus": item.current_status,
+            "rejectReason": item.reject_reason,
+            "archiveDesc": item.archive_desc,
+            "auditUserId": item.audit_user_id,
+            "auditTime": item.audit_time.strftime("%Y-%m-%d %H:%M:%S") if item.audit_time else None,
+            "createTime": item.create_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "updateTime": item.update_time.strftime("%Y-%m-%d %H:%M:%S")
+        },
+        "category": {
+            "id": category.id,
+            "name": category.name
+        } if category else None,
+        "location": {
+            "id": location.id,
+            "name": location.name
+        } if location else None,
+        "images": image_list,
+        "statusHistory": history_list
     }
 
     return JsonResponse({
@@ -266,7 +319,6 @@ def get_item_detail(request):
         "msg": "查询成功",
         "data": data
     })
-
 
 @csrf_exempt
 @require_POST
@@ -571,3 +623,26 @@ def get_location_tree(request):
         "msg": "success",
         "data": tree
     })
+
+from django.http import HttpResponse
+
+def get_item_image(request, image_id):
+    """
+    获取物品图片
+    GET /api/item/image/{image_id}
+    """
+    if request.method != "GET":
+        return JsonResponse({
+            "code": 405,
+            "msg": "请求方式不允许"
+        })
+
+    try:
+        img = ItemImage.objects.get(id=image_id)
+    except ItemImage.DoesNotExist:
+        return HttpResponse(status=404)
+
+    return HttpResponse(
+        img.image_data,
+        content_type="image/jpeg"
+    )

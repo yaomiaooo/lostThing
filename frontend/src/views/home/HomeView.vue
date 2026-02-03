@@ -241,6 +241,15 @@
         </div>
       </main>
     </div>
+
+    <!-- 物品详情卡片 -->
+    <ItemDetailView
+      v-model:visible="showItemDetail"
+      :item-id="currentItemId"
+      @close="handleDetailClose"
+      @claim="handleClaim"
+      @contact="handleContact"
+    />
   </div>
 </template>
 
@@ -248,6 +257,7 @@
 import { ref, onMounted, reactive, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
+import ItemDetailView from './ItemDetailView.vue'
 
 const router = useRouter()
 
@@ -269,6 +279,10 @@ const searchKeyword = ref('')
 const originalLostItems = ref<any[]>([])
 const originalFoundItems = ref<any[]>([])
 const allItems = ref<any[]>([]) // 所有物品数据
+
+/* ================= 物品详情卡片 ================= */
+const showItemDetail = ref(false)
+const currentItemId = ref<number>()
 
 /* ================= 筛选功能 ================= */
 const showFilterPanel = ref(false)
@@ -584,7 +598,24 @@ async function loadItems() {
 
 /* ================= 路由跳转 ================= */
 function goDetail(id: number) {
-  router.push(`/item/detail?itemId=${id}`)
+  currentItemId.value = id
+  showItemDetail.value = true
+}
+
+function handleDetailClose() {
+  showItemDetail.value = false
+  currentItemId.value = undefined
+}
+
+function handleClaim(itemId: number) {
+  console.log('认领物品:', itemId)
+  // 这里可以添加认领逻辑
+  // 例如：router.push('/claim?itemId=' + itemId)
+}
+
+function handleContact(item: any) {
+  console.log('联系发布者:', item)
+  // 这里可以添加联系逻辑
 }
 
 function goPublish() {
