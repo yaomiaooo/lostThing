@@ -197,62 +197,52 @@
           </div>
         </section>
 
-        <!-- 瀑布流卡片容器 -->
+        <!-- ✅ 瀑布流容器（真正 masonry） -->
         <div class="waterfall-grid">
-          <!-- 失物卡片 -->
+          <!-- 失物 -->
           <div
             v-for="item in filteredLostItems"
             :key="`lost-${item.itemId}`"
-            class="waterfall-card item-card lost-card"
+            class="waterfall-card lost-card"
             @click="goDetail(item.itemId)"
           >
-            <div class="card-image-container">
-              <img class="card-image" src="/home/avatar.png" />
-              <div class="card-tag lost-tag">失物</div>
-            </div>
+            <img
+              class="card-image"
+              :src="item.firstImageUrl || '/home/默认.jpg'"
+            />
+            <div class="card-tag lost-tag">失物</div>
+
             <div class="card-content">
               <div class="card-name">{{ item.name }}</div>
               <div class="card-info">
-                <span class="info-item">
-                  <span class="info-icon">📍</span>
-                  {{ item.locationName }}
-                </span>
-                <span class="info-item">
-                  <span class="info-icon">🕒</span>
-                  2小时前
-                </span>
+                <span class="info-item">📍 {{ item.locationName }}</span>
               </div>
               <div class="card-footer">
-                <button class="detail-btn" @click.stop="goDetail(item.itemId)">查看详情</button>
+                <button class="detail-btn">查看详情</button>
               </div>
             </div>
           </div>
 
-          <!-- 招领卡片 -->
+          <!-- 招领 -->
           <div
             v-for="item in filteredFoundItems"
             :key="`found-${item.itemId}`"
-            class="waterfall-card item-card found-card"
+            class="waterfall-card found-card"
             @click="goDetail(item.itemId)"
           >
-            <div class="card-image-container">
-              <img class="card-image" src="/home/avatar.png" />
-              <div class="card-tag found-tag">招领</div>
-            </div>
+            <img
+              class="card-image"
+              :src="item.firstImageUrl || '/home/默认.jpg'"
+            />
+            <div class="card-tag found-tag">招领</div>
+
             <div class="card-content">
               <div class="card-name">{{ item.name }}</div>
               <div class="card-info">
-                <span class="info-item">
-                  <span class="info-icon">📍</span>
-                  {{ item.locationName }}
-                </span>
-                <span class="info-item">
-                  <span class="info-icon">🕒</span>
-                  1天前
-                </span>
+                <span class="info-item">📍 {{ item.locationName }}</span>
               </div>
               <div class="card-footer">
-                <button class="detail-btn" @click.stop="goDetail(item.itemId)">查看详情</button>
+                <button class="detail-btn">查看详情</button>
               </div>
             </div>
           </div>
@@ -260,13 +250,10 @@
       </main>
     </div>
 
-    <!-- 物品详情卡片 -->
     <ItemDetailView
+      v-if="showItemDetail && currentItemId !== undefined"
       v-model:visible="showItemDetail"
       :item-id="currentItemId"
-      @close="handleDetailClose"
-      @claim="handleClaim"
-      @contact="handleContact"
     />
   </div>
 </template>
@@ -486,7 +473,13 @@ const navItems = reactive([
 
 /* ================= 物品详情卡片 ================= */
 const showItemDetail = ref(false)
-const currentItemId = ref<number>()
+const currentItemId = ref<number | undefined>(undefined)
+
+const openDetail = (id: number) => {
+  currentItemId.value = id
+  showItemDetail.value = true
+}
+
 
 /* ================= 生命周期 ================= */
 onMounted(() => {
@@ -1230,30 +1223,23 @@ async function logout() {
 
 /* 瀑布流网格 */
 .waterfall-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 20px;
+  column-count: 4;
+  column-gap: 20px;
 }
 
 /* 瀑布流卡片基础样式 */
 .waterfall-card {
-  background: rgba(255, 255, 255, 0.35);
-  backdrop-filter: blur(15px);
+  break-inside: avoid;
+  margin-bottom: 20px;
+  background: rgba(255,255,255,0.35);
   border-radius: 16px;
   overflow: hidden;
-  border: 1.6px solid rgba(166, 124, 82, 0.2);
-  transition: all 0.3s ease;
-  cursor: pointer;
   position: relative;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
+  transition: 0.3s;
 }
 
 .waterfall-card:hover {
-  transform: translateY(-5px);
-  border-color: rgba(243, 129, 129, 0.5);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
+  transform: translateY(-6px);
 }
 
 /* 物品卡片样式 */
@@ -1265,9 +1251,8 @@ async function logout() {
 
 .card-image {
   width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform 0.3s ease;
+  height: auto;
+  display: block;
 }
 
 .waterfall-card:hover .card-image {
@@ -1371,6 +1356,9 @@ body {
   .layout-container {
     flex-direction: column;
   }
+    .waterfall-grid {
+    column-count: 2;
+  }
 
   /* 左侧导航移至底部，横向布局 */
   .left-nav {
@@ -1451,10 +1439,6 @@ body {
     padding-bottom: 90px; /* 给底部导航留空间 */
   }
 
-  .waterfall-grid {
-    grid-template-columns: 1fr;
-    gap: 20px;
-  }
 
   .filter-tabs {
     justify-content: center;
@@ -1464,7 +1448,7 @@ body {
 /* 平板端适配（769px-1024px） */
 @media (min-width: 769px) and (max-width: 1024px) {
   .waterfall-grid {
-    grid-template-columns: repeat(2, 1fr);
+    column-count: 3;
   }
 
   .left-nav {

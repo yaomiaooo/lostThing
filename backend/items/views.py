@@ -195,6 +195,14 @@ def get_item_list(request):
             location = Location.objects.filter(id=item.location_id).first()
             if location:
                 location_name = location.name
+       # 查询该物品的第一张图片
+        first_image = ItemImage.objects.filter(
+            item_id=item.id
+        ).order_by("sort").first()
+
+        first_image_url = None
+        if first_image:
+            first_image_url = f"/api/item/image/{first_image.id}"
 
         data_list.append({
             "itemId": item.id,
@@ -205,8 +213,9 @@ def get_item_list(request):
             "locationName": location_name,
             "happenTime": item.happen_time.strftime('%Y-%m-%d %H:%M:%S'),
             "rewardAmount": float(item.reward_amount),
-            "currentStatus": item.current_status,  # ⭐ 必须返回
+            "currentStatus": item.current_status,  
             "createTime": item.create_time.strftime('%Y-%m-%d %H:%M:%S'),
+            "firstImageUrl": first_image_url   # 新增：物品的第一张图片
         })
 
     return JsonResponse({
