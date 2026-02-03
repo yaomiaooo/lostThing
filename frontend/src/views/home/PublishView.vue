@@ -72,420 +72,442 @@
             <div class="form-subtitle">请仔细填写以下信息，确保准确无误</div>
           </div>
 
-          <!-- 表单内容 -->
+          <!-- 表单内容 - 优化双栏布局 -->
           <form @submit.prevent="submitForm" class="form-content">
-            <!-- 发布类型 -->
-            <div class="form-section">
-              <div class="section-header">
-                <h3 class="section-title">发布类型</h3>
-                <span class="required-mark">*</span>
-              </div>
-              <div class="form-row">
-                <div class="type-options">
-                  <button
-                    v-for="type in publishTypes"
-                    :key="type.value"
-                    type="button"
-                    class="type-option"
-                    :class="{ 
-                      active: formData.itemCategory === type.value,
-                      disabled: submitting
-                    }"
-                    @click="changePublishType(type.value)"
-                  >
-                    <span class="type-label">{{ type.label }}</span>
-                    <span class="type-desc">{{ type.desc }}</span>
-                  </button>
+            <!-- 左栏：基础信息 -->
+            <div class="form-left-column">
+              <!-- 发布类型 -->
+              <div class="form-section">
+                <div class="section-header">
+                  <h3 class="section-title">发布类型</h3>
+                  <span class="required-mark">*</span>
                 </div>
-                <div v-if="formErrors.itemCategory" class="error-message">
-                  {{ formErrors.itemCategory }}
-                </div>
-              </div>
-            </div>
-
-            <!-- 物品分类 -->
-            <div class="form-section">
-            <div class="section-header">
-                <h3 class="section-title">物品分类</h3>
-                <span class="required-mark">*</span>
-            </div>
-            <div class="form-row">
-                <div class="cascader-group">
-                <!-- 一级分类 -->
-                <div class="cascader-level">
-                    <label class="cascader-label">一级分类</label>
-                    <select 
-                    v-model="selectedFirstCategory"
-                    class="cascader-select"
-                    :disabled="submitting || !categoryTree.length"
-                    @change="onFirstCategoryChange"
-                    >
-                    
-                    <option 
-                        v-for="cat in firstCategories" 
-                        :key="cat.id"
-                        :value="cat.id"
-                    >
-                        {{ cat.name }}
-                    </option>
-                    </select>
-                </div>
-
-                <!-- 二级分类 -->
-                <div class="cascader-level">
-                    <label class="cascader-label">二级分类</label>
-                    <select 
-                    v-model="selectedSecondCategory"
-                    class="cascader-select"
-                    :disabled="submitting || !selectedFirstCategory"
-                    @change="onSecondCategoryChange"
-                    >
-                 
-                    <option 
-                        v-for="cat in secondCategories" 
-                        :key="cat.id"
-                        :value="cat.id"
-                    >
-                        {{ cat.name }}
-                    </option>
-                    </select>
-                </div>
-                </div>
-                <div v-if="formErrors.itemType" class="error-message">
-                {{ formErrors.itemType }}
-                </div>
-            </div>
-            </div>
-
-            <!-- 物品名称 -->
-            <div class="form-section">
-              <div class="section-header">
-                <h3 class="section-title">物品名称</h3>
-                <span class="required-mark">*</span>
-              </div>
-              <div class="form-row">
-                <input
-                  v-model="formData.name"
-                  type="text"
-                  class="form-input"
-                  :class="{ error: formErrors.name }"
-                  placeholder="请输入物品名称，如：黑色蓝牙耳机"
-                  :disabled="submitting"
-                  maxlength="50"
-                />
-                <div v-if="formErrors.name" class="error-message">
-                  {{ formErrors.name }}
-                </div>
-                <div class="input-hint">不超过50个字符</div>
-              </div>
-            </div>
-
-            <!-- 地点信息 -->
-            <div class="form-section">
-              <div class="section-header">
-                <h3 class="section-title">地点信息</h3>
-                <span class="required-mark">*</span>
-              </div>
-              <div class="form-row">
-                <div class="cascader-group">
-                  <!-- 校区 -->
-                  <div class="cascader-level">
-                    <label class="cascader-label">校区</label>
-                    <select 
-                      v-model="selectedCampus"
-                      class="cascader-select"
-                      :disabled="submitting || !locationTree.length"
-                      @change="onCampusChange"
-                    >
-                     
-                      <option 
-                        v-for="campus in campuses" 
-                        :key="campus.id"
-                        :value="campus.id"
-                      >
-                        {{ campus.name }}
-                      </option>
-                    </select>
-                  </div>
-
-                  <!-- 区域 -->
-                  <div class="cascader-level">
-                    <label class="cascader-label">区域</label>
-                    <select 
-                      v-model="selectedArea"
-                      class="cascader-select"
-                      :disabled="submitting || !selectedCampus"
-                      @change="onAreaChange"
-                    >
-                      
-                      <option 
-                        v-for="area in areas" 
-                        :key="area.id"
-                        :value="area.id"
-                      >
-                        {{ area.name }}
-                      </option>
-                    </select>
-                  </div>
-
-                  <!-- 具体地点 -->
-                  <div class="cascader-level">
-                    <label class="cascader-label">具体地点</label>
-                    <select 
-                      v-model="selectedLocation"
-                      class="cascader-select"
-                      :disabled="submitting || !selectedArea"
-                      @change="onLocationChange"
-                    >
-                      
-                      <option 
-                        v-for="location in locations" 
-                        :key="location.id"
-                        :value="location.id"
-                      >
-                        {{ location.name }}
-                      </option>
-                    </select>
-                  </div>
-                </div>
-                
-                <!-- 具体地点补充 -->
                 <div class="form-row">
-                  <label class="form-label">具体位置补充</label>
-                  <input
-                    v-model="formData.locationDetail"
-                    type="text"
-                    class="form-input"
-                    :class="{ error: formErrors.locationDetail }"
-                    placeholder="如：三楼自习区、操场跑道内侧、A楼门口"
-                    :disabled="submitting"
-                    maxlength="255"
-                  />
+                  <div class="horizontal-options">
+                    <button
+                      v-for="type in publishTypes"
+                      :key="type.value"
+                      type="button"
+                      class="type-option horizontal-option"
+                      :class="{ 
+                        active: formData.itemCategory === type.value,
+                        disabled: submitting
+                      }"
+                      @click="changePublishType(type.value)"
+                    >
+                      <span class="type-label">{{ type.label }}</span>
+                      <span class="type-desc">{{ type.desc }}</span>
+                    </button>
+                  </div>
+                  <div v-if="formErrors.itemCategory" class="error-message">
+                    {{ formErrors.itemCategory }}
+                  </div>
+                </div>
+              </div>
+
+              <!-- 物品分类与名称水平排列 -->
+              <div class="horizontal-group">
+                <!-- 物品分类 -->
+                <div class="form-section compact-section">
+                  <div class="section-header">
+                    <h3 class="section-title">物品分类</h3>
+                    <span class="required-mark">*</span>
+                  </div>
+                  <div class="form-row">
+                    <div class="compact-cascader">
+                      <!-- 一级分类 -->
+                      <div class="compact-level">
+                        <label class="compact-label">一级分类</label>
+                        <select 
+                          v-model="selectedFirstCategory"
+                          class="compact-select"
+                          :disabled="submitting || !categoryTree.length"
+                          @change="onFirstCategoryChange"
+                        >
+                          <option 
+                            v-for="cat in firstCategories" 
+                            :key="cat.id"
+                            :value="cat.id"
+                          >
+                            {{ cat.name }}
+                          </option>
+                        </select>
+                      </div>
+
+                      <!-- 二级分类 -->
+                      <div class="compact-level">
+                        <label class="compact-label">二级分类</label>
+                        <select 
+                          v-model="selectedSecondCategory"
+                          class="compact-select"
+                          :disabled="submitting || !selectedFirstCategory"
+                          @change="onSecondCategoryChange"
+                        >
+                          <option 
+                            v-for="cat in secondCategories" 
+                            :key="cat.id"
+                            :value="cat.id"
+                          >
+                            {{ cat.name }}
+                          </option>
+                        </select>
+                      </div>
+                    </div>
+                    <div v-if="formErrors.itemType" class="error-message">
+                      {{ formErrors.itemType }}
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 物品名称 -->
+                <div class="form-section compact-section">
+                  <div class="section-header">
+                    <h3 class="section-title">物品名称</h3>
+                    <span class="required-mark">*</span>
+                  </div>
+                  <div class="form-row">
+                    <input
+                      v-model="formData.name"
+                      type="text"
+                      class="form-input compact-input"
+                      :class="{ error: formErrors.name }"
+                      placeholder="如：黑色蓝牙耳机"
+                      :disabled="submitting"
+                      maxlength="50"
+                    />
+                    <div v-if="formErrors.name" class="error-message">
+                      {{ formErrors.name }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 地点信息 -->
+              <div class="form-section">
+                <div class="section-header">
+                  <h3 class="section-title">地点信息</h3>
+                  <span class="required-mark">*</span>
+                </div>
+                <div class="form-row">
+                  <div class="location-cascader">
+                    <!-- 校区 -->
+                    <div class="compact-level">
+                      <label class="compact-label">校区</label>
+                      <select 
+                        v-model="selectedCampus"
+                        class="compact-select"
+                        :disabled="submitting || !locationTree.length"
+                        @change="onCampusChange"
+                      >
+                        <option 
+                          v-for="campus in campuses" 
+                          :key="campus.id"
+                          :value="campus.id"
+                        >
+                          {{ campus.name }}
+                        </option>
+                      </select>
+                    </div>
+
+                    <!-- 区域 -->
+                    <div class="compact-level">
+                      <label class="compact-label">区域</label>
+                      <select 
+                        v-model="selectedArea"
+                        class="compact-select"
+                        :disabled="submitting || !selectedCampus"
+                        @change="onAreaChange"
+                      >
+                        <option 
+                          v-for="area in areas" 
+                          :key="area.id"
+                          :value="area.id"
+                        >
+                          {{ area.name }}
+                        </option>
+                      </select>
+                    </div>
+
+                    <!-- 具体地点 -->
+                    <div class="compact-level">
+                      <label class="compact-label">具体地点</label>
+                      <select 
+                        v-model="selectedLocation"
+                        class="compact-select"
+                        :disabled="submitting || !selectedArea"
+                        @change="onLocationChange"
+                      >
+                        <option 
+                          v-for="location in locations" 
+                          :key="location.id"
+                          :value="location.id"
+                        >
+                          {{ location.name }}
+                        </option>
+                      </select>
+                    </div>
+                  </div>
+                  
+                  <!-- 具体地点补充 -->
+                  <div class="compact-level">
+                    <label class="compact-label">位置补充</label>
+                    <input
+                      v-model="formData.locationDetail"
+                      type="text"
+                      class="compact-input"
+                      :class="{ error: formErrors.locationDetail }"
+                      placeholder="如：三楼自习区、操场跑道内侧"
+                      :disabled="submitting"
+                      maxlength="255"
+                    />
+                  </div>
+                  
                   <div v-if="formErrors.locationDetail" class="error-message">
                     {{ formErrors.locationDetail }}
                   </div>
-                  <div class="input-hint">补充具体位置信息，不超过255个字符</div>
                 </div>
               </div>
-            </div>
 
-            <!-- 时间信息 -->
-            <div class="form-section">
-              <div class="section-header">
-                <h3 class="section-title">{{ formData.itemCategory === 1 ? '丢失时间' : '发现时间' }}</h3>
-                <span class="required-mark">*</span>
-              </div>
-              <div class="form-row">
-                <input
-                  v-model="formData.happenTime"
-                  type="datetime-local"
-                  class="form-input datetime-input"
-                  :class="{ error: formErrors.happenTime }"
-                  :disabled="submitting"
-                />
-                <div v-if="formErrors.happenTime" class="error-message">
-                  {{ formErrors.happenTime }}
-                </div>
-              </div>
-            </div>
-
-            <!-- 特征描述 -->
-            <div class="form-section">
-              <div class="section-header">
-                <h3 class="section-title">特征描述</h3>
-                <span class="required-mark">*</span>
-              </div>
-              <div class="form-row">
-                <textarea
-                  v-model="formData.feature"
-                  class="form-textarea"
-                  :class="{ error: formErrors.feature }"
-                  placeholder="请详细描述物品特征，如：颜色、大小、品牌、磨损情况、特殊标记等"
-                  :disabled="submitting"
-                  rows="4"
-                  maxlength="1000"
-                ></textarea>
-                <div v-if="formErrors.feature" class="error-message">
-                  {{ formErrors.feature }}
-                </div>
-                <div class="input-hint">请详细描述，不少于2个字符，不超过1000字符</div>
-              </div>
-            </div>
-
-            <!-- 图片上传 -->
-            <div class="form-section">
-              <div class="section-header">
-                <h3 class="section-title">上传图片</h3>
-                <span class="optional-mark">（可选）</span>
-              </div>
-              <div class="form-row">
-                <div class="image-uploader">
-                  <!-- 上传区域 -->
-                  <div 
-                    class="upload-area"
-                    :class="{ disabled: submitting, 'drag-over': dragOver }"
-                    @click="triggerFileInput"
-                    @dragover.prevent="handleDragOver"
-                    @dragleave.prevent="handleDragLeave"
-                    @drop.prevent="handleDrop"
-                  >
-                    <div class="upload-icon">
-                      <img src="/home/上传.svg" alt="上传" class="upload-svg" />
-                    </div>
-                    <p class="upload-text">点击或拖拽上传图片</p>
-                    <p class="upload-hint">最多5张，每张不超过5MB</p>
-                    <p class="upload-hint">支持 JPG、PNG 格式</p>
+              <!-- 时间与悬赏信息水平排列 -->
+              <div class="horizontal-group">
+                <!-- 时间信息 -->
+                <div class="form-section compact-section">
+                  <div class="section-header">
+                    <h3 class="section-title">{{ formData.itemCategory === 1 ? '丢失时间' : '发现时间' }}</h3>
+                    <span class="required-mark">*</span>
                   </div>
-                  <input
-                    ref="fileInput"
-                    type="file"
-                    multiple
-                    accept="image/*"
-                    class="file-input"
-                    @change="handleFileSelect"
-                    :disabled="submitting"
-                  />
-
-                  <!-- 图片预览区 -->
-                  <div v-if="images.length > 0" class="image-preview-container">
-                    <div class="preview-header">
-                      <span class="preview-title">已上传图片（{{ images.length }}/5）</span>
-                      <span class="preview-hint">拖动图片可调整顺序</span>
+                  <div class="form-row">
+                    <input
+                      v-model="formData.happenTime"
+                      type="datetime-local"
+                      class="form-input compact-input datetime-input"
+                      :class="{ error: formErrors.happenTime }"
+                      :disabled="submitting"
+                    />
+                    <div v-if="formErrors.happenTime" class="error-message">
+                      {{ formErrors.happenTime }}
                     </div>
-                    <div class="image-preview">
-                      <div 
-                        v-for="(image, index) in images"
-                        :key="index"
-                        class="preview-item"
-                        draggable="true"
-                        @dragstart="handleDragStart(index)"
-                        @dragover.prevent
-                        @drop="handleDropSort(index)"
-                      >
-                        <img :src="image.previewUrl" class="preview-image" />
-                        <div class="preview-overlay">
-                          <button 
-                            type="button"
-                            class="delete-btn"
-                            @click.stop="removeImage(index)"
-                            :disabled="submitting"
-                          >
-                            ×
-                          </button>
-                          <div class="sort-handle" title="拖动排序">≡</div>
-                        </div>
-                        <div class="preview-index">{{ index + 1 }}</div>
+                  </div>
+                </div>
+
+                <!-- 悬赏金额（仅失物） -->
+                <div v-if="formData.itemCategory === 1" class="form-section compact-section">
+                  <div class="section-header">
+                    <h3 class="section-title">悬赏金额</h3>
+                    <span class="optional-mark">（元）</span>
+                  </div>
+                  <div class="form-row">
+                    <div class="reward-amount-input">
+                      <div class="currency-input">
+                        <span class="currency-symbol">¥</span>
+                        <input
+                          v-model="formData.rewardAmount"
+                          type="number"
+                          class="form-input compact-input reward-input"
+                          :class="{ error: formErrors.rewardAmount }"
+                          placeholder="0.00"
+                          :disabled="submitting"
+                          min="0"
+                          max="999999.99"
+                          step="0.01"
+                        />
+                      </div>
+                      <div v-if="formErrors.rewardAmount" class="error-message">
+                        {{ formErrors.rewardAmount }}
                       </div>
                     </div>
                   </div>
                 </div>
-                <div v-if="formErrors.images" class="error-message">
-                  {{ formErrors.images }}
+
+                <!-- 领取地点（仅招领） -->
+                <div v-if="formData.itemCategory === 2" class="form-section compact-section">
+                  <div class="section-header">
+                    <h3 class="section-title">领取地点</h3>
+                    <span class="optional-mark">（可选）</span>
+                  </div>
+                  <div class="form-row">
+                    <input
+                      v-model="formData.pickupLocation"
+                      type="text"
+                      class="form-input compact-input"
+                      :class="{ error: formErrors.pickupLocation }"
+                      placeholder="如：保卫处值班室"
+                      :disabled="submitting"
+                      maxlength="255"
+                    />
+                    <div v-if="formErrors.pickupLocation" class="error-message">
+                      {{ formErrors.pickupLocation }}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <!-- 悬赏信息（仅失物） -->
-            <div v-if="formData.itemCategory === 1" class="form-section">
-              <div class="section-header">
-                <h3 class="section-title">悬赏信息</h3>
-                <span class="optional-mark">（可选）</span>
-              </div>
-              <div class="form-row">
-                <div class="reward-group">
-                  <div class="reward-input-group">
-                    <label class="reward-label">悬赏金额</label>
-                    <div class="reward-amount-input">
-                      <span class="currency-symbol">¥</span>
-                      <input
-                        v-model="formData.rewardAmount"
-                        type="number"
-                        class="form-input reward-input"
-                        :class="{ error: formErrors.rewardAmount }"
-                        placeholder="0.00"
-                        :disabled="submitting"
-                        min="0"
-                        max="999999.99"
-                        step="0.01"
-                      />
+            <!-- 右栏：详细信息 -->
+            <div class="form-right-column">
+              <!-- 特征描述 -->
+              <div class="form-section">
+                <div class="section-header">
+                  <h3 class="section-title">特征描述</h3>
+                  <span class="required-mark">*</span>
+                </div>
+                <div class="form-row">
+                  <textarea
+                    v-model="formData.feature"
+                    class="form-textarea"
+                    :class="{ error: formErrors.feature }"
+                    placeholder="请详细描述物品特征，如：颜色、大小、品牌、磨损情况、特殊标记等"
+                    :disabled="submitting"
+                    rows="6"
+                    maxlength="1000"
+                  ></textarea>
+                  <div class="textarea-footer">
+                    <div v-if="formErrors.feature" class="error-message">
+                      {{ formErrors.feature }}
                     </div>
-                    <div class="input-hint">单位：元，可不填</div>
+                    <div class="char-counter">{{ formData.feature.length }}/1000</div>
                   </div>
-                  
-                  <div class="reward-input-group">
-                    <label class="reward-label">悬赏说明</label>
+                </div>
+              </div>
+
+              <!-- 图片上传 -->
+              <div class="form-section">
+                <div class="section-header">
+                  <h3 class="section-title">上传图片</h3>
+                  <span class="optional-mark">（最多5张）</span>
+                </div>
+                <div class="form-row">
+                  <div class="compact-uploader">
+                    <!-- 上传区域 -->
+                    <div 
+                      class="upload-area compact-upload-area"
+                      :class="{ disabled: submitting, 'drag-over': dragOver }"
+                      @click="triggerFileInput"
+                      @dragover.prevent="handleDragOver"
+                      @dragleave.prevent="handleDragLeave"
+                      @drop.prevent="handleDrop"
+                    >
+                      <div class="upload-icon">
+                        <img src="/home/上传.svg" alt="上传" class="upload-svg" />
+                      </div>
+                      <p class="upload-text">点击或拖拽上传图片</p>
+                      <p class="upload-hint">每张不超过5MB</p>
+                    </div>
+                    <input
+                      ref="fileInput"
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      class="file-input"
+                      @change="handleFileSelect"
+                      :disabled="submitting"
+                    />
+
+                    <!-- 图片预览区 -->
+                    <div v-if="images.length > 0" class="compact-preview">
+                      <div class="preview-header">
+                        <span class="preview-title">已上传 {{ images.length }}/5</span>
+                        <button 
+                          type="button"
+                          class="clear-all-btn"
+                          @click="clearAllImages"
+                          :disabled="submitting"
+                        >
+                          清空
+                        </button>
+                      </div>
+                      <div class="image-grid">
+                        <div 
+                          v-for="(image, index) in images"
+                          :key="index"
+                          class="grid-item"
+                          draggable="true"
+                          @dragstart="handleDragStart(index)"
+                          @dragover.prevent
+                          @drop="handleDropSort(index)"
+                        >
+                          <img :src="image.previewUrl" class="grid-image" />
+                          <div class="grid-overlay">
+                            <button 
+                              type="button"
+                              class="grid-delete-btn"
+                              @click.stop="removeImage(index)"
+                              :disabled="submitting"
+                            >
+                              ×
+                            </button>
+                            <div class="grid-sort" title="拖动排序">↕</div>
+                          </div>
+                          <div class="grid-index">{{ index + 1 }}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div v-if="formErrors.images" class="error-message">
+                    {{ formErrors.images }}
+                  </div>
+                </div>
+              </div>
+
+              <!-- 悬赏说明与联系人水平排列 -->
+              <div class="horizontal-group">
+                <!-- 悬赏说明（仅失物） -->
+                <div v-if="formData.itemCategory === 1" class="form-section compact-section">
+                  <div class="section-header">
+                    <h3 class="section-title">悬赏说明</h3>
+                    <span class="optional-mark">（可选）</span>
+                  </div>
+                  <div class="form-row">
                     <input
                       v-model="formData.rewardDesc"
                       type="text"
-                      class="form-input"
+                      class="form-input compact-input"
                       :class="{ error: formErrors.rewardDesc }"
-                      placeholder="如：找到必有重谢、提供线索也有奖励"
+                      placeholder="如：找到必有重谢"
                       :disabled="submitting"
                       maxlength="200"
                     />
-                    <div class="input-hint">不超过200个字符</div>
+                    <div v-if="formErrors.rewardDesc" class="error-message">
+                      {{ formErrors.rewardDesc }}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
 
-            <!-- 领取地点（仅招领） -->
-            <div v-if="formData.itemCategory === 2" class="form-section">
-              <div class="section-header">
-                <h3 class="section-title">领取地点说明</h3>
-                <span class="optional-mark">（可选）</span>
-              </div>
-              <div class="form-row">
-                <input
-                  v-model="formData.pickupLocation"
-                  type="text"
-                  class="form-input"
-                  :class="{ error: formErrors.pickupLocation }"
-                  placeholder="如：保卫处值班室、宿管办公室、图书馆服务台"
-                  :disabled="submitting"
-                  maxlength="255"
-                />
-                <div v-if="formErrors.pickupLocation" class="error-message">
-                  {{ formErrors.pickupLocation }}
-                </div>
-                <div class="input-hint">告知失主在哪里领取物品</div>
-              </div>
-            </div>
-
-            <!-- 联系人信息 -->
-            <div class="form-section">
-              <div class="section-header">
-                <h3 class="section-title">联系人信息</h3>
-                <span class="required-mark">*</span>
-              </div>
-              <div class="form-row">
-                <div class="contact-group">
-                  <div class="contact-input-group">
-                    <label class="contact-label">联系人姓名</label>
-                    <input
-                      v-model="formData.contactName"
-                      type="text"
-                      class="form-input"
-                      :class="{ error: formErrors.contactName }"
-                      :disabled="submitting"
-                      maxlength="20"
-                    />
+                <!-- 联系人信息 -->
+                <div class="form-section compact-section">
+                  <div class="section-header">
+                    <h3 class="section-title">联系人</h3>
+                    <span class="required-mark">*</span>
+                  </div>
+                  <div class="form-row">
+                    <div class="compact-contact">
+                      <div class="contact-field">
+                        <label class="compact-label">姓名</label>
+                        <input
+                          v-model="formData.contactName"
+                          type="text"
+                          class="compact-input"
+                          :class="{ error: formErrors.contactName }"
+                          :disabled="submitting"
+                          maxlength="20"
+                        />
+                      </div>
+                      <div class="contact-field">
+                        <label class="compact-label">电话</label>
+                        <input
+                          v-model="formData.contactPhone"
+                          type="tel"
+                          class="compact-input"
+                          :class="{ error: formErrors.contactPhone }"
+                          :disabled="submitting"
+                          placeholder="11位手机号"
+                          maxlength="11"
+                        />
+                      </div>
+                    </div>
                     <div v-if="formErrors.contactName" class="error-message">
                       {{ formErrors.contactName }}
                     </div>
-                  </div>
-                  
-                  <div class="contact-input-group">
-                    <label class="contact-label">联系电话</label>
-                    <input
-                      v-model="formData.contactPhone"
-                      type="tel"
-                      class="form-input"
-                      :class="{ error: formErrors.contactPhone }"
-                      :disabled="submitting"
-                      placeholder="11位手机号码"
-                      maxlength="11"
-                    />
                     <div v-if="formErrors.contactPhone" class="error-message">
                       {{ formErrors.contactPhone }}
                     </div>
@@ -494,7 +516,7 @@
               </div>
             </div>
 
-            <!-- 表单操作按钮 -->
+            <!-- 表单操作按钮（全宽） -->
             <div class="form-actions">
               <button
                 type="button"
@@ -547,7 +569,6 @@
 import { ref, onMounted, reactive, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
-import type { AxiosProgressEvent } from 'axios'
 
 const router = useRouter()
 
@@ -643,16 +664,14 @@ const publishTypes = [
 ]
 
 /* ================= 分类选择器 ================= */
-const categoryTree = ref<any[]>([]) // 存储原始的树形结构
+const categoryTree = ref<any[]>([])
 const selectedFirstCategory = ref<number>(0)
 const selectedSecondCategory = ref<number>(0)
 
-// 计算一级分类（直接取根节点）
 const firstCategories = computed(() => {
   return categoryTree.value
 })
 
-// 计算二级分类（根据选择的一级分类，取它的children）
 const secondCategories = computed(() => {
   if (!selectedFirstCategory.value) return []
   const selectedFirst = categoryTree.value.find(cat => cat.id === selectedFirstCategory.value)
@@ -660,27 +679,23 @@ const secondCategories = computed(() => {
 })
 
 /* ================= 地点选择器 ================= */
-const locationTree = ref<any[]>([]) // 存储原始的树形结构
+const locationTree = ref<any[]>([])
 const selectedCampus = ref<number>(0)
 const selectedArea = ref<number>(0)
 const selectedLocation = ref<number>(0)
 
-// 计算校区（直接取根节点）
 const campuses = computed(() => {
   return locationTree.value
 })
 
-// 计算区域（根据选择的校区，取它的children）
 const areas = computed(() => {
   if (!selectedCampus.value) return []
   const selectedCampusNode = locationTree.value.find(loc => loc.id === selectedCampus.value)
   return selectedCampusNode?.children || []
 })
 
-// 计算具体地点（根据选择的区域，取它的children）
 const locations = computed(() => {
   if (!selectedArea.value) return []
-  // 在所有校区中查找选择的区域
   for (const campus of locationTree.value) {
     if (campus.children) {
       const selectedAreaNode = campus.children.find((area: any) => area.id === selectedArea.value)
@@ -706,7 +721,6 @@ const publishedItemId = ref<number | null>(null)
 /* ================= 工具函数 ================= */
 function getDefaultDateTime(): string {
   const now = new Date()
-  // 格式化为 YYYY-MM-DDTHH:mm
   const year = now.getFullYear()
   const month = String(now.getMonth() + 1).padStart(2, '0')
   const day = String(now.getDate()).padStart(2, '0')
@@ -733,24 +747,19 @@ async function loadUser() {
     const res = await axios.get('/api/user/info')
     if (res.data.code === 0) {
       user.value = res.data.data
-      // 自动填充联系人信息
       formData.contactName = user.value.realName
       formData.contactPhone = user.value.phone
     }
   } catch (error) {
     console.error('加载用户信息失败:', error)
-    // 不设置模拟数据，保持为空
   }
 }
 
 async function loadCategoryTree() {
   try {
     const res = await axios.get('/api/item/category/tree')
-    console.log('分类树接口返回:', res.data)
-    
     if (res.data.code === 200 && Array.isArray(res.data.data)) {
       categoryTree.value = res.data.data
-      console.log('分类树加载成功:', categoryTree.value)
     } else {
       console.error('分类树接口返回的数据格式不正确')
       categoryTree.value = []
@@ -764,11 +773,8 @@ async function loadCategoryTree() {
 async function loadLocationTree() {
   try {
     const res = await axios.get('/api/item/location/tree')
-    console.log('地点树接口返回:', res.data)
-    
     if (res.data.code === 200 && Array.isArray(res.data.data)) {
       locationTree.value = res.data.data
-      console.log('地点树加载成功:', locationTree.value)
     } else {
       console.error('地点树接口返回的数据格式不正确')
       locationTree.value = []
@@ -783,7 +789,6 @@ async function loadLocationTree() {
 function changePublishType(type: number) {
   if (submitting.value) return
   formData.itemCategory = type
-  // 重置一些字段
   formData.rewardAmount = 0
   formData.rewardDesc = ''
   formData.pickupLocation = ''
@@ -835,7 +840,7 @@ function handleFileSelect(event: Event) {
   if (!files) return
   
   handleFiles(Array.from(files))
-  target.value = '' // 重置input
+  target.value = ''
 }
 
 function handleDragOver(event: DragEvent) {
@@ -861,7 +866,6 @@ function handleDrop(event: DragEvent) {
 }
 
 function handleFiles(fileList: File[]) {
-  // 检查数量限制
   const remainingSlots = 5 - images.value.length
   if (remainingSlots <= 0) {
     formErrors.images = '最多只能上传5张图片'
@@ -871,19 +875,16 @@ function handleFiles(fileList: File[]) {
   const validFiles = fileList.slice(0, remainingSlots)
   
   validFiles.forEach(file => {
-    // 检查文件类型
     if (!file.type.startsWith('image/')) {
       formErrors.images = '只能上传图片文件'
       return
     }
     
-    // 检查文件大小（5MB）
     if (file.size > 5 * 1024 * 1024) {
       formErrors.images = '图片大小不能超过5MB'
       return
     }
     
-    // 创建预览URL
     const previewUrl = URL.createObjectURL(file)
     images.value.push({ file, previewUrl })
   })
@@ -893,9 +894,17 @@ function handleFiles(fileList: File[]) {
 
 function removeImage(index: number) {
   if (submitting.value) return
-  // 释放预览URL
   URL.revokeObjectURL(images.value[index].previewUrl)
   images.value.splice(index, 1)
+  clearFormError('images')
+}
+
+function clearAllImages() {
+  if (submitting.value) return
+  images.value.forEach(image => {
+    URL.revokeObjectURL(image.previewUrl)
+  })
+  images.value = []
   clearFormError('images')
 }
 
@@ -907,7 +916,6 @@ function handleDragStart(index: number) {
 function handleDropSort(dropIndex: number) {
   if (draggedImageIndex.value === null || draggedImageIndex.value === dropIndex) return
   
-  // 交换图片位置
   const temp = images.value[draggedImageIndex.value]
   images.value.splice(draggedImageIndex.value, 1)
   images.value.splice(dropIndex, 0, temp)
@@ -919,24 +927,20 @@ function handleDropSort(dropIndex: number) {
 function validateForm(): boolean {
   let isValid = true
   
-  // 清空所有错误信息
   Object.keys(formErrors).forEach(key => {
     formErrors[key as keyof typeof formErrors] = ''
   })
   
-  // 验证发布类型
   if (!formData.itemCategory) {
     formErrors.itemCategory = '请选择发布类型'
     isValid = false
   }
   
-  // 验证物品分类
   if (!formData.itemType) {
     formErrors.itemType = '请选择物品分类'
     isValid = false
   }
   
-  // 验证物品名称
   if (!formData.name.trim()) {
     formErrors.name = '请输入物品名称'
     isValid = false
@@ -945,7 +949,6 @@ function validateForm(): boolean {
     isValid = false
   }
   
-  // 验证地点
   if (!formData.locationId) {
     formErrors.locationId = '请选择地点'
     isValid = false
@@ -956,7 +959,6 @@ function validateForm(): boolean {
     isValid = false
   }
   
-  // 验证时间
   if (!formData.happenTime) {
     formErrors.happenTime = '请选择时间'
     isValid = false
@@ -969,7 +971,6 @@ function validateForm(): boolean {
     }
   }
   
-  // 验证特征描述
   if (!formData.feature.trim()) {
     formErrors.feature = '请输入特征描述'
     isValid = false
@@ -981,7 +982,6 @@ function validateForm(): boolean {
     isValid = false
   }
   
-  // 验证悬赏金额
   if (formData.rewardAmount) {
     if (formData.rewardAmount < 0) {
       formErrors.rewardAmount = '悬赏金额不能为负数'
@@ -992,19 +992,16 @@ function validateForm(): boolean {
     }
   }
   
-  // 验证悬赏说明
   if (formData.rewardDesc && formData.rewardDesc.length > 200) {
     formErrors.rewardDesc = '悬赏说明不能超过200个字符'
     isValid = false
   }
   
-  // 验证领取地点
   if (formData.pickupLocation && formData.pickupLocation.length > 255) {
     formErrors.pickupLocation = '领取地点不能超过255个字符'
     isValid = false
   }
   
-  // 验证联系人姓名
   if (!formData.contactName.trim()) {
     formErrors.contactName = '请输入联系人姓名'
     isValid = false
@@ -1013,7 +1010,6 @@ function validateForm(): boolean {
     isValid = false
   }
   
-  // 验证联系电话
   if (!formData.contactPhone.trim()) {
     formErrors.contactPhone = '请输入联系电话'
     isValid = false
@@ -1033,9 +1029,7 @@ function clearFormError(field: keyof typeof formErrors) {
 async function submitForm() {
   if (submitting.value) return
   
-  // 验证表单
   if (!validateForm()) {
-    // 滚动到第一个错误位置
     const firstError = Object.keys(formErrors).find(key => formErrors[key as keyof typeof formErrors])
     if (firstError) {
       const errorElement = document.querySelector(`.error-message`)
@@ -1047,7 +1041,6 @@ async function submitForm() {
   submitting.value = true
   
   try {
-    // 准备提交数据
     const submitData = {
       ...formData,
       happenTime: formatDateTime(formData.happenTime),
@@ -1057,20 +1050,16 @@ async function submitForm() {
       locationDetail: formData.locationDetail || ''
     }
     
-    // 第一步：发布物品信息
-    console.log('提交物品信息:', submitData)
     const itemRes = await axios.post('/api/item', submitData)
     
     if (itemRes.data.code === 200) {
       const itemId = itemRes.data.data.itemId
       publishedItemId.value = itemId
       
-      // 第二步：如果有图片，上传图片
       if (images.value.length > 0) {
         await uploadImages(itemId)
       }
       
-      // 显示成功提示
       showSuccessModal.value = true
     } else {
       throw new Error(itemRes.data.msg || '发布失败')
@@ -1084,14 +1073,11 @@ async function submitForm() {
 }
 
 function formatDateTime(datetimeLocal: string): string {
-  // 将 YYYY-MM-DDTHH:mm 格式转换为 YYYY-MM-DD HH:mm:00
   return datetimeLocal.replace('T', ' ') + ':00'
 }
 
-/* ================= 图片上传 ================= */
 async function uploadImages(itemId: number) {
   const uploadPromises = images.value.map(async (image, index) => {
-    // 使用 uploadFormData 作为变量名，避免与组件中的 formData 冲突
     const uploadFormData = new FormData()
     uploadFormData.append('itemId', itemId.toString())
     uploadFormData.append('imageType', formData.itemCategory.toString())
@@ -1104,14 +1090,11 @@ async function uploadImages(itemId: number) {
           'Content-Type': 'multipart/form-data'
         }
       })
-      console.log(`图片${index + 1}上传成功`)
     } catch (error) {
       console.error(`图片${index + 1}上传失败:`, error)
-      // 图片上传失败不影响主流程
     }
   })
   
-  // 并行上传所有图片
   await Promise.all(uploadPromises)
 }
 
@@ -1184,7 +1167,6 @@ function goToDetail() {
 }
 
 /* ================= 左侧导航栏 ================= */
-/* 复用首页样式，这里只做微小调整 */
 .left-nav {
   width: 288px;
   height: 100vh;
@@ -1426,7 +1408,7 @@ function goToDetail() {
   padding: 40px;
   border: 2px solid rgba(166, 124, 82, 0.2);
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
-  max-width: 1000px;
+  max-width: 1400px;
   margin: 0 auto;
 }
 
@@ -1449,36 +1431,71 @@ function goToDetail() {
   color: rgba(166, 124, 82, 0.7);
 }
 
-/* 表单内容 */
+/* 表单内容 - 优化双栏布局 */
 .form-content {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 30px;
 }
 
-.form-section {
-  border-bottom: 1px solid rgba(166, 124, 82, 0.1);
-  padding-bottom: 30px;
+/* 左右两栏基本样式 */
+.form-left-column,
+.form-right-column {
+  flex: 1;
+  min-width: 450px;
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
 }
 
-.form-section:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
+/* 水平分组容器 */
+.horizontal-group {
+  display: flex;
+  gap: 20px;
+  width: 100%;
+}
+
+.horizontal-group .compact-section {
+  flex: 1;
+  min-width: 0; /* 防止子元素溢出 */
+}
+
+/* 表单部分通用样式 */
+.form-section {
+  border-radius: 12px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(166, 124, 82, 0.1);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+}
+
+.form-section:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.compact-section {
+  padding: 18px;
+  margin-bottom: 0;
 }
 
 .section-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 20px;
+  margin-bottom: 15px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(166, 124, 82, 0.1);
 }
 
 .section-title {
   font-family: "Comic Sans MS", cursive;
-  font-size: 22px;
+  font-size: 18px;
   color: #a67c52;
   font-weight: 600;
   margin: 0;
+  white-space: nowrap;
 }
 
 .required-mark {
@@ -1488,32 +1505,31 @@ function goToDetail() {
 
 .optional-mark {
   color: rgba(166, 124, 82, 0.5);
-  font-size: 16px;
+  font-size: 14px;
   font-style: italic;
+  white-space: nowrap;
 }
 
 .form-row {
-  margin-bottom: 15px;
+  margin-bottom: 12px;
 }
 
 .form-row:last-child {
   margin-bottom: 0;
 }
 
-/* 发布类型选项 */
-.type-options {
+/* 发布类型选项 - 水平布局 */
+.horizontal-options {
   display: flex;
-  gap: 20px;
-  flex-wrap: wrap;
+  gap: 15px;
+  width: 100%;
 }
 
-.type-option {
+.horizontal-option {
   flex: 1;
-  min-width: 200px;
-  max-height: 100px;
-  padding: 25px 20px;
+  padding: 18px 15px;
   border: 2px solid rgba(166, 124, 82, 0.3);
-  border-radius: 16px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.3);
   cursor: pointer;
   transition: all 0.3s ease;
@@ -1521,138 +1537,146 @@ function goToDetail() {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 8px;
+  min-height: 100px;
 }
 
-.type-option:hover:not(.active):not(.disabled) {
+.horizontal-option:hover:not(.active):not(.disabled) {
   border-color: rgba(243, 129, 129, 0.5);
   background: rgba(255, 255, 255, 0.4);
   transform: translateY(-2px);
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
 }
 
-.type-option.active {
+.horizontal-option.active {
   border-color: #f38181;
   background: linear-gradient(135deg, rgba(243, 129, 129, 0.1), rgba(247, 125, 95, 0.1));
   box-shadow: 0 4px 20px rgba(243, 129, 129, 0.2);
 }
 
-.type-option.disabled {
+.horizontal-option.disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
 .type-icon {
-  font-size: 36px;
+  font-size: 28px;
   margin-bottom: 5px;
 }
 
 .type-label {
   font-family: "Comic Sans MS", cursive;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
   color: #a67c52;
 }
 
 .type-desc {
   font-family: "Comic Sans MS", cursive;
-  font-size: 14px;
+  font-size: 13px;
   color: rgba(166, 124, 82, 0.7);
+  text-align: center;
+  line-height: 1.3;
 }
 
-/* 级联选择器 */
-.cascader-group {
+/* 紧凑型级联选择器 */
+.compact-cascader {
   display: flex;
-  gap: 20px;
-  flex-wrap: wrap;
-  margin-bottom: 20px;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 
-.cascader-level {
-  flex: 1;
-  min-width: 200px;
+.location-cascader {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 12px;
 }
 
-.cascader-label {
-  display: block;
+.compact-level {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.compact-label {
   font-family: "Comic Sans MS", cursive;
-  font-size: 16px;
+  font-size: 14px;
   color: #a67c52;
-  margin-bottom: 8px;
   font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.cascader-select {
+.compact-select {
   width: 100%;
-  padding: 12px 16px;
+  padding: 10px 12px;
   border: 1.6px solid rgba(166, 124, 82, 0.4);
-  border-radius: 12px;
+  border-radius: 10px;
   background: rgba(255, 255, 255, 0.4);
   font-family: "Comic Sans MS", cursive;
-  font-size: 16px;
+  font-size: 14px;
   color: #a67c52;
   cursor: pointer;
   transition: all 0.3s ease;
   outline: none;
-}
-
-.cascader-select:focus {
-  border-color: rgba(243, 129, 129, 0.7);
-  background: rgba(255, 255, 255, 0.6);
-  box-shadow: 0 0 0 3px rgba(243, 129, 129, 0.15);
-}
-
-.cascader-select:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* 表单输入框 */
-.form-label {
-  display: block;
-  font-family: "Comic Sans MS", cursive;
-  font-size: 16px;
-  color: #a67c52;
-  margin-bottom: 8px;
-  font-weight: 500;
-}
-
-.form-input {
-  width: 100%;
-  padding: 12px 16px;
-  border: 1.6px solid rgba(166, 124, 82, 0.4);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.4);
-  font-family: "Comic Sans MS", cursive;
-  font-size: 16px;
-  color: #a67c52;
-  transition: all 0.3s ease;
-  outline: none;
+  min-height: 42px;
   box-sizing: border-box;
 }
 
-.form-input::placeholder {
-  color: rgba(166, 124, 82, 0.5);
-}
-
-.form-input:focus {
+.compact-select:focus {
   border-color: rgba(243, 129, 129, 0.7);
   background: rgba(255, 255, 255, 0.6);
   box-shadow: 0 0 0 3px rgba(243, 129, 129, 0.15);
 }
 
-.form-input:disabled {
+.compact-select:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.form-input.error {
+/* 紧凑型输入框 */
+.compact-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1.6px solid rgba(166, 124, 82, 0.4);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.4);
+  font-family: "Comic Sans MS", cursive;
+  font-size: 14px;
+  color: #a67c52;
+  transition: all 0.3s ease;
+  outline: none;
+  min-height: 42px;
+  box-sizing: border-box;
+}
+
+.compact-input::placeholder {
+  color: rgba(166, 124, 82, 0.5);
+  font-size: 13px;
+}
+
+.compact-input:focus {
+  border-color: rgba(243, 129, 129, 0.7);
+  background: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 0 0 3px rgba(243, 129, 129, 0.15);
+}
+
+.compact-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.compact-input.error {
   border-color: #ff4d4f;
   background: rgba(255, 77, 79, 0.05);
 }
 
 .datetime-input {
-  max-width: 300px;
+  width: 100%;
+  font-size: 14px;
 }
 
 /* 文本域 */
@@ -1663,12 +1687,12 @@ function goToDetail() {
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.4);
   font-family: "Comic Sans MS", cursive;
-  font-size: 16px;
+  font-size: 15px;
   color: #a67c52;
   transition: all 0.3s ease;
   outline: none;
   resize: vertical;
-  min-height: 120px;
+  min-height: 160px;
   box-sizing: border-box;
 }
 
@@ -1692,119 +1716,168 @@ function goToDetail() {
   background: rgba(255, 77, 79, 0.05);
 }
 
-/* 图片上传区域 */
-.image-uploader {
-  position: relative;
-}
-
-.upload-area {
-  border: 2px dashed rgba(166, 124, 82, 0.4);
-  border-radius: 12px;
-  padding: 40px 20px;
-  background: rgba(255, 255, 255, 0.2);
-  text-align: center;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  margin-bottom: 20px;
-}
-
-.upload-area:hover:not(.disabled) {
-  border-color: rgba(243, 129, 129, 0.6);
-  background: rgba(255, 255, 255, 0.3);
-}
-
-.upload-area.drag-over {
-  border-color: #f38181;
-  background: rgba(243, 129, 129, 0.1);
-}
-
-.upload-area.disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.upload-icon {
-  margin-bottom: 15px;
-}
-
-.upload-svg {
-  width: 60px;
-  height: 60px;
-  object-fit: contain;
-  filter: brightness(0.8);
-}
-
-.upload-text {
-  font-family: "Comic Sans MS", cursive;
-  font-size: 18px;
-  color: #a67c52;
-  margin-bottom: 8px;
-  font-weight: 500;
-}
-
-.upload-hint {
-  font-family: "Comic Sans MS", cursive;
-  font-size: 14px;
-  color: rgba(166, 124, 82, 0.6);
-  margin: 5px 0;
-}
-
-.file-input {
-  display: none;
-}
-
-/* 图片预览区 */
-.image-preview-container {
-  margin-top: 20px;
-}
-
-.preview-header {
+.textarea-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 15px;
+  margin-top: 8px;
 }
 
-.preview-title {
+.char-counter {
+  font-family: "Comic Sans MS", cursive;
+  font-size: 13px;
+  color: rgba(166, 124, 82, 0.6);
+  font-style: italic;
+}
+
+/* 悬赏金额输入 */
+.currency-input {
+  position: relative;
+}
+
+.currency-symbol {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
   font-family: "Comic Sans MS", cursive;
   font-size: 16px;
   color: #a67c52;
   font-weight: 500;
 }
 
-.preview-hint {
-  font-family: "Comic Sans MS", cursive;
-  font-size: 14px;
-  color: rgba(166, 124, 82, 0.6);
+.reward-input {
+  padding-left: 28px;
 }
 
-.image-preview {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 15px;
-}
-
-.preview-item {
+/* 紧凑型图片上传 */
+.compact-uploader {
   position: relative;
-  width: 150px;
-  height: 150px;
+}
+
+.compact-upload-area {
+  border: 2px dashed rgba(166, 124, 82, 0.4);
+  border-radius: 12px;
+  padding: 25px 15px;
+  background: rgba(255, 255, 255, 0.2);
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-bottom: 15px;
+}
+
+.compact-upload-area:hover:not(.disabled) {
+  border-color: rgba(243, 129, 129, 0.6);
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.compact-upload-area.drag-over {
+  border-color: #f38181;
+  background: rgba(243, 129, 129, 0.1);
+}
+
+.compact-upload-area.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.compact-upload-area .upload-icon {
+  margin-bottom: 10px;
+}
+
+.compact-upload-area .upload-svg {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  filter: brightness(0.8);
+}
+
+.compact-upload-area .upload-text {
+  font-family: "Comic Sans MS", cursive;
+  font-size: 15px;
+  color: #a67c52;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+.compact-upload-area .upload-hint {
+  font-family: "Comic Sans MS", cursive;
+  font-size: 13px;
+  color: rgba(166, 124, 82, 0.6);
+  margin: 3px 0;
+}
+
+.file-input {
+  display: none;
+}
+
+/* 紧凑型图片预览 */
+.compact-preview {
+  margin-top: 15px;
+}
+
+.compact-preview .preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.compact-preview .preview-title {
+  font-family: "Comic Sans MS", cursive;
+  font-size: 15px;
+  color: #a67c52;
+  font-weight: 500;
+}
+
+.clear-all-btn {
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: rgba(166, 124, 82, 0.1);
+  border: 1px solid rgba(166, 124, 82, 0.3);
+  color: #a67c52;
+  font-family: "Comic Sans MS", cursive;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.clear-all-btn:hover:not(:disabled) {
+  background: rgba(166, 124, 82, 0.2);
+  border-color: rgba(166, 124, 82, 0.5);
+}
+
+.clear-all-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.image-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.grid-item {
+  position: relative;
+  aspect-ratio: 1;
   border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   cursor: move;
 }
 
-.preview-item:hover .preview-overlay {
+.grid-item:hover .grid-overlay {
   opacity: 1;
 }
 
-.preview-image {
+.grid-image {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.preview-overlay {
+.grid-overlay {
   position: absolute;
   top: 0;
   left: 0;
@@ -1818,17 +1891,17 @@ function goToDetail() {
   transition: opacity 0.3s ease;
 }
 
-.delete-btn {
+.grid-delete-btn {
   position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 24px;
-  height: 24px;
+  top: 5px;
+  right: 5px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   border: none;
   background: #ff4d4f;
   color: white;
-  font-size: 18px;
+  font-size: 12px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -1836,114 +1909,80 @@ function goToDetail() {
   transition: all 0.3s ease;
 }
 
-.delete-btn:hover:not(:disabled) {
+.grid-delete-btn:hover:not(:disabled) {
   background: #ff7875;
   transform: scale(1.1);
 }
 
-.delete-btn:disabled {
+.grid-delete-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.sort-handle {
+.grid-sort {
   position: absolute;
-  top: 8px;
-  left: 8px;
-  width: 24px;
-  height: 24px;
+  top: 5px;
+  left: 5px;
+  width: 18px;
+  height: 18px;
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.3);
   color: white;
-  font-size: 16px;
+  font-size: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: move;
 }
 
-.preview-index {
+.grid-index {
   position: absolute;
-  bottom: 8px;
-  right: 8px;
-  width: 24px;
-  height: 24px;
+  bottom: 5px;
+  right: 5px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   background: rgba(243, 129, 129, 0.8);
   color: white;
-  font-size: 12px;
+  font-size: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 600;
 }
 
-/* 悬赏信息组 */
-.reward-group,
-.contact-group {
+/* 联系人信息紧凑布局 */
+.compact-contact {
   display: flex;
-  gap: 20px;
-  flex-wrap: wrap;
+  gap: 12px;
+  width: 100%;
 }
 
-.reward-input-group,
-.contact-input-group {
+.contact-field {
   flex: 1;
-  min-width: 200px;
-}
-
-.reward-label,
-.contact-label {
-  display: block;
-  font-family: "Comic Sans MS", cursive;
-  font-size: 16px;
-  color: #a67c52;
-  margin-bottom: 8px;
-  font-weight: 500;
-}
-
-.reward-amount-input {
-  position: relative;
-}
-
-.currency-symbol {
-  position: absolute;
-  left: 16px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-family: "Comic Sans MS", cursive;
-  font-size: 16px;
-  color: #a67c52;
-  font-weight: 500;
-}
-
-.reward-input {
-  padding-left: 32px;
-}
-
-/* 输入提示 */
-.input-hint {
-  font-family: "Comic Sans MS", cursive;
-  font-size: 14px;
-  color: rgba(166, 124, 82, 0.5);
-  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
 }
 
 /* 错误信息 */
 .error-message {
   font-family: "Comic Sans MS", cursive;
-  font-size: 14px;
+  font-size: 13px;
   color: #ff4d4f;
-  margin-top: 8px;
+  margin-top: 6px;
+  line-height: 1.3;
 }
 
 /* 表单操作按钮 */
 .form-actions {
+  flex: 1 0 100%;
   display: flex;
   justify-content: flex-end;
   gap: 20px;
-  margin-top: 40px;
-  padding-top: 30px;
+  margin-top: 20px;
+  padding-top: 25px;
   border-top: 1px solid rgba(166, 124, 82, 0.1);
 }
 
@@ -1956,7 +1995,7 @@ function goToDetail() {
   cursor: pointer;
   transition: all 0.3s ease;
   border: none;
-  min-width: 120px;
+  min-width: 140px;
 }
 
 .cancel-btn {
@@ -2108,12 +2147,28 @@ function goToDetail() {
 
 /* ================= 响应式设计 ================= */
 
-/* 平板端适配（769px-1024px） */
-@media (min-width: 769px) and (max-width: 1024px) {
-  .left-nav {
-    width: 260px;
+/* 大屏幕适配（1400px以上） */
+@media (min-width: 1401px) {
+  .publish-form-card {
+    max-width: 1600px;
   }
   
+  .form-left-column,
+  .form-right-column {
+    min-width: 500px;
+  }
+  
+  .location-cascader {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  
+  .image-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+/* 中等屏幕适配（992px-1400px） */
+@media (min-width: 992px) and (max-width: 1400px) {
   .main-content {
     margin-left: 260px;
     max-width: calc(100vw - 260px);
@@ -2122,32 +2177,69 @@ function goToDetail() {
   
   .publish-form-card {
     padding: 30px;
+    max-width: 1200px;
   }
   
-  .type-options {
+  .form-left-column,
+  .form-right-column {
+    min-width: 400px;
+  }
+  
+  .location-cascader {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  .image-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* 平板端适配（769px-991px） */
+@media (min-width: 769px) and (max-width: 991px) {
+  .left-nav {
+    width: 240px;
+  }
+  
+  .main-content {
+    margin-left: 240px;
+    max-width: calc(100vw - 240px);
+    padding: 15px;
+  }
+  
+  .publish-form-card {
+    padding: 25px;
+    max-width: 100%;
+  }
+  
+  .form-content {
     flex-direction: column;
+    gap: 25px;
   }
   
-  .type-option {
+  .form-left-column,
+  .form-right-column {
     min-width: 100%;
   }
   
-  .cascader-group {
+  .horizontal-group {
+    flex-wrap: wrap;
+  }
+  
+  .horizontal-group .compact-section {
+    flex: 1 0 calc(50% - 10px);
+  }
+  
+  .location-cascader {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .image-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  .compact-contact {
     flex-direction: column;
-  }
-  
-  .cascader-level {
-    min-width: 100%;
-  }
-  
-  .reward-group,
-  .contact-group {
-    flex-direction: column;
-  }
-  
-  .reward-input-group,
-  .contact-input-group {
-    min-width: 100%;
+    gap: 15px;
   }
 }
 
@@ -2157,7 +2249,7 @@ function goToDetail() {
     flex-direction: column;
   }
 
-  /* 左侧导航移至底部，横向布局 */
+  /* 左侧导航移至底部 */
   .left-nav {
     width: 100%;
     height: auto;
@@ -2231,7 +2323,7 @@ function goToDetail() {
     margin-left: 0;
     max-width: 100vw;
     padding: 20px 15px;
-    padding-bottom: 90px; /* 给底部导航留空间 */
+    padding-bottom: 90px;
   }
   
   .publish-form-card {
@@ -2246,44 +2338,83 @@ function goToDetail() {
     font-size: 16px;
   }
   
+  /* 移动端改为单栏布局 */
+  .form-content {
+    flex-direction: column;
+    gap: 20px;
+  }
+  
+  .form-left-column,
+  .form-right-column {
+    min-width: 100%;
+  }
+  
+  .form-section {
+    padding: 18px;
+  }
+  
+  .compact-section {
+    padding: 16px;
+  }
+  
   .section-title {
-    font-size: 18px;
+    font-size: 16px;
   }
   
-  .type-options {
+  /* 水平选项组 */
+  .horizontal-group {
+    flex-direction: column;
+    gap: 15px;
+  }
+  
+  .horizontal-group .compact-section {
+    flex: 1 0 100%;
+  }
+  
+  .horizontal-options {
     flex-direction: column;
   }
   
-  .type-option {
-    min-width: 100%;
-    padding: 20px 15px;
+  .horizontal-option {
+    min-height: 80px;
   }
   
-  .cascader-group {
+  /* 级联选择器 */
+  .compact-cascader {
     flex-direction: column;
+    gap: 15px;
   }
   
-  .cascader-level {
-    min-width: 100%;
+  .location-cascader {
+    grid-template-columns: 1fr;
+    gap: 15px;
   }
   
-  .cascader-select,
-  .form-input,
-  .form-textarea {
+  .compact-select,
+  .compact-input {
     font-size: 14px;
     padding: 10px 12px;
+    min-height: 44px;
   }
   
-  .reward-group,
-  .contact-group {
+  /* 文本域 */
+  .form-textarea {
+    min-height: 140px;
+    font-size: 14px;
+  }
+  
+  /* 图片网格 */
+  .image-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  /* 联系人布局 */
+  .compact-contact {
     flex-direction: column;
+    gap: 15px;
   }
   
-  .reward-input-group,
-  .contact-input-group {
-    min-width: 100%;
-  }
-  
+  /* 表单操作按钮 */
   .form-actions {
     flex-direction: column;
     gap: 15px;
@@ -2292,8 +2423,10 @@ function goToDetail() {
   .action-btn {
     width: 100%;
     padding: 12px 20px;
+    font-size: 16px;
   }
   
+  /* 模态框 */
   .modal-content {
     padding: 25px 20px;
     width: 95%;
@@ -2327,29 +2460,59 @@ function goToDetail() {
     font-size: 20px;
   }
   
+  .form-subtitle {
+    font-size: 14px;
+  }
+  
   .form-content {
-    gap: 20px;
+    gap: 15px;
   }
   
   .form-section {
-    padding-bottom: 20px;
+    padding: 15px;
+  }
+  
+  .compact-section {
+    padding: 12px;
+  }
+  
+  .section-title {
+    font-size: 15px;
+  }
+  
+  .horizontal-option {
+    padding: 15px 10px;
+    min-height: 70px;
   }
   
   .type-icon {
-    font-size: 28px;
+    font-size: 24px;
   }
   
   .type-label {
-    font-size: 16px;
+    font-size: 14px;
   }
   
   .type-desc {
     font-size: 12px;
   }
   
-  .preview-item {
-    width: 120px;
-    height: 120px;
+  .compact-upload-area {
+    padding: 20px 10px;
+  }
+  
+  .image-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  
+  .grid-item {
+    aspect-ratio: 1;
+  }
+  
+  .form-actions {
+    margin-top: 15px;
+    padding-top: 20px;
   }
 }
 </style>

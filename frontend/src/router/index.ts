@@ -7,12 +7,15 @@ const routes: Array<RouteRecordRaw> = [
   {
     path: '/',
     name: 'Root',
-    redirect: '/home'
+    redirect: '/login' 
   },
   {
     path: '/login',
     name: 'Login',
-    component: () => import('../views/login/LoginView.vue')
+    component: () => import('../views/login/LoginView.vue'),
+    meta: {
+      title: '登录'
+    }
   },
   {
     path: '/home',
@@ -71,7 +74,7 @@ const routes: Array<RouteRecordRaw> = [
   {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
-    redirect: '/home'
+    redirect: '/login'
   }
 ]
 
@@ -81,7 +84,6 @@ const routes: Array<RouteRecordRaw> = [
 const router = createRouter({
   history: createWebHistory(),
   routes,
-  // 路由切换时的滚动行为
   scrollBehavior(to, from, savedPosition) {
     if (savedPosition) {
       return savedPosition
@@ -96,47 +98,38 @@ const router = createRouter({
  */
 router.beforeEach((to, from, next) => {
   console.log(`路由跳转: ${from.path} -> ${to.path}`)
-  
+
   // 设置页面标题
   if (to.meta.title) {
     document.title = `${to.meta.title} - 校园失物招领平台`
   } else {
     document.title = '校园失物招领平台'
   }
-  
-  // 检查是否需要登录权限
+
+  // 需要登录的页面
   if (to.meta.requiresAuth) {
-    // 从localStorage获取用户信息
     const userId = localStorage.getItem('userId')
     const role = localStorage.getItem('role')
-    
-    // 检查用户信息是否完整
+
     if (userId && role) {
-      // 已登录，允许访问
       next()
       return
     }
-    
-    // 未登录或用户信息不完整，重定向到登录页
-    // 保存目标路径，以便登录后跳转回来
-    const returnUrl = to.fullPath
-    if (returnUrl !== '/login') {
-      localStorage.setItem('returnUrl', returnUrl)
-    }
-    
+
+    // 未登录，记录返回地址
+    localStorage.setItem('returnUrl', to.fullPath)
     next('/login')
     return
   }
-  
-  // 如果已经登录但访问登录页，重定向到首页
+
+  // 已登录却访问登录页
   if (to.path === '/login') {
     const userId = localStorage.getItem('userId')
     const role = localStorage.getItem('role')
-    
+
     if (userId && role) {
-      // 已登录，重定向到首页或保存的returnUrl
       const returnUrl = localStorage.getItem('returnUrl')
-      if (returnUrl && returnUrl !== '/login') {
+      if (returnUrl) {
         localStorage.removeItem('returnUrl')
         next(returnUrl)
       } else {
@@ -145,15 +138,14 @@ router.beforeEach((to, from, next) => {
       return
     }
   }
-  
+
   next()
 })
 
 /**
  * 全局后置路由守卫
  */
-router.afterEach((to, from) => {
-  // 可以在这里添加页面访问统计等
+router.afterEach((to) => {
   console.log(`页面加载完成: ${to.path}`)
 })
 
