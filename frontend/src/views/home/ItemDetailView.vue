@@ -3,16 +3,44 @@
     <transition name="mask-fade">
       <div v-if="visible" class="detail-mask" @click.self="close">
         <transition name="card-pop">
-          <div class="detail-card">
+          <div 
+            class="detail-card" 
+            :class="{ 
+              'single-image': images.length === 1,
+              'no-image': images.length === 0
+            }"
+            :style="cardStyle"
+          >
             <!-- 关闭按钮 -->
             <div class="close-btn" @click="close">×</div>
 
             <!-- 内容区 -->
             <div v-if="ready" class="card-content">
-              <!-- 左侧图片轮播区域 -->
-              <div class="carousel-container" ref="carouselContainer">
+              <!-- 左侧图片区域 -->
+              <div 
+                v-if="images.length > 0" 
+                class="carousel-container" 
+                ref="carouselContainer"
+                :class="{ 'single-image-mode': images.length === 1 }"
+              >
                 <!-- 图片容器 -->
                 <div 
+                  v-if="images.length === 1"
+                  class="single-image-wrapper"
+                  :style="singleImageStyle"
+                >
+                  <img
+                    :src="getImageUrl(images[0])"
+                    :alt="`物品图片`"
+                    @load="onSingleImageLoad"
+                    @error="() => handleImageError(0)"
+                    loading="lazy"
+                    ref="singleImageRef"
+                  />
+                </div>
+                
+                <div 
+                  v-else
                   class="carousel-track" 
                   ref="carouselTrack"
                   :style="trackStyle"
@@ -31,7 +59,8 @@
                       v-if="shouldLoadImage(index)"
                       :src="getImageUrl(img)"
                       :alt="`物品图片 ${index + 1}`"
-                      @load="() => onImageLoad(index)"
+                      :style="getMultiImageStyle(index)"
+                      @load="(e) => onMultiImageLoad(e, index)"
                       @error="() => handleImageError(index)"
                       loading="lazy"
                     />
@@ -42,7 +71,7 @@
                 </div>
 
                 <!-- 左右箭头（仅在多张图片时显示） -->
-                <template v-if="images && images.length > 1">
+                <template v-if="images.length > 1">
                   <button 
                     class="arrow-btn arrow-left" 
                     :class="{ 'arrow-hidden': currentIndex === 0 }"
@@ -66,14 +95,14 @@
                 </template>
 
                 <!-- 文字指示器（右上角） -->
-                <div v-if="images && images.length > 1" class="text-indicator">
+                <div v-if="images.length > 1" class="text-indicator">
                   <div class="indicator-text">
                     {{ currentIndex + 1 }} / {{ images.length }}
                   </div>
                 </div>
                 
                 <!-- 点选择器（底部） -->
-                <div v-if="images && images.length > 1" class="dots-indicator">
+                <div v-if="images.length > 1" class="dots-indicator">
                   <div class="indicator-dots">
                     <div 
                       v-for="(img, index) in images" 
@@ -88,7 +117,10 @@
               </div>
 
               <!-- 右侧信息 -->
-              <div class="right-info">
+              <div 
+                class="right-info"
+                :class="{ 'full-width': images.length === 0 }"
+              >
                 <h2 class="title">{{ item.name }}</h2>
 
                 <div class="info-line">
@@ -138,6 +170,7 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted, onBeforeUnmount, computed, nextTick } from 'vue'
+import type { CSSProperties } from 'vue'
 import axios from 'axios'
 
 interface ImageItem {
@@ -174,6 +207,13 @@ interface LocationData {
   parentId: number
 }
 
+interface ImageSize {
+  width: number
+  height: number
+  aspectRatio: number
+  loaded: boolean
+}
+
 const props = defineProps<{
   visible: boolean
   itemId: number | null
@@ -196,13 +236,22 @@ const dragOffset = ref(0)
 const isTransitionEnabled = ref(true)
 const loadedImages = ref<Set<number>>(new Set())
 
+// 图片尺寸信息
+const imageSizes = ref<ImageSize[]>([])
+const maxImageWidth = ref(0)
+const carouselHeight = ref(500) // 固定高度
+
+// 单张图片相关
+const singleImageRef = ref<HTMLImageElement | null>(null)
+const singleImageSize = ref<{width: number, height: number} | null>(null)
+
 // DOM引用
 const carouselContainer = ref<HTMLElement | null>(null)
 const carouselTrack = ref<HTMLElement | null>(null)
 
-// 计算属性 - 修复：检查 images 是否存在
+// 计算属性
 const trackStyle = computed(() => {
-  if (!images.value || images.value.length === 0) {
+  if (images.value.length <= 1) {
     return { transform: 'translateX(0%)', transition: 'none' }
   }
   
@@ -213,31 +262,137 @@ const trackStyle = computed(() => {
   }
 })
 
-// 图片懒加载策略：预加载当前、前一张、后一张
+// 卡片样式
+const cardStyle = computed(() => {
+  if (images.value.length === 1 && singleImageSize.value) {
+    const aspectRatio = singleImageSize.value.width / singleImageSize.value.height
+    const imageWidth = Math.min(carouselHeight.value * aspectRatio, window.innerWidth * 0.8 - 400)
+    
+    return {
+      width: `${imageWidth + 400}px`, // 图片宽度 + 右侧信息栏宽度
+      maxWidth: '90vw'
+    }
+  }
+  return {
+    width: '900px',
+    maxWidth: '90vw'
+  }
+})
+
+// 单张图片容器样式
+const singleImageStyle = computed(() => {
+  if (!singleImageSize.value) return {}
+  
+  const aspectRatio = singleImageSize.value.width / singleImageSize.value.height
+  const width = Math.min(carouselHeight.value * aspectRatio, window.innerWidth * 0.8 - 400)
+  
+  return {
+    width: `${width}px`,
+    height: `${carouselHeight.value}px`
+  }
+})
+
+// 获取多张图片样式
+const getMultiImageStyle = (index: number): CSSProperties => {
+  const size = getImageSize(index)
+  
+  if (size.width > 0 && maxImageWidth.value > 0) {
+    const scale = maxImageWidth.value / size.width
+    const scaledHeight = size.height * scale
+    
+    return {
+      width: `${maxImageWidth.value}px`,
+      height: `${scaledHeight}px`,
+      objectFit: 'contain' as const
+    }
+  }
+  
+  return {
+    width: '100%',
+    height: '100%',
+    objectFit: 'contain' as const
+  }
+}
+
+// 获取图片尺寸信息
+const getImageSize = (index: number): ImageSize => {
+  if (index < 0 || index >= imageSizes.value.length) {
+    return { width: 0, height: 0, aspectRatio: 1, loaded: false }
+  }
+  return imageSizes.value[index]
+}
+
+// 图片懒加载策略
 const shouldLoadImage = (index: number) => {
-  // 已经加载过的
   if (loadedImages.value.has(index)) return true
   
-  // 当前图片、前一张、后一张
   const distance = Math.abs(index - currentIndex.value)
   return distance <= 1
 }
 
 const getImageUrl = (img: ImageItem) => {
-  // 处理图片URL
   if (img.url && img.url.startsWith('data:image')) {
     return img.url
   }
-  // 如果图片有ID，使用图片ID获取，否则尝试使用itemId
   if (img.id) {
     return `/api/item/image/${img.id}`
   }
   return img.url || ''
 }
 
+// 计算最宽图片宽度
+const calculateMaxImageWidth = () => {
+  if (images.value.length <= 1) return
+  
+  let maxWidth = 0
+  imageSizes.value.forEach(size => {
+    if (size.width > maxWidth) {
+      maxWidth = size.width
+    }
+  })
+  
+  const containerWidth = carouselContainer.value?.offsetWidth || 500
+  maxImageWidth.value = Math.min(maxWidth, containerWidth * 0.9)
+}
+
+// 单张图片加载完成
+const onSingleImageLoad = (e: Event) => {
+  const img = e.target as HTMLImageElement
+  singleImageSize.value = {
+    width: img.naturalWidth,
+    height: img.naturalHeight
+  }
+}
+
+// 多张图片加载完成
+const onMultiImageLoad = (e: Event, index: number) => {
+  const img = e.target as HTMLImageElement
+  loadedImages.value.add(index)
+  
+  if (index < imageSizes.value.length) {
+    imageSizes.value[index] = {
+      width: img.naturalWidth,
+      height: img.naturalHeight,
+      aspectRatio: img.naturalWidth / img.naturalHeight,
+      loaded: true
+    }
+  } else {
+    imageSizes.value[index] = {
+      width: img.naturalWidth,
+      height: img.naturalHeight,
+      aspectRatio: img.naturalWidth / img.naturalHeight,
+      loaded: true
+    }
+  }
+  
+  if (loadedImages.value.size === images.value.length) {
+    calculateMaxImageWidth()
+  }
+}
+
 // 触摸事件处理
 const handleTouchStart = (e: TouchEvent) => {
-  if (!images.value || images.value.length <= 1) return
+  if (images.value.length <= 1) return
   
   isDragging.value = true
   isTransitionEnabled.value = false
@@ -247,38 +402,34 @@ const handleTouchStart = (e: TouchEvent) => {
 }
 
 const handleTouchMove = (e: TouchEvent) => {
-  if (!isDragging.value || !images.value || images.value.length <= 1) return
+  if (!isDragging.value || images.value.length <= 1) return
   
   e.preventDefault()
   currentX.value = e.touches[0].clientX
   dragOffset.value = currentX.value - startX.value
   
-  // 限制拖拽范围
   const containerWidth = carouselContainer.value?.offsetWidth || 1
   const maxOffset = containerWidth * 0.3
   dragOffset.value = Math.max(-maxOffset, Math.min(maxOffset, dragOffset.value))
 }
 
 const handleTouchEnd = () => {
-  if (!isDragging.value || !images.value || images.value.length <= 1) return
+  if (!isDragging.value || images.value.length <= 1) return
   
   isDragging.value = false
   isTransitionEnabled.value = true
   
   const containerWidth = carouselContainer.value?.offsetWidth || 1
-  const threshold = containerWidth * 0.15 // 降低阈值，更容易触发切换
+  const threshold = containerWidth * 0.15
   
   if (Math.abs(dragOffset.value) > threshold) {
     if (dragOffset.value > 0) {
-      // 向右滑动，显示前一张
       prevImage()
     } else {
-      // 向左滑动，显示下一张
       nextImage()
     }
   }
   
-  // 重置拖拽偏移
   setTimeout(() => {
     dragOffset.value = 0
   }, 300)
@@ -286,9 +437,8 @@ const handleTouchEnd = () => {
 
 // 鼠标事件处理（桌面端）
 const handleMouseDown = (e: MouseEvent) => {
-  if (!images.value || images.value.length <= 1) return
+  if (images.value.length <= 1) return
   
-  // 检查是否点击了箭头按钮
   const target = e.target as HTMLElement
   if (target.closest('.arrow-btn')) {
     return
@@ -306,7 +456,6 @@ const handleMouseDown = (e: MouseEvent) => {
     currentX.value = moveEvent.clientX
     dragOffset.value = currentX.value - startX.value
     
-    // 限制拖拽范围
     const containerWidth = carouselContainer.value?.offsetWidth || 1
     const maxOffset = containerWidth * 0.3
     dragOffset.value = Math.max(-maxOffset, Math.min(maxOffset, dragOffset.value))
@@ -319,7 +468,7 @@ const handleMouseDown = (e: MouseEvent) => {
     isTransitionEnabled.value = true
     
     const containerWidth = carouselContainer.value?.offsetWidth || 1
-    const threshold = containerWidth * 0.15 // 降低阈值，更容易触发切换
+    const threshold = containerWidth * 0.15
     
     if (Math.abs(dragOffset.value) > threshold) {
       if (dragOffset.value > 0) {
@@ -331,7 +480,6 @@ const handleMouseDown = (e: MouseEvent) => {
     
     dragOffset.value = 0
     
-    // 清理事件监听
     document.removeEventListener('mousemove', handleMouseMove)
     document.removeEventListener('mouseup', handleMouseUp)
   }
@@ -342,36 +490,33 @@ const handleMouseDown = (e: MouseEvent) => {
 
 // 图片切换方法
 const nextImage = () => {
-  if (!images.value || images.value.length === 0) return
+  if (images.value.length <= 1) return
   
   if (currentIndex.value < images.value.length - 1) {
     currentIndex.value++
-    // 预加载下一张图片
     preloadAdjacentImages()
   }
 }
 
 const prevImage = () => {
-  if (!images.value || images.value.length === 0) return
+  if (images.value.length <= 1) return
   
   if (currentIndex.value > 0) {
     currentIndex.value--
-    // 预加载上一张图片
     preloadAdjacentImages()
   }
 }
 
 const goToImage = (index: number) => {
-  if (!images.value || index < 0 || index >= images.value.length) return
+  if (index < 0 || index >= images.value.length) return
   
   currentIndex.value = index
-  // 预加载相邻图片
   preloadAdjacentImages()
 }
 
 // 预加载相邻图片
 const preloadAdjacentImages = () => {
-  if (!images.value || images.value.length === 0) return
+  if (images.value.length === 0) return
   
   const indicesToLoad = [
     currentIndex.value - 1,
@@ -388,11 +533,6 @@ const preloadAdjacentImages = () => {
       }
     }
   })
-}
-
-// 图片加载完成处理
-const onImageLoad = (index: number) => {
-  loadedImages.value.add(index)
 }
 
 const handleImageError = (index: number) => {
@@ -426,7 +566,10 @@ const loadDetail = async () => {
   ready.value = false
   currentIndex.value = 0
   loadedImages.value.clear()
+  imageSizes.value = []
+  maxImageWidth.value = 0
   dragOffset.value = 0
+  singleImageSize.value = null
 
   try {
     const res = await axios.get('/api/item/detail', {
@@ -437,24 +580,26 @@ const loadDetail = async () => {
     item.value = data.item || data
     location.value = data.location || null
     
-    // 确保 images 是数组
     if (Array.isArray(data.images)) {
       images.value = data.images
     } else {
       images.value = []
     }
     
-    console.log('加载的图片数据:', images.value)
-    
-    // 预加载第一张图片
-    if (images.value.length > 0) {
-      preloadAdjacentImages()
-    }
+    imageSizes.value = new Array(images.value.length).fill(null).map(() => ({
+      width: 0,
+      height: 0,
+      aspectRatio: 1,
+      loaded: false
+    }))
 
     ready.value = true
     
-    // 等待 DOM 更新后，重新计算容器宽度
     await nextTick()
+    
+    if (images.value.length > 0) {
+      preloadAdjacentImages()
+    }
   } catch (e) {
     console.error('加载详情失败:', e)
     ready.value = true
@@ -476,10 +621,10 @@ watch(
     if (v && props.itemId) {
       loadDetail()
     } else {
-      // 关闭时重置状态
       currentIndex.value = 0
       dragOffset.value = 0
       isDragging.value = false
+      singleImageSize.value = null
     }
   }
 )
@@ -487,8 +632,8 @@ watch(
 // ESC 关闭和键盘切换
 const onKeydown = (e: KeyboardEvent) => {
   if (e.key === 'Escape') close()
-  if (e.key === 'ArrowLeft' && images.value && images.value.length > 1) prevImage()
-  if (e.key === 'ArrowRight' && images.value && images.value.length > 1) nextImage()
+  if (e.key === 'ArrowLeft' && images.value.length > 1) prevImage()
+  if (e.key === 'ArrowRight' && images.value.length > 1) nextImage()
 }
 
 onMounted(() => {
@@ -517,13 +662,16 @@ onBeforeUnmount(() => {
 .detail-card {
   position: relative;
   height: 580px;
-  max-width: 95vw;
-  width: 900px;
   background: #fff;
   border-radius: 16px;
   overflow: hidden;
   display: flex;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+/* 无图片模式 */
+.detail-card.no-image {
+  width: 500px;
 }
 
 /* 关闭按钮 */
@@ -540,15 +688,17 @@ onBeforeUnmount(() => {
   justify-content: center;
   font-size: 24px;
   cursor: pointer;
-  z-index: 10;
+  z-index: 100;
   transition: all 0.2s;
   border: none;
   color: #333;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .close-btn:hover {
   background: #fff;
   transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 /* 内容区域 */
@@ -561,23 +711,50 @@ onBeforeUnmount(() => {
 /* 左侧轮播图区域 */
 .carousel-container {
   position: relative;
-  width: 500px;
   height: 100%;
   overflow: hidden;
-  background: #f8f9fa;
+  /* background: #f8f9fa; */
+  background: #ffffff;
   user-select: none;
   touch-action: pan-y pinch-zoom;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 单张图片模式 */
+.carousel-container.single-image-mode {
+  background: transparent;
+}
+
+.single-image-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f8f9fa;
+}
+
+.single-image-wrapper img {
+  max-width: 100%;
+  max-height: 100%;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
 }
 
 .carousel-track {
   display: flex;
-  height: 100%;
+  height: 500px; /* 固定高度 */
   will-change: transform;
+  align-items: center;
+  justify-content: flex-start;
 }
 
 .carousel-slide {
   flex: 0 0 100%;
-  height: 100%;
+  height: 500px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -588,9 +765,6 @@ onBeforeUnmount(() => {
 .carousel-slide img {
   max-width: 100%;
   max-height: 100%;
-  width: auto;
-  height: auto;
-  object-fit: contain;
   display: block;
 }
 
@@ -622,12 +796,6 @@ onBeforeUnmount(() => {
   to { transform: rotate(360deg); }
 }
 
-.image-error {
-  color: #999;
-  font-size: 14px;
-  padding: 20px;
-}
-
 /* 左右箭头按钮 */
 .arrow-btn {
   position: absolute;
@@ -642,7 +810,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 2;
+  z-index: 10;
   transition: all 0.3s;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
@@ -673,13 +841,12 @@ onBeforeUnmount(() => {
   pointer-events: none;
 }
 
-/* 轮播指示器 */
 /* 文字指示器（右上角） */
 .text-indicator {
   position: absolute;
   top: 20px;
   right: 20px;
-  z-index: 2;
+  z-index: 10;
 }
 
 /* 点选择器（底部） */
@@ -690,7 +857,7 @@ onBeforeUnmount(() => {
   right: 0;
   display: flex;
   justify-content: center;
-  z-index: 2;
+  z-index: 10;
 }
 
 .indicator-dots {
@@ -726,7 +893,6 @@ onBeforeUnmount(() => {
   border-radius: 16px;
   backdrop-filter: blur(8px);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  font-family: "Comic Sans MS", cursive;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
@@ -736,6 +902,13 @@ onBeforeUnmount(() => {
   padding: 32px;
   overflow-y: auto;
   min-width: 300px;
+  max-width: 400px;
+}
+
+/* 无图片时信息栏全宽 */
+.right-info.full-width {
+  width: 100%;
+  max-width: none;
 }
 
 .title {
@@ -842,11 +1015,33 @@ onBeforeUnmount(() => {
 }
 
 /* 响应式设计 */
+@media (max-width: 1024px) {
+  .detail-card {
+    height: 500px;
+  }
+  
+  .carousel-track {
+    height: 400px;
+  }
+  
+  .carousel-slide {
+    height: 400px;
+  }
+  
+  .right-info {
+    padding: 24px;
+  }
+  
+  .single-image-wrapper {
+    height: 400px;
+  }
+}
+
 @media (max-width: 768px) {
   .detail-card {
     flex-direction: column;
     height: 90vh;
-    width: 95vw;
+    width: 95vw !important;
     max-width: 95vw;
     border-radius: 12px;
   }
@@ -856,10 +1051,19 @@ onBeforeUnmount(() => {
     height: 45vh;
   }
   
+  .carousel-track {
+    height: 40vh;
+  }
+  
+  .carousel-slide {
+    height: 40vh;
+  }
+  
   .right-info {
     padding: 20px;
     overflow-y: auto;
     max-height: 45vh;
+    max-width: 100%;
   }
   
   .arrow-btn {
@@ -875,25 +1079,38 @@ onBeforeUnmount(() => {
     right: 8px;
   }
   
-  .carousel-indicator {
-    bottom: 16px;
+  .dots-indicator {
+    bottom: 12px;
   }
   
   .title {
     font-size: 20px;
     margin-bottom: 20px;
   }
+  
+  .single-image-wrapper {
+    height: 40vh;
+    width: 100% !important;
+  }
 }
 
 @media (max-width: 480px) {
   .detail-card {
     height: 100vh;
-    max-width: 100vw;
+    max-width: 100vw !important;
     border-radius: 0;
   }
   
   .carousel-container {
     height: 50vh;
+  }
+  
+  .carousel-track {
+    height: 45vh;
+  }
+  
+  .carousel-slide {
+    height: 45vh;
   }
   
   .right-info {
@@ -906,6 +1123,10 @@ onBeforeUnmount(() => {
     width: 28px;
     height: 28px;
     font-size: 20px;
+  }
+  
+  .single-image-wrapper {
+    height: 45vh;
   }
 }
 </style>
