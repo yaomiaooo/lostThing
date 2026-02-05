@@ -304,10 +304,10 @@ const handleLogin = async () => {
     const user = res.data.data
 
     // 保存用户信息
-    localStorage.setItem('userId', user.id)
-    localStorage.setItem('realName', user.realName)
-    localStorage.setItem('role', user.role)
-    localStorage.setItem('loginTime', new Date().toISOString())
+    sessionStorage.setItem('userId', user.id)
+    sessionStorage.setItem('realName', user.realName)
+    sessionStorage.setItem('role', user.role)
+    sessionStorage.setItem('loginTime', new Date().toISOString())
     
     // 记住我功能 - 所有角色都支持
     if (rememberMe.value) {

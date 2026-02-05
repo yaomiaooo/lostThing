@@ -7,7 +7,7 @@ const routes: Array<RouteRecordRaw> = [
   {
     path: '/',
     name: 'Root',
-    redirect: '/login' 
+    redirect: '/login'
   },
   {
     path: '/login',
@@ -106,31 +106,31 @@ router.beforeEach((to, from, next) => {
     document.title = '校园失物招领平台'
   }
 
-  // 需要登录的页面
+  // ===== 需要登录的页面 =====
   if (to.meta.requiresAuth) {
-    const userId = localStorage.getItem('userId')
-    const role = localStorage.getItem('role')
+    const userId = sessionStorage.getItem('userId')
+    const role = sessionStorage.getItem('role')
 
     if (userId && role) {
       next()
       return
     }
 
-    // 未登录，记录返回地址
-    localStorage.setItem('returnUrl', to.fullPath)
+    // 未登录，记录返回地址（本次会话有效）
+    sessionStorage.setItem('returnUrl', to.fullPath)
     next('/login')
     return
   }
 
-  // 已登录却访问登录页
+  // ===== 已登录却访问登录页 =====
   if (to.path === '/login') {
-    const userId = localStorage.getItem('userId')
-    const role = localStorage.getItem('role')
+    const userId = sessionStorage.getItem('userId')
+    const role = sessionStorage.getItem('role')
 
     if (userId && role) {
-      const returnUrl = localStorage.getItem('returnUrl')
+      const returnUrl = sessionStorage.getItem('returnUrl')
       if (returnUrl) {
-        localStorage.removeItem('returnUrl')
+        sessionStorage.removeItem('returnUrl')
         next(returnUrl)
       } else {
         next('/home')
