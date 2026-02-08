@@ -654,35 +654,35 @@ const maskPhone = (phone: string) => {
   return phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')
 }
 
-// 新增：获取状态文本
-const getStatusText = () => {
-  const statusMap = {
-    1: '待审核',
-    2: '已通过',
-    3: '已匹配',
-    4: '已认领',
-    5: '已驳回',
-    6: '已取消',
-    7: '已归档',
-    8: '无效'
-  }
-  return statusMap[item.value.currentStatus] || '未知状态'
-}
+// // 新增：获取状态文本
+// const getStatusText = () => {
+//   const statusMap = {
+//     1: '待审核',
+//     2: '已通过',
+//     3: '已匹配',
+//     4: '已认领',
+//     5: '已驳回',
+//     6: '已取消',
+//     7: '已归档',
+//     8: '无效'
+//   }
+//   return statusMap[item.value.currentStatus] || '未知状态'
+// }
 
-// 新增：获取状态样式类
-const getStatusClass = () => {
-  const statusClassMap = {
-    1: 'status-pending',
-    2: 'status-success',
-    3: 'status-matched',
-    4: 'status-claimed',
-    5: 'status-rejected',
-    6: 'status-canceled',
-    7: 'status-archived',
-    8: 'status-invalid'
-  }
-  return statusClassMap[item.value.currentStatus] || 'status-default'
-}
+// // 新增：获取状态样式类
+// const getStatusClass = () => {
+//   const statusClassMap = {
+//     1: 'status-pending',
+//     2: 'status-success',
+//     3: 'status-matched',
+//     4: 'status-claimed',
+//     5: 'status-rejected',
+//     6: 'status-canceled',
+//     7: 'status-archived',
+//     8: 'status-invalid'
+//   }
+//   return statusClassMap[item.value.currentStatus] || 'status-default'
+// }
 
 // 新增：分类数据
 const categoryTree = ref<any[]>([])
