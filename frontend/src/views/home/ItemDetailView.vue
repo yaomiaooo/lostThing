@@ -232,45 +232,6 @@
                   <span class="label">归档说明：</span>
                   <span>{{ item.archiveDesc }}</span>
                 </div>
-
-                <!-- 操作按钮区域（从我的发布页面打开时显示） -->
-                <div v-if="props.showActions" class="action-buttons">
-                  <div class="action-buttons-container">
-                    <!-- 待审核状态：修改、删除 -->
-                    <template v-if="item.currentStatus === 1">
-                      <button class="action-btn edit-btn" @click="handleEdit">
-                        修改
-                      </button>
-                      <button class="action-btn delete-btn" @click="handleDelete">
-                        删除
-                      </button>
-                    </template>
-
-                    <!-- 已通过状态：取消发布 -->
-                    <template v-else-if="item.currentStatus === 2">
-                      <button class="action-btn cancel-btn" @click="handleCancel">
-                        取消发布
-                      </button>
-                    </template>
-
-                    <!-- 已驳回状态：修改、删除 -->
-                    <template v-else-if="item.currentStatus === 5">
-                      <button class="action-btn edit-btn" @click="handleEdit">
-                        重新编辑
-                      </button>
-                      <button class="action-btn delete-btn" @click="handleDelete">
-                        删除
-                      </button>
-                    </template>
-
-                    <!-- 已取消状态：删除 -->
-                    <template v-else-if="item.currentStatus === 6">
-                      <button class="action-btn delete-btn" @click="handleDelete">
-                        删除
-                      </button>
-                    </template>
-                  </div>
-                </div>
               </div>
             </div>
 
@@ -337,10 +298,9 @@ interface ImageSize {
 const props = defineProps<{
   visible: boolean
   itemId: number | null
-  showActions?: boolean // 是否显示操作按钮（从我的发布页面打开时）
 }>()
 
-const emit = defineEmits(['close', 'edit', 'delete', 'cancel'])
+const emit = defineEmits(['close'])
 
 // 状态管理
 const ready = ref(false)
@@ -698,19 +658,6 @@ const formatTime = (timeStr: string) => {
 const maskPhone = (phone: string) => {
   if (!phone || phone.length !== 11) return phone
   return phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')
-}
-
-// 操作按钮事件处理
-const handleEdit = () => {
-  emit('edit', item.value)
-}
-
-const handleDelete = () => {
-  emit('delete', item.value)
-}
-
-const handleCancel = () => {
-  emit('cancel', item.value)
 }
 
 // 新增：校区信息
@@ -1333,67 +1280,6 @@ onBeforeUnmount(() => {
   background: #f9f0ff;
   color: #9254de;
   border-left: 4px solid #9254de;
-}
-
-/* 操作按钮区域样式 */
-.action-buttons {
-  margin-top: 25px;
-  padding-top: 20px;
-  border-top: 1px solid rgba(166, 124, 82, 0.2);
-}
-
-.action-buttons-container {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.action-btn {
-  padding: 10px 20px;
-  border: none;
-  border-radius: 8px;
-  font-family: "Comic Sans MS", cursive;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  white-space: nowrap;
-  background: rgba(255, 255, 255, 0.3);
-  color: #a67c52;
-  border: 1px solid rgba(166, 124, 82, 0.2);
-}
-
-.action-btn:hover {
-  background: rgba(255, 255, 255, 0.5);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.edit-btn {
-  background: linear-gradient(to right, #4caf50, #45a049);
-  color: white;
-}
-
-.edit-btn:hover {
-  background: linear-gradient(to right, #45a049, #4caf50);
-}
-
-.delete-btn {
-  background: linear-gradient(to right, #f44336, #d32f2f);
-  color: white;
-}
-
-.delete-btn:hover {
-  background: linear-gradient(to right, #d32f2f, #f44336);
-}
-
-.cancel-btn {
-  background: linear-gradient(to right, #ff9800, #f57c00);
-  color: white;
-}
-
-.cancel-btn:hover {
-  background: linear-gradient(to right, #f57c00, #ff9800);
 }
 
 /* loading 占位 */

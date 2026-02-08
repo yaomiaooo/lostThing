@@ -186,19 +186,11 @@
               <div class="card-content">
                 <div class="card-name">{{ post.name }}</div>
                 <div class="card-info">
-                  <span class="info-item">📍 {{ post.locationName }}</span>
-                  <span class="info-item">⏰ {{ formatTime(post.happenTime || post.createTime) }}</span>
-                </div>
+                <span class="info-item campus">🏫 {{ getCampusName(post.locationId) }}</span>
+                <span class="info-item">📍 {{ post.locationName }}</span>
+              </div>
                 
-                <!-- 物品描述 -->
-                <div class="post-desc">
-                  {{ post.feature || '暂无详细描述' }}
-                </div>
-
-                <!-- 悬赏金额 -->
-                <div v-if="post.rewardAmount && post.rewardAmount > 0" class="reward-amount">
-                  💰 悬赏 {{ post.rewardAmount }} 元
-                </div>
+                
 
                 <!-- 状态标签 -->
                 <div class="post-status" :class="getStatusClass(post.currentStatus)">
@@ -548,6 +540,21 @@ const navItems = [
   }
 ]
 
+/* ================= 工具函数 ================= */
+function getCampusName(locationId: number): string {
+  const campusCode = Math.floor(locationId / 10000)
+  switch (campusCode) {
+    case 1:
+      return '朝晖校区'
+    case 2:
+      return '屏峰校区'
+    case 3:
+      return '莫干山校区'
+    default:
+      return '未知校区'
+  }
+}
+
 /* ================= 计算属性 ================= */
 const filteredPosts = computed(() => {
   if (currentStatus.value === 'all') {
@@ -793,13 +800,6 @@ function setStatusFilter(status: string) {
 
 /* ================= 操作函数 ================= */
 function editPost(post: any) {
-  // 验证post对象和itemId字段
-  if (!post || !post.itemId) {
-    console.error('编辑失败：物品数据不完整，缺少itemId', post)
-    alert('编辑失败：物品数据不完整，请重试')
-    return
-  }
-  
   // 跳转到发布页面进行编辑，传递物品ID作为参数
   router.push(`/publish?edit=true&itemId=${post.itemId}`)
 }
