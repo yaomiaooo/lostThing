@@ -127,55 +127,60 @@
               </div>
             </div>
 
-            <!-- 物品分类筛选 -->
-            <div class="filter-group">
-              <div class="group-title">物品分类</div>
-              
-              <!-- 一级分类 -->
-              <div class="category-level">
-                <div class="option-buttons">
-                  <button 
-                    class="option-btn" 
-                    :class="{ active: filterParams.category === '' }" 
-                    @click="toggleCategoryFilter('', '')" 
-                  >
-                    不限
-                  </button>
-                  <button 
-                    v-for="category in categoryTree" 
-                    :key="category.id" 
-                    class="option-btn" 
-                    :class="{ active: filterParams.category === category.id.toString() }" 
-                    @click="toggleCategoryFilter(category.id.toString(), '')" 
-                  >
-                    {{ category.name }}
-                  </button>
-                </div>
-              </div>
-              
-              <!-- 二级分类 -->
-              <div v-if="filterParams.category && getSubCategories(filterParams.category).length > 0" class="category-level sub-category">
-                <div class="group-title sub-title">{{ getCategoryName(filterParams.category) }}</div>
-                <div class="option-buttons">
-                  <button 
-                    class="option-btn" 
-                    :class="{ active: filterParams.subCategory === '' }" 
-                    @click="toggleSubCategoryFilter('')" 
-                  >
-                    不限
-                  </button>
-                  <button 
-                    v-for="subCategory in getSubCategories(filterParams.category)" 
-                    :key="subCategory.id" 
-                    class="option-btn" 
-                    :class="{ active: filterParams.subCategory === subCategory.id.toString() }" 
-                    @click="toggleSubCategoryFilter(subCategory.id.toString())" 
-                  >
-                    {{ subCategory.name }}
-                  </button>
-                </div>
+           <!-- 物品分类筛选 -->
+          <div class="filter-group">
+            <div class="group-title">物品分类</div>
+            
+            <!-- 一级分类 -->
+            <div v-if="categoryTree.length > 0" class="category-level">
+              <div class="option-buttons">
+                <button 
+                  class="option-btn" 
+                  :class="{ active: filterParams.category === '' }" 
+                  @click="toggleCategoryFilter('', '')" 
+                >
+                  不限
+                </button>
+                <button 
+                  v-for="category in categoryTree" 
+                  :key="category.id" 
+                  class="option-btn" 
+                  :class="{ active: filterParams.category === category.id.toString() }" 
+                  @click="toggleCategoryFilter(category.id.toString(), '')" 
+                >
+                  {{ category.name }}
+                </button>
               </div>
             </div>
+            
+            <!-- 二级分类 -->
+            <div v-if="filterParams.category && getSubCategories(filterParams.category).length > 0" class="category-level sub-category">
+              <!-- <div class="group-title sub-title">{{ getCategoryName(filterParams.category) }}</div> -->
+              <div class="option-buttons">
+                <button 
+                  class="option-btn" 
+                  :class="{ active: filterParams.subCategory === '' }" 
+                  @click="toggleSubCategoryFilter('')" 
+                >
+                  不限
+                </button>
+                <button 
+                  v-for="subCategory in getSubCategories(filterParams.category)" 
+                  :key="subCategory.id" 
+                  class="option-btn" 
+                  :class="{ active: filterParams.subCategory === subCategory.id.toString() }" 
+                  @click="toggleSubCategoryFilter(subCategory.id.toString())" 
+                >
+                  {{ subCategory.name }}
+                </button>
+              </div>
+            </div>
+            
+            <!-- 加载状态 -->
+            <div v-else-if="categoryTree.length === 0" class="loading-text">
+              加载分类中...
+            </div>
+          </div>
 
            
 
@@ -195,21 +200,6 @@
               </div>
             </div>
 
-            <!-- 物品状态筛选 -->
-            <div class="filter-group">
-              <div class="group-title">物品状态</div>
-              <div class="option-buttons">
-                <button 
-                  v-for="status in itemStatuses" 
-                  :key="status.value"
-                  class="option-btn"
-                  :class="{ active: filterParams.status === status.value }"
-                  @click="toggleFilter('status', status.value)"
-                >
-                  {{ status.label }}
-                </button>
-              </div>
-            </div>
 
             <!-- 底部操作区 -->
             <div class="panel-footer">
@@ -335,6 +325,10 @@ const allItems = ref<any[]>([]) // 所有物品数据
 const currentFilter = ref('all')
 const searchKeyword = ref('')
 
+/* ================= 分类数据（从接口获取） ================= */
+const categoryTree = ref<any[]>([]) // 完整的分类树
+const subCategoriesMap = ref<Record<number, any[]>>({}) // 二级分类映射表
+
 /* ================= 筛选功能 ================= */
 const showFilterPanel = ref(false)
 const filterParams = ref({
@@ -352,87 +346,6 @@ const itemTypes = [
   { value: '1', label: '失物' },
   { value: '2', label: '招领' }
 ]
-
-// 分类树数据结构
-const categoryTree = [
-  {
-    id: 1,
-    name: '证件',
-    children: [
-      { id: 101, name: '校园卡' },
-      { id: 102, name: '身份证' },
-      { id: 103, name: '学生证' },
-      { id: 104, name: '银行卡' }
-    ]
-  },
-  {
-    id: 2,
-    name: '电子设备',
-    children: [
-      { id: 201, name: '手机' },
-      { id: 202, name: '耳机' },
-      { id: 203, name: '平板电脑' },
-      { id: 204, name: '充电宝' },
-      { id: 205, name: '电脑' }
-    ]
-  },
-  {
-    id: 3,
-    name: '日用品',
-    children: [
-      { id: 301, name: '水杯' },
-      { id: 302, name: '雨伞' },
-      { id: 303, name: '衣物' },
-      { id: 304, name: '钥匙' }
-    ]
-  },
-  {
-    id: 4,
-    name: '学习用品',
-    children: [
-      { id: 401, name: '书本' },
-      { id: 402, name: '笔记本' },
-      { id: 403, name: '文具' }
-    ]
-  },
-  {
-    id: 5,
-    name: '其他',
-    children: [
-      { id: 501, name: '其他物品' }
-    ]
-  }
-]
-
-const subCategoriesMap = {
-  1: [
-    { id: 101, name: '校园卡' },
-    { id: 102, name: '身份证' },
-    { id: 103, name: '学生证' },
-    { id: 104, name: '银行卡' }
-  ],
-  2: [
-    { id: 201, name: '手机' },
-    { id: 202, name: '耳机' },
-    { id: 203, name: '平板电脑' },
-    { id: 204, name: '充电宝' },
-    { id: 205, name: '电脑' }
-  ],
-  3: [
-    { id: 301, name: '水杯' },
-    { id: 302, name: '雨伞' },
-    { id: 303, name: '衣物' },
-    { id: 304, name: '钥匙' }
-  ],
-  4: [
-    { id: 401, name: '书本' },
-    { id: 402, name: '笔记本' },
-    { id: 403, name: '文具' }
-  ],
-  5: [
-    { id: 501, name: '其他物品' }
-  ]
-}
 
 const campuses = [
   { value: '', label: '不限' },
@@ -458,7 +371,7 @@ const itemStatuses = [
 
 /* ================= 计算属性：过滤后的物品列表 ================= */
 const filteredLostItems = computed(() => {
-  let items = allItems.value.filter(item => item.itemCategory === 1) // 使用 itemCategory 字段
+  let items = allItems.value.filter(item => item.itemCategory === 1)
   
   // 应用搜索关键词
   if (searchKeyword.value.trim()) {
@@ -478,12 +391,17 @@ const filteredLostItems = computed(() => {
   if (filterParams.value.category) {
     if (filterParams.value.subCategory) {
       // 二级分类筛选
-      items = items.filter(item => {
-        if (!item.itemType) return false
-        const categoryCode = Math.floor(parseInt(filterParams.value.subCategory) / 100)
-        const itemCategoryCode = Math.floor(item.itemType / 100)
-        return itemCategoryCode === categoryCode
-      })
+      items = items.filter(item => 
+        item.itemType === parseInt(filterParams.value.subCategory)
+      )
+    } else {
+      // 一级分类筛选：获取该一级分类下的所有二级分类ID
+      const subCategoryIds = getSubCategories(filterParams.value.category).map(sub => sub.id)
+      if (subCategoryIds.length > 0) {
+        items = items.filter(item => 
+          subCategoryIds.includes(item.itemType)
+        )
+      }
     }
   }
   
@@ -506,7 +424,7 @@ const filteredLostItems = computed(() => {
 })
 
 const filteredFoundItems = computed(() => {
-  let items = allItems.value.filter(item => item.itemCategory === 2) // 使用 itemCategory 字段
+  let items = allItems.value.filter(item => item.itemCategory === 2)
   
   // 应用搜索关键词
   if (searchKeyword.value.trim()) {
@@ -526,12 +444,17 @@ const filteredFoundItems = computed(() => {
   if (filterParams.value.category) {
     if (filterParams.value.subCategory) {
       // 二级分类筛选
-      items = items.filter(item => {
-        if (!item.itemType) return false
-        const categoryCode = Math.floor(parseInt(filterParams.value.subCategory) / 100)
-        const itemCategoryCode = Math.floor(item.itemType / 100)
-        return itemCategoryCode === categoryCode
-      })
+      items = items.filter(item => 
+        item.itemType === parseInt(filterParams.value.subCategory)
+      )
+    } else {
+      // 一级分类筛选：获取该一级分类下的所有二级分类ID
+      const subCategoryIds = getSubCategories(filterParams.value.category).map(sub => sub.id)
+      if (subCategoryIds.length > 0) {
+        items = items.filter(item => 
+          subCategoryIds.includes(item.itemType)
+        )
+      }
     }
   }
   
@@ -568,22 +491,6 @@ function getCampusName(locationId: number): string {
   }
 }
 
-/* ================= 时间格式化 ================= */
-const currentTime = computed(() => {
-  const now = new Date()
-  return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
-})
-
-function formatTime(timeStr: string) {
-  if (!timeStr) return ''
-  const date = new Date(timeStr)
-  const month = date.getMonth() + 1
-  const day = date.getDate()
-  const hours = date.getHours()
-  const minutes = date.getMinutes()
-  return `${month}月${day}日 ${hours}:${minutes.toString().padStart(2, '0')}`
-}
-
 /* ================= 筛选功能方法 ================= */
 const toggleFilterPanel = () => {
   showFilterPanel.value = !showFilterPanel.value
@@ -609,13 +516,28 @@ const toggleSubCategoryFilter = (subCategory: string) => {
 
 // 获取子分类
 const getSubCategories = (categoryId: string) => {
-  return subCategoriesMap[parseInt(categoryId)] || []
+  const id = parseInt(categoryId)
+  return subCategoriesMap.value[id] || []
 }
 
 // 获取分类名称
 const getCategoryName = (categoryId: string) => {
-  const category = categoryTree.find(cat => cat.id === parseInt(categoryId))
-  return category ? category.name : '物品类型'
+  const id = parseInt(categoryId)
+  // 在一级分类中查找
+  const category = categoryTree.value.find(cat => cat.id === id)
+  if (category) return category.name
+  
+  // 如果在二级分类中，找到其父分类
+  for (const cat of categoryTree.value) {
+    if (cat.children) {
+      const subCategory = cat.children.find((sub: any) => sub.id === id)
+      if (subCategory) {
+        return cat.name // 返回父分类名称
+      }
+    }
+  }
+  
+  return '物品类型'
 }
 
 const resetFilters = () => {
@@ -682,12 +604,10 @@ const navItems = reactive([
 const showItemDetail = ref(false)
 const currentItemId = ref<number | null>(null)
 
-
-
-
 /* ================= 生命周期 ================= */
 onMounted(() => {
   loadUser()
+  loadCategoryTree() // 先加载分类树
   loadItems()
 })
 
@@ -709,6 +629,94 @@ async function loadUser() {
       role: 1,
       status: 1
     }
+  }
+}
+
+// 加载分类树数据
+async function loadCategoryTree() {
+  try {
+    const res = await axios.get('/api/item/category/tree')
+    console.log('分类树接口返回:', res.data)
+    
+    if (res.data.code === 200) {
+      const treeData = res.data.data
+      categoryTree.value = treeData
+      
+      // 构建子分类映射表
+      const map: Record<number, any[]> = {}
+      treeData.forEach((category: any) => {
+        if (category.children && category.children.length > 0) {
+          map[category.id] = category.children
+        }
+      })
+      subCategoriesMap.value = map
+      
+      console.log('分类树加载成功:', categoryTree.value)
+      console.log('子分类映射:', subCategoriesMap.value)
+    }
+  } catch (error) {
+    console.error('加载分类树失败:', error)
+    // 使用默认数据作为后备
+    const defaultTree = [
+      {
+        id: 1,
+        name: '证件',
+        children: [
+          { id: 101, name: '校园卡' },
+          { id: 102, name: '身份证' },
+          { id: 103, name: '学生证' },
+          { id: 104, name: '银行卡' }
+        ]
+      },
+      {
+        id: 2,
+        name: '电子设备',
+        children: [
+          { id: 201, name: '手机' },
+          { id: 202, name: '耳机' },
+          { id: 203, name: '平板电脑' },
+          { id: 204, name: '充电宝' },
+          { id: 205, name: '电脑' }
+        ]
+      },
+      {
+        id: 3,
+        name: '日用品',
+        children: [
+          { id: 301, name: '水杯' },
+          { id: 302, name: '雨伞' },
+          { id: 303, name: '衣物' },
+          { id: 304, name: '钥匙' }
+        ]
+      },
+      {
+        id: 4,
+        name: '学习用品',
+        children: [
+          { id: 401, name: '书本' },
+          { id: 402, name: '笔记本' },
+          { id: 403, name: '文具' }
+        ]
+      },
+      {
+        id: 5,
+        name: '其他',
+        children: [
+          { id: 501, name: '其他物品' }
+        ]
+      }
+    ]
+    
+    categoryTree.value = defaultTree
+    
+    // 构建子分类映射表
+    const map: Record<number, any[]> = {}
+    defaultTree.forEach((category: any) => {
+      if (category.children && category.children.length > 0) {
+        map[category.id] = category.children
+      }
+    })
+    subCategoriesMap.value = map
   }
 }
 
@@ -745,7 +753,7 @@ async function loadItems() {
         name: '黑色雨伞', 
         locationName: '教学楼A栋门口', 
         itemCategory: 1,
-        itemType: 201,
+        itemType: 301,
         happenTime: '2025-03-01 10:30:00',
         rewardAmount: 20,
         feature: '长柄黑色雨伞'
@@ -755,7 +763,7 @@ async function loadItems() {
         name: 'AirPods耳机', 
         locationName: '运动场看台', 
         itemCategory: 1,
-        itemType: 202,
+        itemType: 201,
         happenTime: '2025-03-02 09:15:00',
         rewardAmount: 100,
         feature: '白色，右耳有划痕'
@@ -775,7 +783,7 @@ async function loadItems() {
         name: '钥匙串', 
         locationName: '宿舍楼下', 
         itemCategory: 2,
-        itemType: 401,
+        itemType: 304,
         happenTime: '2025-03-01 16:45:00',
         rewardAmount: 0,
         feature: '3把钥匙，1个U盘'
@@ -785,7 +793,7 @@ async function loadItems() {
         name: '笔记本', 
         locationName: '实验室302', 
         itemCategory: 2,
-        itemType: 501,
+        itemType: 402,
         happenTime: '2025-03-01 14:20:00',
         rewardAmount: 0,
         feature: '黑色笔记本，内有笔记'
@@ -805,7 +813,7 @@ async function loadItems() {
         name: '背包', 
         locationName: '篮球场', 
         itemCategory: 2,
-        itemType: 601,
+        itemType: 501,
         happenTime: '2025-03-02 15:00:00',
         rewardAmount: 100,
         feature: '黑色双肩包'
@@ -825,16 +833,6 @@ function goDetail(id: number) {
 function handleDetailClose() {
   showItemDetail.value = false
   currentItemId.value = null
-}
-
-function handleClaim(itemId: number) {
-  console.log('认领物品:', itemId)
-  goDetail(itemId)
-}
-
-function handleContact(item: any) {
-  console.log('联系发布者:', item)
-  goDetail(item.itemId)
 }
 
 function goPublish() {
