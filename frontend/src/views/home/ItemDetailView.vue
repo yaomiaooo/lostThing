@@ -11,8 +11,7 @@
             }"
             :style="cardStyle"
           >
-            <!-- 关闭按钮 -->
-            <div class="close-btn" @click="close">×</div>
+
 
             <!-- 内容区 -->
             <div v-if="ready" class="card-content">
@@ -22,6 +21,8 @@
                 class="carousel-container" 
                 ref="carouselContainer"
                 :class="{ 'single-image-mode': images.length === 1 }"
+                @mouseenter="handleMouseEnter"
+                @mouseleave="handleMouseLeave"
               >
                 <!-- 图片容器 -->
                 <div 
@@ -74,7 +75,10 @@
                 <template v-if="images.length > 1">
                   <button 
                     class="arrow-btn arrow-left" 
-                    :class="{ 'arrow-hidden': currentIndex === 0 }"
+                    :class="{ 
+                      'arrow-hidden': currentIndex === 0,
+                      'nav-visible': isHovering
+                    }"
                     @click="prevImage"
                     aria-label="上一张"
                   >
@@ -84,7 +88,10 @@
                   </button>
                   <button 
                     class="arrow-btn arrow-right" 
-                    :class="{ 'arrow-hidden': currentIndex === images.length - 1 }"
+                    :class="{ 
+                      'arrow-hidden': currentIndex === images.length - 1,
+                      'nav-visible': isHovering
+                    }"
                     @click="nextImage"
                     aria-label="下一张"
                   >
@@ -95,14 +102,14 @@
                 </template>
 
                 <!-- 文字指示器（右上角） -->
-                <div v-if="images.length > 1" class="text-indicator">
+                <div v-if="images.length > 1" class="text-indicator" :class="{ 'nav-visible': isHovering }">
                   <div class="indicator-text">
                     {{ currentIndex + 1 }} / {{ images.length }}
                   </div>
                 </div>
                 
                 <!-- 点选择器（底部） -->
-                <div v-if="images.length > 1" class="dots-indicator">
+                <div v-if="images.length > 1" class="dots-indicator" :class="{ 'nav-visible': isHovering }">
                   <div class="indicator-dots">
                     <div 
                       v-for="(img, index) in images" 
@@ -121,37 +128,103 @@
                 class="right-info"
                 :class="{ 'full-width': images.length === 0 }"
               >
+                <!-- 标题 -->
                 <h2 class="title">{{ item.name }}</h2>
 
+                <!-- 类型标签 -->
                 <div class="info-line">
                   <span class="label">类型：</span>
-                  <span>{{ item.itemCategory === 1 ? '失物' : '招领' }}</span>
+                  <span class="category-tag" :class="item.itemCategory === 1 ? 'lost' : 'found'">
+                    {{ item.itemCategory === 1 ? '失物信息' : '招领信息' }}
+                  </span>
                 </div>
 
+                <!-- 物品分类（补充） -->
                 <div class="info-line">
-                  <span class="label">地点：</span>
-                  <span>{{ location?.name }} {{ item.locationDetail }}</span>
+                  <span class="label">分类：</span>
+                  <span>{{ getItemCategoryText() }}</span>
                 </div>
 
+                <!-- 丢失/拾取地点 -->
                 <div class="info-line">
-                  <span class="label">时间：</span>
+                  <span class="label">{{ item.itemCategory === 1 ? '丢失地点' : '拾取地点' }}：</span>
+                  <span>{{ location?.name }} {{ item.locationDetail || '' }}</span>
+                </div>
+
+                <!-- 时间 -->
+                <div class="info-line">
+                  <span class="label">{{ item.itemCategory === 1 ? '丢失时间' : '拾取时间' }}：</span>
                   <span>{{ formatTime(item.happenTime) }}</span>
                 </div>
 
+                <!-- 领取地点（仅招领） -->
+                <div v-if="item.itemCategory === 2 && item.pickupLocation" class="info-line">
+                  <span class="label">领取地点：</span>
+                  <span>{{ item.pickupLocation }}</span>
+                </div>
+
+                <!-- 特征描述 -->
                 <div class="info-block">
                   <span class="label">特征描述：</span>
-                  <p class="feature-text">{{ item.feature }}</p>
+                  <div class="feature-text-wrapper">
+                    <p 
+                      class="feature-text" 
+                      :class="{ 'text-collapsed': isFeatureCollapsed && featureTextLength > 100 }"
+                    >
+                      {{ item.feature }}
+                    </p>
+                    <span 
+                      v-if="featureTextLength > 100" 
+                      class="toggle-text" 
+                      @click="isFeatureCollapsed = !isFeatureCollapsed"
+                    >
+                      {{ isFeatureCollapsed ? '展开' : '收起' }}
+                    </span>
+                  </div>
                 </div>
 
+                <!-- 发布时间 -->
+                <div class="info-line text-muted">
+                  <span class="label">发布时间：</span>
+                  <span>{{ formatTime(item.createTime) }}</span>
+                </div>
+
+                <!-- 联系人 -->
                 <div class="info-line">
                   <span class="label">联系人：</span>
-                  <span class="contact-info">{{ item.contactName }} {{ item.contactPhone }}</span>
+                  <span class="contact-info">{{ item.contactName }}</span>
                 </div>
 
-                <div v-if="item.rewardAmount > 0" class="reward">
-                  <span class="label">悬赏：</span>
-                  <span class="reward-amount">￥{{ item.rewardAmount }}</span>
+                <!-- 联系电话（隐私保护） -->
+                <div class="info-line">
+                  <span class="label">联系电话：</span>
+                  <span class="contact-phone">
+                    {{ showFullPhone ? item.contactPhone : maskPhone(item.contactPhone) }}
+                    <button 
+                      v-if="!showFullPhone" 
+                      class="show-phone-btn" 
+                      @click="showFullPhone = true"
+                    >
+                      查看完整号码
+                    </button>
+                  </span>
+                </div>
+
+                <!-- 悬赏信息（仅失物） -->
+                <div v-if="item.itemCategory === 1 && item.rewardAmount > 0" class="reward">
+                  <span class="label">悬赏金额：</span>
+                  <span class="reward-amount">￥{{ item.rewardAmount.toFixed(2) }}</span>
                   <span v-if="item.rewardDesc" class="reward-desc">（{{ item.rewardDesc }}）</span>
+                </div>
+
+                <!-- 驳回/归档说明（状态相关） -->
+                <div v-if="item.currentStatus === 5 && item.rejectReason" class="status-desc reject-desc">
+                  <span class="label">驳回原因：</span>
+                  <span>{{ item.rejectReason }}</span>
+                </div>
+                <div v-if="item.currentStatus === 7 && item.archiveDesc" class="status-desc archive-desc">
+                  <span class="label">归档说明：</span>
+                  <span>{{ item.archiveDesc }}</span>
                 </div>
               </div>
             </div>
@@ -199,6 +272,8 @@ interface ItemData {
   createTime: string
   locationDetail?: string
   pickupLocation?: string
+  rejectReason?: string
+  archiveDesc?: string
 }
 
 interface LocationData {
@@ -248,6 +323,14 @@ const singleImageSize = ref<{width: number, height: number} | null>(null)
 // DOM引用
 const carouselContainer = ref<HTMLElement | null>(null)
 const carouselTrack = ref<HTMLElement | null>(null)
+
+// 新增：隐私保护和文本折叠
+const showFullPhone = ref(false)
+const isFeatureCollapsed = ref(true)
+const featureTextLength = computed(() => item.value.feature?.length || 0)
+
+// 新增：鼠标悬停控制导航元素显示
+const isHovering = ref(false)
 
 // 计算属性
 const trackStyle = computed(() => {
@@ -388,6 +471,15 @@ const onMultiImageLoad = (e: Event, index: number) => {
   if (loadedImages.value.size === images.value.length) {
     calculateMaxImageWidth()
   }
+}
+
+// 鼠标悬停事件处理
+const handleMouseEnter = () => {
+  isHovering.value = true
+}
+
+const handleMouseLeave = () => {
+  isHovering.value = false
 }
 
 // 触摸事件处理
@@ -556,7 +648,91 @@ const formatTime = (timeStr: string) => {
   }
 }
 
+// 新增：手机号脱敏
+const maskPhone = (phone: string) => {
+  if (!phone || phone.length !== 11) return phone
+  return phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')
+}
+
+// 新增：获取状态文本
+const getStatusText = () => {
+  const statusMap = {
+    1: '待审核',
+    2: '已通过',
+    3: '已匹配',
+    4: '已认领',
+    5: '已驳回',
+    6: '已取消',
+    7: '已归档',
+    8: '无效'
+  }
+  return statusMap[item.value.currentStatus] || '未知状态'
+}
+
+// 新增：获取状态样式类
+const getStatusClass = () => {
+  const statusClassMap = {
+    1: 'status-pending',
+    2: 'status-success',
+    3: 'status-matched',
+    4: 'status-claimed',
+    5: 'status-rejected',
+    6: 'status-canceled',
+    7: 'status-archived',
+    8: 'status-invalid'
+  }
+  return statusClassMap[item.value.currentStatus] || 'status-default'
+}
+
+// 新增：分类数据
+const categoryTree = ref<any[]>([])
+
+// 新增：获取分类树数据
+const loadCategoryTree = async () => {
+  try {
+    const response = await fetch('/api/item/category/tree')
+    if (response.ok) {
+      const result = await response.json()
+      if (result.code === 200) {
+        categoryTree.value = result.data
+      }
+    }
+  } catch (error) {
+    console.error('获取分类树失败:', error)
+  }
+}
+
+// 新增：根据分类ID获取分类名称
+const getCategoryNameById = (categoryId: number) => {
+  if (!categoryTree.value.length) return '未知分类'
+  
+  // 递归查找分类
+  const findCategory = (categories: any[], id: number): string | null => {
+    for (const category of categories) {
+      if (category.id === id) {
+        return category.name
+      }
+      if (category.children && category.children.length > 0) {
+        const found = findCategory(category.children, id)
+        if (found) return found
+      }
+    }
+    return null
+  }
+  
+  return findCategory(categoryTree.value, categoryId) || '未知分类'
+}
+
+// 修改：获取物品分类文本，使用后端数据
+const getItemCategoryText = () => {
+  if (!item.value || !item.value.itemType) return '未知分类'
+  return getCategoryNameById(item.value.itemType)
+}
+
 const close = () => {
+  // 重置隐私状态
+  showFullPhone.value = false
+  isFeatureCollapsed.value = true
   emit('close')
 }
 
@@ -570,6 +746,11 @@ const loadDetail = async () => {
   maxImageWidth.value = 0
   dragOffset.value = 0
   singleImageSize.value = null
+  showFullPhone.value = false
+  isFeatureCollapsed.value = true
+  
+  // 加载分类树数据
+  await loadCategoryTree()
 
   try {
     const res = await axios.get('/api/item/detail', {
@@ -625,6 +806,8 @@ watch(
       dragOffset.value = 0
       isDragging.value = false
       singleImageSize.value = null
+      showFullPhone.value = false
+      isFeatureCollapsed.value = true
     }
   }
 )
@@ -674,32 +857,7 @@ onBeforeUnmount(() => {
   width: 500px;
 }
 
-/* 关闭按钮 */
-.close-btn {
-  position: absolute;
-  right: 20px;
-  top: 16px;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.9);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-  cursor: pointer;
-  z-index: 100;
-  transition: all 0.2s;
-  border: none;
-  color: #333;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-}
-
-.close-btn:hover {
-  background: #fff;
-  transform: scale(1.1);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-}
+/* 关闭按钮已删除，点击空白区域关闭 */
 
 /* 内容区域 */
 .card-content {
@@ -713,7 +871,6 @@ onBeforeUnmount(() => {
   position: relative;
   height: 100%;
   overflow: hidden;
-  /* background: #f8f9fa; */
   background: #ffffff;
   user-select: none;
   touch-action: pan-y pinch-zoom;
@@ -813,12 +970,19 @@ onBeforeUnmount(() => {
   z-index: 10;
   transition: all 0.3s;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  visibility: hidden;
 }
 
 .arrow-btn:hover:not(.arrow-hidden) {
   background: rgba(0, 0, 0, 0.8);
   transform: translateY(-50%) scale(1.1);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.arrow-btn.nav-visible {
+  opacity: 1;
+  visibility: visible;
 }
 
 .arrow-btn svg {
@@ -847,6 +1011,14 @@ onBeforeUnmount(() => {
   top: 20px;
   right: 20px;
   z-index: 10;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+}
+
+.text-indicator.nav-visible {
+  opacity: 1;
+  visibility: visible;
 }
 
 /* 点选择器（底部） */
@@ -858,6 +1030,14 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: center;
   z-index: 10;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+}
+
+.dots-indicator.nav-visible {
+  opacity: 1;
+  visibility: visible;
 }
 
 .indicator-dots {
@@ -911,12 +1091,31 @@ onBeforeUnmount(() => {
   max-width: none;
 }
 
-.title {
-  margin: 0 0 24px 0;
-  font-size: 24px;
-  font-weight: 600;
-  color: #1a1a1a;
-  line-height: 1.4;
+/* 标题 */
+  .title {
+    margin-bottom: 24px;
+    font-size: 24px;
+    font-weight: 600;
+    color: #1a1a1a;
+    line-height: 1.4;
+  }
+
+/* 分类标签 */
+.category-tag {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.category-tag.lost {
+  background: #fff1f0;
+  color: #ff4d4f;
+}
+
+.category-tag.found {
+  background: #f0fff4;
+  color: #52c41a;
 }
 
 .info-line {
@@ -927,15 +1126,26 @@ onBeforeUnmount(() => {
   align-items: flex-start;
 }
 
+/* 浅色调文本 */
+.text-muted {
+  color: #8c8c8c;
+  font-size: 14px;
+}
+
 .label {
   color: #666;
   margin-right: 8px;
-  min-width: 60px;
+  min-width: 70px;
   font-weight: 500;
 }
 
 .info-block {
   margin-bottom: 24px;
+}
+
+/* 特征描述优化 */
+.feature-text-wrapper {
+  position: relative;
 }
 
 .feature-text {
@@ -945,6 +1155,37 @@ onBeforeUnmount(() => {
   border-radius: 8px;
   line-height: 1.7;
   color: #444;
+  transition: max-height 0.3s ease;
+  max-height: 500px;
+}
+
+.feature-text.text-collapsed {
+  max-height: 100px;
+  overflow: hidden;
+  position: relative;
+}
+
+.feature-text.text-collapsed::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  background: linear-gradient(to top, #f8f9fa, transparent);
+}
+
+.toggle-text {
+  display: inline-block;
+  margin-top: 8px;
+  color: #1890ff;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.toggle-text:hover {
+  color: #40a9ff;
+  text-decoration: underline;
 }
 
 .contact-info {
@@ -952,12 +1193,39 @@ onBeforeUnmount(() => {
   color: #2c3e50;
 }
 
+/* 联系电话样式 */
+.contact-phone {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.show-phone-btn {
+  background: #f0f9ff;
+  color: #1890ff;
+  border: none;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.show-phone-btn:hover {
+  background: #e6f7ff;
+  color: #40a9ff;
+}
+
+/* 悬赏样式优化 */
 .reward {
   margin-top: 20px;
   padding: 16px;
   background: linear-gradient(135deg, #fff9e6 0%, #ffe58f 100%);
   border-radius: 8px;
   border-left: 4px solid #faad14;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .reward-amount {
@@ -970,6 +1238,27 @@ onBeforeUnmount(() => {
 .reward-desc {
   color: #8c8c8c;
   font-size: 14px;
+  margin-left: 4px;
+}
+
+/* 状态说明（驳回/归档） */
+.status-desc {
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.reject-desc {
+  background: #fff2f0;
+  color: #f5222d;
+  border-left: 4px solid #ff4d4f;
+}
+
+.archive-desc {
+  background: #f9f0ff;
+  color: #9254de;
+  border-left: 4px solid #9254de;
 }
 
 /* loading 占位 */
@@ -1086,6 +1375,8 @@ onBeforeUnmount(() => {
   .title {
     font-size: 20px;
     margin-bottom: 20px;
+    padding-bottom: 0;
+    border-bottom: none;
   }
   
   .single-image-wrapper {
@@ -1117,13 +1408,7 @@ onBeforeUnmount(() => {
     max-height: 50vh;
   }
   
-  .close-btn {
-    right: 12px;
-    top: 12px;
-    width: 28px;
-    height: 28px;
-    font-size: 20px;
-  }
+  /* 关闭按钮和状态标签已删除 */
   
   .single-image-wrapper {
     height: 45vh;
