@@ -31,4 +31,14 @@ urlpatterns = [
 
     # 6.4.9 获取物品图片
     path('/image/<int:image_id>', views.get_item_image),
+
+    # 6.4.10 获取当前用户的发布记录
+    path('/my-posts', views.get_my_posts),
+    # 6.4.11 修改物品信息   
+    path('/<int:item_id>', views.update_item, name='update_item'),
+    # 6.4.12 取消发布物品
+    path('/<int:item_id>/cancel', views.cancel_item, name='cancel_item'),
+    # 6.4.13 删除物品
+    path('/<int:item_id>/delete', views.delete_item, name='delete_item'),
+
 ]
