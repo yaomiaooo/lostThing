@@ -111,18 +111,18 @@
               </div>
             </div>
 
-            <!-- 地点筛选 -->
+            <!-- 校区筛选 -->
             <div class="filter-group">
-              <div class="group-title">地点</div>
+              <div class="group-title">校区</div>
               <div class="option-buttons">
                 <button 
-                  v-for="location in locations" 
-                  :key="location.value"
+                  v-for="campus in campuses" 
+                  :key="campus.value"
                   class="option-btn"
-                  :class="{ active: filterParams.location === location.value }"
-                  @click="toggleFilter('location', location.value)"
+                  :class="{ active: filterParams.campus === campus.value }"
+                  @click="toggleFilter('campus', campus.value)"
                 >
-                  {{ location.label }}
+                  {{ campus.label }}
                 </button>
               </div>
             </div>
@@ -215,6 +215,7 @@
             <div class="card-content">
               <div class="card-name">{{ item.name }}</div>
               <div class="card-info">
+                <span class="info-item campus">🏫 {{ getCampusName(item.locationId) }}</span>
                 <span class="info-item">📍 {{ item.locationName }}</span>
               </div>
               <div class="card-footer">
@@ -239,6 +240,7 @@
             <div class="card-content">
               <div class="card-name">{{ item.name }}</div>
               <div class="card-info">
+                <span class="info-item campus">🏫 {{ getCampusName(item.locationId) }}</span>
                 <span class="info-item">📍 {{ item.locationName }}</span>
               </div>
               <div class="card-footer">
@@ -285,7 +287,7 @@ const searchKeyword = ref('')
 const showFilterPanel = ref(false)
 const filterParams = ref({
   itemType: '',
-  location: '',
+  campus: '',
   timeRange: '',
   status: ''
 })
@@ -297,13 +299,11 @@ const itemTypes = [
   { value: '2', label: '招领' }
 ]
 
-const locations = [
+const campuses = [
   { value: '', label: '不限' },
-  { value: '图书馆', label: '图书馆' },
-  { value: '教学楼', label: '教学楼' },
-  { value: '宿舍楼', label: '宿舍楼' },
-  { value: '食堂', label: '食堂' },
-  { value: '运动场', label: '运动场' }
+  { value: '1', label: '朝晖校区' },
+  { value: '2', label: '屏峰校区' },
+  { value: '3', label: '莫干山校区' }
 ]
 
 const timeRanges = [
@@ -339,8 +339,12 @@ const filteredLostItems = computed(() => {
     items = items.filter(item => item.itemCategory === parseInt(filterParams.value.itemType))
   }
   
-  if (filterParams.value.location) {
-    items = items.filter(item => item.locationName?.includes(filterParams.value.location))
+  if (filterParams.value.campus) {
+    items = items.filter(item => {
+      if (!item.locationId) return false
+      const campusCode = Math.floor(item.locationId / 10000)
+      return campusCode === parseInt(filterParams.value.campus)
+    })
   }
   
   // 根据当前筛选器类型过滤
@@ -370,8 +374,12 @@ const filteredFoundItems = computed(() => {
     items = items.filter(item => item.itemCategory === parseInt(filterParams.value.itemType))
   }
   
-  if (filterParams.value.location) {
-    items = items.filter(item => item.locationName?.includes(filterParams.value.location))
+  if (filterParams.value.campus) {
+    items = items.filter(item => {
+      if (!item.locationId) return false
+      const campusCode = Math.floor(item.locationId / 10000)
+      return campusCode === parseInt(filterParams.value.campus)
+    })
   }
   
   // 根据当前筛选器类型过滤
@@ -383,6 +391,21 @@ const filteredFoundItems = computed(() => {
     return items
   }
 })
+
+/* ================= 校区信息 ================= */
+function getCampusName(locationId: number): string {
+  const campusCode = Math.floor(locationId / 10000)
+  switch (campusCode) {
+    case 1:
+      return '朝晖校区'
+    case 2:
+      return '屏峰校区'
+    case 3:
+      return '莫干山校区'
+    default:
+      return '未知校区'
+  }
+}
 
 /* ================= 时间格式化 ================= */
 const currentTime = computed(() => {
@@ -416,7 +439,7 @@ const toggleFilter = (type: string, value: string) => {
 const resetFilters = () => {
   filterParams.value = {
     itemType: '',
-    location: '',
+    campus: '',
     timeRange: '',
     status: ''
   }
@@ -526,6 +549,7 @@ async function loadItems() {
         itemId: 1, 
         name: '校园卡（张三）', 
         locationName: '图书馆三楼自习区', 
+        locationId: 10301,
         itemCategory: 1,
         itemType: 101,
         happenTime: '2025-03-01 14:00:00',
@@ -658,8 +682,12 @@ async function logout() {
   } catch (error) {
     console.error('退出登录失败:', error)
   } finally {
+    // 清理所有存储
     localStorage.clear()
-    router.push('/login')
+    sessionStorage.clear()
+    
+    // 使用 replace 而不是 push，避免路由守卫拦截
+    router.replace('/login')
   }
 }
 </script>

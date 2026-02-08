@@ -145,6 +145,12 @@
                   <span>{{ getItemCategoryText() }}</span>
                 </div>
 
+                <!-- 校区 -->
+                <div class="info-line">
+                  <span class="label">校区：</span>
+                  <span>{{ getCampusName(item.locationId) }}</span>
+                </div>
+
                 <!-- 丢失/拾取地点 -->
                 <div class="info-line">
                   <span class="label">{{ item.itemCategory === 1 ? '丢失地点' : '拾取地点' }}：</span>
@@ -652,6 +658,21 @@ const formatTime = (timeStr: string) => {
 const maskPhone = (phone: string) => {
   if (!phone || phone.length !== 11) return phone
   return phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')
+}
+
+// 新增：校区信息
+function getCampusName(locationId: number): string {
+  const campusCode = Math.floor(locationId / 10000)
+  switch (campusCode) {
+    case 1:
+      return '朝晖校区'
+    case 2:
+      return '屏峰校区'
+    case 3:
+      return '莫干山校区'
+    default:
+      return '未知校区'
+  }
 }
 
 // // 新增：获取状态文本
