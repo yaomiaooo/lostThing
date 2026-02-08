@@ -452,6 +452,17 @@
         </div>
       </div>
     </div>
+
+    <!-- 物品详情卡片 -->
+    <ItemDetailView
+      :visible="showItemDetail"
+      :itemId="currentItemId"
+      :show-actions="true"
+      @close="handleDetailClose"
+      @edit="handleDetailEdit"
+      @delete="handleDetailDelete"
+      @cancel="handleDetailCancel"
+    />
   </div>
 </template>
 
@@ -459,6 +470,7 @@
 import { ref, onMounted, reactive, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
+import ItemDetailView from './ItemDetailView.vue'
 
 const router = useRouter()
 
@@ -497,6 +509,10 @@ const editingPost = ref<any>(null)
 const deletingPost = ref<any>(null)
 const cancelingPost = ref<any>(null)
 const submitting = ref(false)
+
+/* ================= 物品详情卡片状态 ================= */
+const showItemDetail = ref(false)
+const currentItemId = ref<number | null>(null)
 
 /* ================= 分类数据和地点数据 ================= */
 const categoryTree = ref<any[]>([])
@@ -777,22 +793,15 @@ function setStatusFilter(status: string) {
 
 /* ================= 操作函数 ================= */
 function editPost(post: any) {
-  editingPost.value = { ...post }
-  
-  // 设置校区
-  if (post.locationId) {
-    const campusCode = Math.floor(post.locationId / 10000)
-    editingPost.value.campus = campusCode.toString()
+  // 验证post对象和itemId字段
+  if (!post || !post.itemId) {
+    console.error('编辑失败：物品数据不完整，缺少itemId', post)
+    alert('编辑失败：物品数据不完整，请重试')
+    return
   }
   
-  // 格式化时间以便datetime-local使用
-  if (editingPost.value.happenTime) {
-    editingPost.value.happenTime = editingPost.value.happenTime.replace(' ', 'T').substring(0, 16)
-  }
-  
-  // 过滤地点选项
-  filterLocationOptions()
-  showEditModal.value = true
+  // 跳转到发布页面进行编辑，传递物品ID作为参数
+  router.push(`/publish?edit=true&itemId=${post.itemId}`)
 }
 
 function handleCategoryChange() {
@@ -911,7 +920,31 @@ function closeCancelConfirm() {
 }
 
 function viewDetail(post: any) {
-  router.push(`/item/detail?itemId=${post.itemId}`)
+  currentItemId.value = post.itemId
+  showItemDetail.value = true
+}
+
+function handleDetailClose() {
+  showItemDetail.value = false
+  currentItemId.value = null
+}
+
+function handleDetailEdit(itemData: any) {
+  showItemDetail.value = false
+  // 调用现有的编辑方法
+  editPost(itemData)
+}
+
+function handleDetailDelete(itemData: any) {
+  showItemDetail.value = false
+  // 调用现有的删除确认方法
+  confirmDelete(itemData)
+}
+
+function handleDetailCancel(itemData: any) {
+  showItemDetail.value = false
+  // 调用现有的取消发布确认方法
+  confirmCancel(itemData)
 }
 
 /* ================= 路由跳转 ================= */

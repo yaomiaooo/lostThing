@@ -68,8 +68,8 @@
         <!-- 发布表单卡片 -->
         <div class="publish-form-card bubble">
           <div class="form-header">
-            <h2 class="form-title">发布物品信息</h2>
-            <div class="form-subtitle">请仔细填写以下信息，确保准确无误</div>
+            <h2 class="form-title">{{ isEditMode ? '编辑物品信息' : '发布物品信息' }}</h2>
+            <div class="form-subtitle">{{ isEditMode ? '请修改物品信息，确保准确无误' : '请仔细填写以下信息，确保准确无误' }}</div>
           </div>
 
           <!-- 表单内容 - 优化双栏布局 -->
@@ -534,9 +534,9 @@
               >
                 <span v-if="submitting" class="loading-text">
                   <span class="loading-spinner"></span>
-                  提交中...
+                  {{ isEditMode ? '更新中...' : '提交中...' }}
                 </span>
-                <span v-else>发布信息</span>
+                <span v-else>{{ isEditMode ? '更新信息' : '发布信息' }}</span>
               </button>
             </div>
           </form>
@@ -549,16 +549,16 @@
       <div class="modal-content bubble">
         <div class="modal-header">
           <div class="modal-icon">✅</div>
-          <h3 class="modal-title">发布成功！</h3>
+          <h3 class="modal-title">{{ isEditMode ? '更新成功！' : '发布成功！' }}</h3>
         </div>
         <div class="modal-body">
-          <p>您的物品信息已成功提交，等待管理员审核。</p>
-          <p>审核通过后将在首页显示。</p>
+          <p>{{ isEditMode ? '您的物品信息已成功更新。' : '您的物品信息已成功提交，等待管理员审核。' }}</p>
+          <p v-if="!isEditMode">审核通过后将在首页显示。</p>
           <p>您可以在"我的"页面查看审核进度。</p>
         </div>
         <div class="modal-footer">
           <button class="modal-btn view-btn" @click="goToDetail">查看详情</button>
-          <button class="modal-btn back-btn" @click="goBack">返回首页</button>
+          <button class="modal-btn back-btn" @click="goBack">{{ isEditMode ? '返回我的' : '返回首页' }}</button>
         </div>
       </div>
     </div>
@@ -566,11 +566,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, reactive, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, reactive, computed, onBeforeMount, watch, nextTick } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import axios from 'axios'
 
 const router = useRouter()
+const route = useRoute()
 
 /* ================= 用户信息 ================= */
 const user = ref({
@@ -709,14 +710,26 @@ const locations = computed(() => {
 
 /* ================= 图片上传 ================= */
 const fileInput = ref<HTMLInputElement>()
-const images = ref<Array<{ file: File; previewUrl: string }>>([])
+const images = ref<Array<{ 
+  file?: File;  // 新上传的文件
+  previewUrl: string;  // 图片预览URL
+  isOriginal?: boolean; // 是否为原始图片
+  originalId?: number; // 原始图片ID
+}>>([])
 const dragOver = ref(false)
 const draggedImageIndex = ref<number | null>(null)
+
+/* ================= 编辑模式状态 ================= */
+const isEditMode = ref(false)
+const editingItemId = ref<number | null>(null)
 
 /* ================= 表单状态 ================= */
 const submitting = ref(false)
 const showSuccessModal = ref(false)
 const publishedItemId = ref<number | null>(null)
+
+/* ================= 加载状态 ================= */
+const loadingData = ref(false)
 
 /* ================= 工具函数 ================= */
 function getDefaultDateTime(): string {
@@ -734,12 +747,206 @@ const currentDate = computed(() => {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 })
 
+/* ================= URL参数解析 ================= */
+onBeforeMount(() => {
+  // 解析URL参数，判断是否为编辑模式
+  const editParam = route.query.edit
+  const itemIdParam = route.query.itemId
+  
+  if (editParam === 'true' && itemIdParam) {
+    isEditMode.value = true
+    editingItemId.value = parseInt(itemIdParam as string)
+    console.log('编辑模式，物品ID:', editingItemId.value)
+  }
+})
+
 /* ================= 生命周期 ================= */
 onMounted(() => {
   loadUser()
   loadCategoryTree()
   loadLocationTree()
+  
+  // 添加对分类树和地点树加载完成的监听
+  watch([() => categoryTree.value.length, () => locationTree.value.length], 
+    ([categoryLoaded, locationLoaded]) => {
+      console.log('分类树和地点树加载状态:', { categoryLoaded, locationLoaded })
+      // 如果是编辑模式且两个树都已加载，则加载物品数据
+      if (isEditMode.value && editingItemId.value && categoryLoaded > 0 && locationLoaded > 0) {
+        console.log('开始加载物品数据...')
+        loadItemData(editingItemId.value)
+      }
+    },
+    { immediate: true }
+  )
 })
+
+/* ================= 物品数据加载 ================= */
+async function loadItemData(itemId: number) {
+  if (loadingData.value) return
+  
+  loadingData.value = true
+  console.log('加载物品数据，ID:', itemId)
+  
+  try {
+    const res = await axios.get('/api/item/detail', {
+      params: { itemId: itemId }
+    })
+    
+    console.log('物品详情接口返回:', res.data)
+    
+    if (res.data.code === 200) {
+      const itemData = res.data.data.item || res.data.data
+      
+      console.log('物品数据:', itemData)
+      
+      // 等待分类和地点数据加载完成后再填充表单
+      await nextTick() // 等待DOM更新
+      
+      // 填充表单数据
+      fillFormData(itemData)
+      
+      // 加载物品图片
+      if (res.data.data.images && res.data.data.images.length > 0) {
+        console.log('加载物品图片:', res.data.data.images)
+        await loadItemImages(res.data.data.images)
+      }
+    } else {
+      console.error('获取物品详情失败:', res.data.msg)
+      alert('加载物品数据失败，请重试')
+    }
+  } catch (error) {
+    console.error('加载物品数据失败:', error)
+    alert('加载物品数据失败，请检查网络连接')
+  } finally {
+    loadingData.value = false
+  }
+}
+
+/* ================= 表单数据填充 ================= */
+function fillFormData(itemData: any) {
+  console.log('填充表单数据:', itemData)
+  
+  // 基础表单数据
+  formData.itemCategory = itemData.itemCategory
+  formData.itemType = itemData.itemType
+  formData.name = itemData.name
+  formData.locationId = itemData.locationId
+  formData.locationDetail = itemData.locationDetail || ''
+  formData.pickupLocation = itemData.pickupLocation || ''
+  
+  // 格式化时间（兼容datetime-local格式）
+  if (itemData.happenTime) {
+    let timeStr = itemData.happenTime
+    if (timeStr.includes(' ')) {
+      timeStr = timeStr.replace(' ', 'T')
+    }
+    // 确保格式为 YYYY-MM-DDTHH:mm
+    if (timeStr.includes(':')) {
+      const parts = timeStr.split(':')
+      if (parts.length >= 2) {
+        timeStr = `${parts[0]}:${parts[1]}`
+      }
+    }
+    formData.happenTime = timeStr.substring(0, 16)
+  }
+  
+  formData.feature = itemData.feature
+  formData.rewardAmount = itemData.rewardAmount || 0
+  formData.rewardDesc = itemData.rewardDesc || ''
+  formData.contactName = itemData.contactName
+  formData.contactPhone = itemData.contactPhone
+  
+  console.log('填充后的表单数据:', formData)
+  
+  // 设置分类选择器
+  setupCategorySelectors(itemData.itemType)
+  
+  // 设置地点选择器
+  setupLocationSelectors(itemData.locationId)
+}
+
+/* ================= 分类选择器设置 ================= */
+function setupCategorySelectors(itemType: number) {
+  console.log('设置分类选择器，itemType:', itemType)
+  
+  // 等待分类树加载完成后再设置
+  if (categoryTree.value.length === 0) {
+    console.warn('分类树尚未加载完成')
+    return
+  }
+  
+  // 查找对应的分类
+  for (const firstCat of categoryTree.value) {
+    if (firstCat.children) {
+      for (const secondCat of firstCat.children) {
+        if (secondCat.id === itemType) {
+          console.log('找到分类:', firstCat.id, secondCat.id)
+          selectedFirstCategory.value = firstCat.id
+          selectedSecondCategory.value = secondCat.id
+          formData.itemType = secondCat.id
+          return
+        }
+      }
+    }
+  }
+  
+  console.warn('未找到对应的分类:', itemType)
+}
+
+/* ================= 地点选择器设置 ================= */
+function setupLocationSelectors(locationId: number) {
+  console.log('设置地点选择器，locationId:', locationId)
+  
+  // 等待地点树加载完成后再设置
+  if (locationTree.value.length === 0) {
+    console.warn('地点树尚未加载完成')
+    return
+  }
+  
+  // 查找对应的地点层级
+  for (const campus of locationTree.value) {
+    if (campus.children) {
+      for (const area of campus.children) {
+        if (area.children) {
+          for (const location of area.children) {
+            if (location.id === locationId) {
+              console.log('找到地点:', campus.id, area.id, location.id)
+              selectedCampus.value = campus.id
+              selectedArea.value = area.id
+              selectedLocation.value = location.id
+              formData.locationId = location.id
+              return
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  console.warn('未找到对应的地点:', locationId)
+}
+
+/* ================= 物品图片加载 ================= */
+async function loadItemImages(imageList: Array<{ id: number; url: string }>) {
+  console.log('加载物品图片:', imageList)
+  
+  try {
+    images.value = [] // 清空当前图片数组
+    
+    // 对于每个图片，我们直接使用图片的URL作为预览，并保存图片ID
+    for (const image of imageList) {
+      images.value.push({
+        previewUrl: image.url,
+        isOriginal: true,
+        originalId: image.id
+      })
+    }
+    
+    console.log('图片加载完成:', images.value)
+  } catch (error) {
+    console.error('加载物品图片失败:', error)
+  }
+}
 
 /* ================= 数据加载 ================= */
 async function loadUser() {
@@ -747,22 +954,88 @@ async function loadUser() {
     const res = await axios.get('/api/user/info')
     if (res.data.code === 0) {
       user.value = res.data.data
-      formData.contactName = user.value.realName
-      formData.contactPhone = user.value.phone
+      // 如果表单中的联系人信息为空，用用户信息填充
+      if (!formData.contactName) {
+        formData.contactName = user.value.realName
+      }
+      if (!formData.contactPhone) {
+        formData.contactPhone = user.value.phone
+      }
     }
   } catch (error) {
     console.error('加载用户信息失败:', error)
+    // 使用模拟数据
+    user.value = {
+      id: 1,
+      username: 'testuser',
+      realName: '测试用户',
+      phone: '13800138000',
+      role: 1,
+      status: 1
+    }
   }
 }
 
 async function loadCategoryTree() {
   try {
     const res = await axios.get('/api/item/category/tree')
+    console.log('分类树接口返回:', res.data)
+    
     if (res.data.code === 200 && Array.isArray(res.data.data)) {
       categoryTree.value = res.data.data
+      console.log('分类树加载完成，数量:', categoryTree.value.length)
     } else {
-      console.error('分类树接口返回的数据格式不正确')
-      categoryTree.value = []
+      console.error('分类树接口返回的数据格式不正确:', res.data)
+      // 使用默认数据
+      categoryTree.value = [
+        {
+          id: 1,
+          name: '证件',
+          children: [
+            { id: 101, name: '校园卡' },
+            { id: 102, name: '身份证' },
+            { id: 103, name: '学生证' },
+            { id: 104, name: '银行卡' }
+          ]
+        },
+        {
+          id: 2,
+          name: '电子设备',
+          children: [
+            { id: 201, name: '手机' },
+            { id: 202, name: '耳机' },
+            { id: 203, name: '平板电脑' },
+            { id: 204, name: '充电宝' },
+            { id: 205, name: '电脑' }
+          ]
+        },
+        {
+          id: 3,
+          name: '日用品',
+          children: [
+            { id: 301, name: '水杯' },
+            { id: 302, name: '雨伞' },
+            { id: 303, name: '衣物' },
+            { id: 304, name: '钥匙' }
+          ]
+        },
+        {
+          id: 4,
+          name: '学习用品',
+          children: [
+            { id: 401, name: '书本' },
+            { id: 402, name: '笔记本' },
+            { id: 403, name: '文具' }
+          ]
+        },
+        {
+          id: 5,
+          name: '其他',
+          children: [
+            { id: 501, name: '其他物品' }
+          ]
+        }
+      ]
     }
   } catch (error) {
     console.error('加载分类树失败:', error)
@@ -773,11 +1046,60 @@ async function loadCategoryTree() {
 async function loadLocationTree() {
   try {
     const res = await axios.get('/api/item/location/tree')
+    console.log('地点树接口返回:', res.data)
+    
     if (res.data.code === 200 && Array.isArray(res.data.data)) {
       locationTree.value = res.data.data
+      console.log('地点树加载完成，数量:', locationTree.value.length)
     } else {
-      console.error('地点树接口返回的数据格式不正确')
-      locationTree.value = []
+      console.error('地点树接口返回的数据格式不正确:', res.data)
+      // 使用默认数据
+      locationTree.value = [
+        {
+          id: 1,
+          name: '朝晖校区',
+          children: [
+            {
+              id: 101,
+              name: '教学楼',
+              children: [
+                { id: 10101, name: '文荟楼' },
+                { id: 10102, name: '文萃楼' },
+                { id: 10103, name: '文荟楼' }
+              ]
+            },
+            {
+              id: 102,
+              name: '图书馆',
+              children: [
+                { id: 10201, name: '朝晖图书馆' }
+              ]
+            }
+          ]
+        },
+        {
+          id: 2,
+          name: '屏峰校区',
+          children: [
+            {
+              id: 201,
+              name: '教学楼',
+              children: [
+                { id: 20101, name: '健行楼 A 楼' },
+                { id: 20102, name: '健行楼 B 楼' },
+                { id: 20103, name: '广知楼' }
+              ]
+            },
+            {
+              id: 202,
+              name: '图书馆',
+              children: [
+                { id: 20201, name: '屏峰图书馆' }
+              ]
+            }
+          ]
+        }
+      ]
     }
   } catch (error) {
     console.error('加载地点树失败:', error)
@@ -886,7 +1208,11 @@ function handleFiles(fileList: File[]) {
     }
     
     const previewUrl = URL.createObjectURL(file)
-    images.value.push({ file, previewUrl })
+    images.value.push({ 
+      file: file, 
+      previewUrl: previewUrl,
+      isOriginal: false
+    })
   })
   
   clearFormError('images')
@@ -894,7 +1220,12 @@ function handleFiles(fileList: File[]) {
 
 function removeImage(index: number) {
   if (submitting.value) return
-  URL.revokeObjectURL(images.value[index].previewUrl)
+  
+  // 释放新图片的URL
+  if (!images.value[index].isOriginal) {
+    URL.revokeObjectURL(images.value[index].previewUrl)
+  }
+  
   images.value.splice(index, 1)
   clearFormError('images')
 }
@@ -902,7 +1233,10 @@ function removeImage(index: number) {
 function clearAllImages() {
   if (submitting.value) return
   images.value.forEach(image => {
-    URL.revokeObjectURL(image.previewUrl)
+    // 只释放新上传图片的URL
+    if (!image.isOriginal) {
+      URL.revokeObjectURL(image.previewUrl)
+    }
   })
   images.value = []
   clearFormError('images')
@@ -1050,23 +1384,56 @@ async function submitForm() {
       locationDetail: formData.locationDetail || ''
     }
     
-    const itemRes = await axios.post('/api/item', submitData)
+    console.log('提交的数据:', submitData)
     
-    if (itemRes.data.code === 200) {
-      const itemId = itemRes.data.data.itemId
-      publishedItemId.value = itemId
+    let itemId: number
+    
+    if (isEditMode.value && editingItemId.value) {
+      // 编辑模式：调用更新接口
+      console.log('调用更新接口，itemId:', editingItemId.value)
+      const updateRes = await axios.put(`/api/item/${editingItemId.value}`, submitData)
       
-      if (images.value.length > 0) {
-        await uploadImages(itemId)
+      console.log('更新接口返回:', updateRes.data)
+      
+      if (updateRes.data.code === 200) {
+        itemId = editingItemId.value
+        publishedItemId.value = itemId
+        
+        // 调用图片更新接口（删除所有旧图片，上传所有新图片）
+        if (images.value.length > 0) {
+          await updateItemImages(itemId)
+        } else {
+          // 如果没有图片，调用空更新以删除所有旧图片
+          await updateItemImagesEmpty(itemId)
+        }
+        
+        showSuccessModal.value = true
+      } else {
+        throw new Error(updateRes.data.msg || '更新失败')
       }
-      
-      showSuccessModal.value = true
     } else {
-      throw new Error(itemRes.data.msg || '发布失败')
+      // 发布模式：调用创建接口
+      console.log('调用创建接口')
+      const itemRes = await axios.post('/api/item', submitData)
+      
+      console.log('创建接口返回:', itemRes.data)
+      
+      if (itemRes.data.code === 200) {
+        itemId = itemRes.data.data.itemId
+        publishedItemId.value = itemId
+        
+        if (images.value.length > 0) {
+          await uploadImages(itemId)
+        }
+        
+        showSuccessModal.value = true
+      } else {
+        throw new Error(itemRes.data.msg || '发布失败')
+      }
     }
   } catch (error: any) {
-    console.error('发布失败:', error)
-    alert(`发布失败: ${error.message || '网络错误'}`)
+    console.error(isEditMode.value ? '更新失败:' : '发布失败:', error)
+    alert(`${isEditMode.value ? '更新' : '发布'}失败: ${error.message || '网络错误'}`)
   } finally {
     submitting.value = false
   }
@@ -1076,31 +1443,124 @@ function formatDateTime(datetimeLocal: string): string {
   return datetimeLocal.replace('T', ' ') + ':00'
 }
 
+/* ================= 图片处理函数 ================= */
+
+// 发布模式：上传图片
 async function uploadImages(itemId: number) {
-  const uploadPromises = images.value.map(async (image, index) => {
-    const uploadFormData = new FormData()
-    uploadFormData.append('itemId', itemId.toString())
-    uploadFormData.append('imageType', formData.itemCategory.toString())
-    uploadFormData.append('sort', (index + 1).toString())
-    uploadFormData.append('file', image.file)
+  console.log('发布模式：上传图片，itemId:', itemId)
+  
+  for (let i = 0; i < images.value.length; i++) {
+    const image = images.value[i]
+    
+    // 只上传有file对象的图片
+    if (!image.file) {
+      console.warn(`图片 ${i} 没有file对象，跳过`)
+      continue
+    }
     
     try {
+      const uploadFormData = new FormData()
+      uploadFormData.append('itemId', itemId.toString())
+      uploadFormData.append('imageType', formData.itemCategory.toString())
+      uploadFormData.append('sort', (i + 1).toString())
+      uploadFormData.append('file', image.file)
+      
+      console.log(`上传图片 ${i + 1}`)
       await axios.post('/api/item/image/upload', uploadFormData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }
       })
     } catch (error) {
-      console.error(`图片${index + 1}上传失败:`, error)
+      console.error(`图片${i + 1}上传失败:`, error)
     }
-  })
+  }
+}
+
+// 编辑模式：调用新的图片更新接口
+async function updateItemImages(itemId: number) {
+  console.log('编辑模式：调用图片更新接口，itemId:', itemId)
   
-  await Promise.all(uploadPromises)
+  try {
+    const formData = new FormData()
+    
+    // 将所有图片添加到formData中
+    for (let i = 0; i < images.value.length; i++) {
+      const image = images.value[i]
+      
+      if (image.file) {
+        // 新上传的图片，直接添加
+        formData.append('images', image.file)
+      } else if (image.isOriginal && image.previewUrl) {
+        // 原始图片，需要从URL获取并转换为File对象
+        try {
+          console.log(`处理原始图片: ${image.previewUrl}`)
+          const response = await fetch(image.previewUrl)
+          if (response.ok) {
+            const blob = await response.blob()
+            const file = new File([blob], `image_${image.originalId || i}.jpg`, { type: blob.type })
+            formData.append('images', file)
+          } else {
+            console.error(`无法获取原始图片: ${image.previewUrl}`, response.status)
+          }
+        } catch (error) {
+          console.error(`获取原始图片失败 ${i}:`, error)
+        }
+      }
+    }
+    
+    // 调用图片更新接口
+    const response = await axios.post(`/api/item/${itemId}/images/update`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+    
+    console.log('图片更新接口返回:', response.data)
+    
+    if (response.data.code !== 200) {
+      throw new Error(response.data.msg || '图片更新失败')
+    }
+  } catch (error) {
+    console.error('图片更新失败:', error)
+    throw error
+  }
+}
+
+// 编辑模式：清空所有图片（当用户删除所有图片时调用）
+async function updateItemImagesEmpty(itemId: number) {
+  console.log('清空物品的所有图片，itemId:', itemId)
+  
+  try {
+    // 创建一个空的FormData
+    const formData = new FormData()
+    
+    // 调用图片更新接口（没有图片，会删除所有旧图片）
+    const response = await axios.post(`/api/item/${itemId}/images/update`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+    
+    console.log('清空图片接口返回:', response.data)
+    
+    if (response.data.code !== 200) {
+      throw new Error(response.data.msg || '清空图片失败')
+    }
+  } catch (error) {
+    console.error('清空图片失败:', error)
+    throw error
+  }
 }
 
 /* ================= 导航操作 ================= */
 function goBack() {
-  router.push('/')
+  if (isEditMode.value) {
+    // 编辑模式下返回"我的"页面
+    router.push('/my-posts')
+  } else {
+    router.push('/')
+  }
 }
 
 async function logout() {

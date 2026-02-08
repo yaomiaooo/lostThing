@@ -1139,3 +1139,121 @@ def cancel_item(request, item_id):
         'code': 200,
         'msg': '取消发布成功'
     })
+
+
+@csrf_exempt
+def update_item_images(request, item_id):
+    """
+    更新物品图片（批量操作）
+    URL: POST /api/item/{item_id}/images/update
+    说明：删除旧图片，上传新图片，一次性完成
+    """
+    
+    # 1. 只允许 POST 请求
+    if request.method != 'POST':
+        return JsonResponse({
+            'code': 405,
+            'msg': '请求方法不允许'
+        })
+    
+    # 2. 获取当前登录用户
+    user_id = request.session.get('user_id')
+    if not user_id:
+        return JsonResponse({
+            'code': 401,
+            'msg': '未登录，请先登录'
+        })
+    
+    # 3. 查询物品
+    try:
+        item = Item.objects.get(id=item_id)
+    except Item.DoesNotExist:
+        return JsonResponse({
+            'code': 404,
+            'msg': '物品不存在'
+        })
+    
+    # 4. 权限校验：只有发布者可以更新图片
+    if item.user_id != user_id:
+        return JsonResponse({
+            'code': 403,
+            'msg': '无权限更新此物品的图片'
+        })
+    
+    # 5. 删除所有旧图片
+    try:
+        deleted_count, _ = ItemImage.objects.filter(item_id=item_id).delete()
+        print(f"删除了 {deleted_count} 张旧图片")
+    except Exception as e:
+        return JsonResponse({
+            'code': 500,
+            'msg': '删除旧图片失败',
+            'error': str(e)
+        })
+    
+    # 6. 获取新图片
+    images_data = []
+    
+    # 检查是否是多部分表单数据
+    if request.content_type.startswith('multipart/form-data'):
+        # 处理上传的图片文件
+        files = request.FILES.getlist('images')
+        
+        if len(files) > 5:
+            return JsonResponse({
+                'code': 400,
+                'msg': '最多只能上传5张图片'
+            })
+        
+        for index, file in enumerate(files):
+            if not file.content_type.startswith('image/'):
+                return JsonResponse({
+                    'code': 400,
+                    'msg': '只能上传图片文件'
+                })
+            
+            if file.size > 5 * 1024 * 1024:
+                return JsonResponse({
+                    'code': 400,
+                    'msg': f'图片"{file.name}"大小不能超过5MB'
+                })
+            
+            try:
+                # 读取图片二进制
+                image_bytes = file.read()
+                
+                # 创建图片记录
+                item_image = ItemImage.objects.create(
+                    item_id=item_id,
+                    image_data=image_bytes,
+                    image_url=file.name,
+                    image_type=item.item_category,  # 使用物品类型
+                    sort=index + 1
+                )
+                
+                images_data.append({
+                    'imageId': item_image.id,
+                    'sort': item_image.sort
+                })
+                
+            except Exception as e:
+                return JsonResponse({
+                    'code': 500,
+                    'msg': f'保存图片"{file.name}"失败',
+                    'error': str(e)
+                })
+    
+    # 7. 更新物品的更新时间
+    item.update_time = timezone.now()
+    item.save()
+    
+    # 8. 返回结果
+    return JsonResponse({
+        'code': 200,
+        'msg': '图片更新成功',
+        'data': {
+            'deletedCount': deleted_count,
+            'uploadedCount': len(images_data),
+            'images': images_data
+        }
+    })

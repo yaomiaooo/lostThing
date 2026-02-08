@@ -40,5 +40,6 @@ urlpatterns = [
     path('/<int:item_id>/cancel', views.cancel_item, name='cancel_item'),
     # 6.4.13 删除物品
     path('/<int:item_id>/delete', views.delete_item, name='delete_item'),
-
+    # 6.4.14 更新物品图片
+    path('/<int:item_id>/images/update', views.update_item_images, name='update_item_images'),
 ]
