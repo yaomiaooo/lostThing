@@ -111,7 +111,7 @@
               </div>
             </div>
 
-            <!-- 校区筛选 -->
+             <!-- 校区筛选 -->
             <div class="filter-group">
               <div class="group-title">校区</div>
               <div class="option-buttons">
@@ -126,6 +126,58 @@
                 </button>
               </div>
             </div>
+
+            <!-- 物品分类筛选 -->
+            <div class="filter-group">
+              <div class="group-title">物品分类</div>
+              
+              <!-- 一级分类 -->
+              <div class="category-level">
+                <div class="option-buttons">
+                  <button 
+                    class="option-btn" 
+                    :class="{ active: filterParams.category === '' }" 
+                    @click="toggleCategoryFilter('', '')" 
+                  >
+                    不限
+                  </button>
+                  <button 
+                    v-for="category in categoryTree" 
+                    :key="category.id" 
+                    class="option-btn" 
+                    :class="{ active: filterParams.category === category.id.toString() }" 
+                    @click="toggleCategoryFilter(category.id.toString(), '')" 
+                  >
+                    {{ category.name }}
+                  </button>
+                </div>
+              </div>
+              
+              <!-- 二级分类 -->
+              <div v-if="filterParams.category && getSubCategories(filterParams.category).length > 0" class="category-level sub-category">
+                <div class="group-title sub-title">{{ getCategoryName(filterParams.category) }}</div>
+                <div class="option-buttons">
+                  <button 
+                    class="option-btn" 
+                    :class="{ active: filterParams.subCategory === '' }" 
+                    @click="toggleSubCategoryFilter('')" 
+                  >
+                    不限
+                  </button>
+                  <button 
+                    v-for="subCategory in getSubCategories(filterParams.category)" 
+                    :key="subCategory.id" 
+                    class="option-btn" 
+                    :class="{ active: filterParams.subCategory === subCategory.id.toString() }" 
+                    @click="toggleSubCategoryFilter(subCategory.id.toString())" 
+                  >
+                    {{ subCategory.name }}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+           
 
             <!-- 时间范围筛选 -->
             <div class="filter-group">
@@ -287,6 +339,8 @@ const searchKeyword = ref('')
 const showFilterPanel = ref(false)
 const filterParams = ref({
   itemType: '',
+  category: '',
+  subCategory: '',
   campus: '',
   timeRange: '',
   status: ''
@@ -298,6 +352,87 @@ const itemTypes = [
   { value: '1', label: '失物' },
   { value: '2', label: '招领' }
 ]
+
+// 分类树数据结构
+const categoryTree = [
+  {
+    id: 1,
+    name: '证件',
+    children: [
+      { id: 101, name: '校园卡' },
+      { id: 102, name: '身份证' },
+      { id: 103, name: '学生证' },
+      { id: 104, name: '银行卡' }
+    ]
+  },
+  {
+    id: 2,
+    name: '电子设备',
+    children: [
+      { id: 201, name: '手机' },
+      { id: 202, name: '耳机' },
+      { id: 203, name: '平板电脑' },
+      { id: 204, name: '充电宝' },
+      { id: 205, name: '电脑' }
+    ]
+  },
+  {
+    id: 3,
+    name: '日用品',
+    children: [
+      { id: 301, name: '水杯' },
+      { id: 302, name: '雨伞' },
+      { id: 303, name: '衣物' },
+      { id: 304, name: '钥匙' }
+    ]
+  },
+  {
+    id: 4,
+    name: '学习用品',
+    children: [
+      { id: 401, name: '书本' },
+      { id: 402, name: '笔记本' },
+      { id: 403, name: '文具' }
+    ]
+  },
+  {
+    id: 5,
+    name: '其他',
+    children: [
+      { id: 501, name: '其他物品' }
+    ]
+  }
+]
+
+const subCategoriesMap = {
+  1: [
+    { id: 101, name: '校园卡' },
+    { id: 102, name: '身份证' },
+    { id: 103, name: '学生证' },
+    { id: 104, name: '银行卡' }
+  ],
+  2: [
+    { id: 201, name: '手机' },
+    { id: 202, name: '耳机' },
+    { id: 203, name: '平板电脑' },
+    { id: 204, name: '充电宝' },
+    { id: 205, name: '电脑' }
+  ],
+  3: [
+    { id: 301, name: '水杯' },
+    { id: 302, name: '雨伞' },
+    { id: 303, name: '衣物' },
+    { id: 304, name: '钥匙' }
+  ],
+  4: [
+    { id: 401, name: '书本' },
+    { id: 402, name: '笔记本' },
+    { id: 403, name: '文具' }
+  ],
+  5: [
+    { id: 501, name: '其他物品' }
+  ]
+}
 
 const campuses = [
   { value: '', label: '不限' },
@@ -339,6 +474,19 @@ const filteredLostItems = computed(() => {
     items = items.filter(item => item.itemCategory === parseInt(filterParams.value.itemType))
   }
   
+  // 分类筛选
+  if (filterParams.value.category) {
+    if (filterParams.value.subCategory) {
+      // 二级分类筛选
+      items = items.filter(item => {
+        if (!item.itemType) return false
+        const categoryCode = Math.floor(parseInt(filterParams.value.subCategory) / 100)
+        const itemCategoryCode = Math.floor(item.itemType / 100)
+        return itemCategoryCode === categoryCode
+      })
+    }
+  }
+  
   if (filterParams.value.campus) {
     items = items.filter(item => {
       if (!item.locationId) return false
@@ -372,6 +520,19 @@ const filteredFoundItems = computed(() => {
   // 应用筛选条件
   if (filterParams.value.itemType) {
     items = items.filter(item => item.itemCategory === parseInt(filterParams.value.itemType))
+  }
+  
+  // 分类筛选
+  if (filterParams.value.category) {
+    if (filterParams.value.subCategory) {
+      // 二级分类筛选
+      items = items.filter(item => {
+        if (!item.itemType) return false
+        const categoryCode = Math.floor(parseInt(filterParams.value.subCategory) / 100)
+        const itemCategoryCode = Math.floor(item.itemType / 100)
+        return itemCategoryCode === categoryCode
+      })
+    }
   }
   
   if (filterParams.value.campus) {
@@ -436,9 +597,32 @@ const toggleFilter = (type: string, value: string) => {
   }
 }
 
+// 分类筛选方法
+const toggleCategoryFilter = (category: string, subCategory: string) => {
+  filterParams.value.category = category
+  filterParams.value.subCategory = subCategory
+}
+
+const toggleSubCategoryFilter = (subCategory: string) => {
+  filterParams.value.subCategory = subCategory
+}
+
+// 获取子分类
+const getSubCategories = (categoryId: string) => {
+  return subCategoriesMap[parseInt(categoryId)] || []
+}
+
+// 获取分类名称
+const getCategoryName = (categoryId: string) => {
+  const category = categoryTree.find(cat => cat.id === parseInt(categoryId))
+  return category ? category.name : '物品类型'
+}
+
 const resetFilters = () => {
   filterParams.value = {
     itemType: '',
+    category: '',
+    subCategory: '',
     campus: '',
     timeRange: '',
     status: ''
@@ -1158,6 +1342,23 @@ async function logout() {
   border-color: #f37f75;
   background: #f37f75;
   color: white;
+}
+
+/* 分类筛选样式 */
+.category-level {
+  margin-bottom: 12px;
+}
+
+.category-level.sub-category {
+  margin-left: 20px;
+  padding-left: 12px;
+  border-left: 2px solid #f0f0f0;
+}
+
+.sub-title {
+  font-size: 16px !important;
+  color: #666 !important;
+  margin-bottom: 8px !important;
 }
 
 .panel-footer {
