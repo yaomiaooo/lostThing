@@ -42,6 +42,8 @@ INSTALLED_APPS = [
     'items',
     # 用户应用
     'user',
+    # 聊天应用
+    'chat',
 ]
 
 MIDDLEWARE = [
