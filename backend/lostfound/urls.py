@@ -23,5 +23,6 @@ urlpatterns = [
 
     path('api/item', include('items.urls')),    # 物品管理接口
     path('api/user', include('user.urls')),    # 用户接口
+    path('api/chat', include('chat.urls')),    # 聊天接口
 ]
 

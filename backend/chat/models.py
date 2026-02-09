@@ -1,5 +1,6 @@
 from django.db import models
-from django.conf import settings
+from user.models import User
+from items.models import Item
 
 
 class Conversation(models.Model):
@@ -12,20 +13,20 @@ class Conversation(models.Model):
     """
 
     item = models.ForeignKey(
-        'items.Item',
+        Item,
         on_delete=models.CASCADE,
         verbose_name="关联物品"
     )
 
     owner = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        User,
         on_delete=models.CASCADE,
         related_name='owner_conversations',
         verbose_name="失主"
     )
 
     finder = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        User,
         on_delete=models.CASCADE,
         related_name='finder_conversations',
         verbose_name="拾主"
@@ -62,7 +63,7 @@ class Message(models.Model):
     )
 
     sender = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        User,
         on_delete=models.CASCADE,
         verbose_name="发送者"
     )
