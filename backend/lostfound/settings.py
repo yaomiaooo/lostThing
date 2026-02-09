@@ -89,6 +89,7 @@ DATABASES = {
         'PORT': '3306',             # MySQL 默认端口
         'OPTIONS': {
             'charset': 'utf8mb4',
+            'init_command': "SET time_zone = '+08:00'",  # 添加这一行
         }
     }
 }
@@ -117,13 +118,14 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
 
-LANGUAGE_CODE = "en-us"
+LANGUAGE_CODE = "zh-hans"
 
-TIME_ZONE = "UTC"
+TIME_ZONE = "Asia/Shanghai"
 
 USE_I18N = True
 
-USE_TZ = True
+###########解决方案：https://www.codeleading.com/article/70905756675/
+USE_TZ = False
 
 
 # Static files (CSS, JavaScript, Images)

@@ -1440,7 +1440,7 @@ async function submitForm() {
 }
 
 function formatDateTime(datetimeLocal: string): string {
-  return datetimeLocal.replace('T', ' ') + ':00'
+  return datetimeLocal.replace('T', ' ')+':00'
 }
 
 /* ================= 图片处理函数 ================= */

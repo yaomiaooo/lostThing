@@ -288,3 +288,70 @@ def send_message(request):
         })
 
 
+from django.db.models import Q
+from django.db.models import Max
+
+
+@csrf_exempt
+def get_my_conversations(request):
+    """
+    获取当前用户的会话列表
+
+    GET /api/chat/conversation/list
+    """
+
+    # 1. 仅支持 GET
+    if request.method != 'GET':
+        return JsonResponse({
+            "code": 1,
+            "msg": "只支持 GET 请求",
+            "data": None
+        })
+
+    # 2. 登录校验
+    user_id = request.session.get('user_id')
+    if not user_id:
+        return JsonResponse({
+            "code": 401,
+            "msg": "未登录",
+            "data": None
+        })
+
+    current_user = User.objects.get(id=user_id)
+
+    # 3. 查询参与的会话
+    conversations = Conversation.objects.filter(
+        Q(owner_id=user_id) | Q(finder_id=user_id)
+    ).order_by('-created_at')
+
+    result = []
+
+    for conv in conversations:
+        # 我的角色
+        if conv.owner_id == user_id:
+            my_role = 'owner'
+            other_role = 'finder'
+        else:
+            my_role = 'finder'
+            other_role = 'owner'
+
+        # 最近一条消息
+        last_msg = conv.messages.order_by('-created_at').first()
+
+        result.append({
+            "conversationId": conv.id,
+            "itemId": conv.item_id,
+            "itemTitle": conv.item.title if hasattr(conv.item, 'title') else '',
+            "myRole": my_role,
+            "otherRole": other_role,
+            "lastMessage": last_msg.content if last_msg else '',
+            "lastTime": last_msg.created_at.strftime('%Y-%m-%d %H:%M:%S') if last_msg else ''
+        })
+
+    return JsonResponse({
+        "code": 0,
+        "msg": "success",
+        "data": result
+    })
+
+
