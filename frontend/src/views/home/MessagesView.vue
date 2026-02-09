@@ -163,6 +163,16 @@
         </div>
       </main>
     </div>
+
+    <!-- 聊天对话框 -->
+    <DetailMessagesView
+      :visible="chatDialogVisible"
+      :conversation-id="currentConversationId"
+      :item-id="currentItemId"
+      :dialog-title="dialogTitle"
+      @update:visible="chatDialogVisible = $event"
+      @close="closeChatDialog"
+    />
   </div>
 </template>
 
@@ -170,6 +180,7 @@
 import { ref, onMounted, reactive, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
+import DetailMessagesView from './DetailMessagesView.vue'
 
 // 路由实例
 const router = useRouter()
@@ -184,6 +195,12 @@ const hasMore = ref(true)
 const currentPage = ref(1)
 const pageSize = 20
 const activeConversationId = ref<number | null>(null)
+
+// ==================== 聊天对话框状态 ====================
+const chatDialogVisible = ref(false)
+const currentConversationId = ref<number | undefined>(undefined)
+const currentItemId = ref<number>(0)
+const dialogTitle = ref('')
 
 // ==================== 用户信息 ====================
 const user = ref({
@@ -333,15 +350,17 @@ const refreshList = async () => {
 // ==================== 会话操作 ====================
 const openConversation = (conversation: any) => {
   activeConversationId.value = conversation.conversationId
-  // 导航到详情消息页面
-  router.push({
-    name: 'DetailMessagesView',
-    query: {
-      conversationId: conversation.conversationId,
-      itemId: conversation.itemId,
-      dialogTitle: `${conversation.itemName} - ${conversation.myRole === 'owner' ? '失主' : '拾主'}`
-    }
-  })
+  currentConversationId.value = conversation.conversationId
+  currentItemId.value = conversation.itemId || 0
+  dialogTitle.value = `${conversation.itemName} - ${conversation.myRole === 'owner' ? '失主' : '拾主'}`
+  chatDialogVisible.value = true
+}
+
+const closeChatDialog = () => {
+  chatDialogVisible.value = false
+  currentConversationId.value = undefined
+  currentItemId.value = 0
+  dialogTitle.value = ''
 }
 
 // ==================== 工具函数 ====================
