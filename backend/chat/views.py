@@ -341,7 +341,7 @@ def get_my_conversations(request):
         result.append({
             "conversationId": conv.id,
             "itemId": conv.item_id,
-            "itemTitle": conv.item.title if hasattr(conv.item, 'title') else '',
+            "itemName": conv.item.name if hasattr(conv.item, 'name') else '',
             "myRole": my_role,
             "otherRole": other_role,
             "lastMessage": last_msg.content if last_msg else '',
@@ -355,3 +355,72 @@ def get_my_conversations(request):
     })
 
 
+@csrf_exempt
+def can_send_message(request):
+    """
+    判断会话是否还能发送消息
+
+    GET /api/chat/conversation/can-send
+    """
+
+    if request.method != 'GET':
+        return JsonResponse({
+            "code": 1,
+            "msg": "只支持 GET 请求",
+            "data": None
+        })
+
+    # 登录校验
+    user_id = request.session.get('user_id')
+    if not user_id:
+        return JsonResponse({
+            "code": 401,
+            "msg": "未登录",
+            "data": None
+        })
+
+    conversation_id = request.GET.get('conversationId')
+    if not conversation_id:
+        return JsonResponse({
+            "code": 1,
+            "msg": "缺少 conversationId",
+            "data": None
+        })
+
+    try:
+        conversation = Conversation.objects.select_related('item').get(id=conversation_id)
+    except Conversation.DoesNotExist:
+        return JsonResponse({
+            "code": 1,
+            "msg": "会话不存在",
+            "data": None
+        })
+
+    # 是否是会话成员
+    if user_id not in [conversation.owner_id, conversation.finder_id]:
+        return JsonResponse({
+            "code": 403,
+            "msg": "无权访问该会话",
+            "data": None
+        })
+
+    item = conversation.item
+
+    """
+    ★ 这里根据你的物品状态字段改 ★
+    例如：
+    item.status == 4  表示 已认领 / 已结束
+    """
+
+    if hasattr(item, 'current_status') and item.current_status == 4:
+        can_send = False
+    else:
+        can_send = True
+
+    return JsonResponse({
+        "code": 0,
+        "msg": "success",
+        "data": {
+            "canSend": can_send
+        }
+    })

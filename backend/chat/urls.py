@@ -10,4 +10,6 @@ urlpatterns = [
     path('/conversation/message/send', views.send_message, name='send_message'),
     # 6.5.4 获取当前用户的会话列表
     path('/conversation/list', views.get_my_conversations, name='get_my_conversations'),
+    # 6.5.5 判断会话是否还能发送消息
+    path('/conversation/can-send', views.can_send_message, name='can_send_message'),
 ]
