@@ -60,12 +60,6 @@
         <!-- 左侧下半区：操作按钮 -->
         <div class="nav-bottom-group">
           <button 
-            class="left-action-btn back-btn"
-            @click="goBack"
-          >
-            <span class="btn-text">返回首页</span>
-          </button>
-          <button 
             class="left-action-btn logout-btn"
             @click="logout"
           >
@@ -173,9 +167,8 @@
             >
               <!-- 显示图片 -->
               <img
-                v-if="post.firstImageUrl"
                 class="card-image"
-                :src="post.firstImageUrl"
+                :src="post.firstImageUrl || '/home/默认.jpg'"
                 :alt="post.name"
                 @error="handleImageError"
               />
@@ -184,18 +177,21 @@
               </div>
 
               <div class="card-content">
-                <div class="card-name">{{ post.name }}</div>
-                <div class="card-info">
-                <span class="info-item campus">🏫 {{ getCampusName(post.locationId) }}</span>
-                <span class="info-item">📍 {{ post.locationName }}</span>
-              </div>
-                
-                
-
-                <!-- 状态标签 -->
-                <div class="post-status" :class="getStatusClass(post.currentStatus)">
-                  {{ getStatusText(post.currentStatus) }}
+                <!-- 标题行：物品名称 + 状态标签 -->
+                <div class="card-header">
+                  <div class="card-name">{{ post.name }}</div>
+                  <div class="post-status" :class="getStatusClass(post.currentStatus)">
+                    {{ getStatusText(post.currentStatus) }}
+                  </div>
                 </div>
+                
+                <!-- 校区和地点信息 -->
+                <div class="card-info">
+                  <span class="info-item campus">🏫 {{ getCampusName(post.locationId) }}</span>
+                  <span class="info-item">📍 {{ post.locationName }}</span>
+                </div>
+                
+               
 
                 <!-- 驳回原因（如果状态是已驳回） -->
                 <div v-if="post.currentStatus === 5 && post.rejectReason" class="reject-reason">
@@ -948,10 +944,6 @@ function handleDetailCancel(itemData: any) {
 }
 
 /* ================= 路由跳转 ================= */
-function goBack() {
-  router.push('/home')
-}
-
 function goPublish() {
   router.push('/publish')
 }
@@ -1493,13 +1485,20 @@ async function logout() {
   flex-direction: column;
 }
 
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 11.2px;
+}
+
 .card-name {
   font-family: "Comic Sans MS", "Marker Felt", cursive;
   font-size: 17.6px;
   color: #a67c52;
-  margin-bottom: 11.2px;
   font-weight: 600;
   line-height: 1.3;
+  margin: 0;
 }
 
 .card-info {
@@ -1546,7 +1545,6 @@ async function logout() {
   white-space: nowrap;
   background: rgba(166, 124, 82, 0.3);
   border: 1px solid rgba(166, 124, 82, 0.2);
-  margin-bottom: 12px;
   align-self: flex-start;
 }
 
@@ -1555,7 +1553,7 @@ async function logout() {
   border: 1px solid rgba(244, 67, 54, 0.3);
   border-radius: 8px;
   padding: 12px;
-  margin-bottom: 16px;
+  margin-top: 10px;
 }
 
 .reject-title {
@@ -1574,6 +1572,7 @@ async function logout() {
 }
 
 .post-actions {
+  margin-top: 16px;
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
