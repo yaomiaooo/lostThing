@@ -8,9 +8,14 @@
             <div class="chat-title">
               <span class="participant-role">{{ dialogTitle }}</span>
               <span class="chat-hint">仅可沟通物品相关事宜，违规消息将被禁止发送</span>
-
+              <span v-if="isConnected" class="connection-status connected">● 在线</span>
+              <span v-else class="connection-status disconnected">● 离线</span>
             </div>
-            <button class="close-btn" @click="closeDialog">×</button>
+            <button class="close-btn" @click="closeDialog">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
           
           <!-- 消息区域 -->
@@ -18,51 +23,81 @@
             <div 
               v-for="message in messages" 
               :key="message.id || message.tempId"
-              class="message-item"
+              class="message-container"
               :class="{ 
                 'own-message': message.isOwn, 
                 'system-message': message.type === 2
               }"
             >
-              <div class="message-content">
-                {{ message.content }}
-              </div>
-              <div class="message-time">
+              <!-- 时间戳 -->
+              <div class="message-timestamp" v-if="shouldShowTimestamp(message)">
                 {{ formatMessageTime(message.createTime) }}
-                <span v-if="message.status === 'sending'" class="sending-indicator">
-                  <span class="dot"></span>
-                  <span class="dot"></span>
-                  <span class="dot"></span>
-                </span>
-                <span v-else-if="message.status === 'error'" class="error-indicator" title="发送失败">
-                  ❌
-                </span>
+              </div>
+              
+              <!-- 消息气泡 -->
+              <div class="message-bubble">
+                <div class="message-content">
+                  {{ message.content }}
+                </div>
+                <div class="message-footer">
+                  <span class="message-time">
+                    {{ formatTime(message.createTime) }}
+                  </span>
+                  <span v-if="message.status === 'sending'" class="message-status">
+                    <span class="sending-indicator">
+                      <span class="dot"></span>
+                      <span class="dot"></span>
+                      <span class="dot"></span>
+                    </span>
+                  </span>
+                  <span v-else-if="message.status === 'error'" class="message-status error" title="发送失败">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                    </svg>
+                  </span>
+                  <span v-else-if="message.isOwn" class="message-status sent">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                    </svg>
+                  </span>
+                </div>
               </div>
             </div>
             <div v-if="messages.length === 0" class="no-messages">
-              暂无消息，开始沟通吧
+              <div class="empty-icon">💬</div>
+              <div class="empty-text">暂无消息，开始沟通吧</div>
             </div>
           </div>
           
           <!-- 输入区域 -->
           <div class="chat-input-area">
-            <textarea 
-              v-model="inputText" 
-              placeholder="请输入与物品相关的消息..."
-              :rows="2"
-              maxlength="200"
-              @keydown.enter.prevent="sendMessage"
-              @input="validateMessage"
-              ref="chatInputRef"
-            ></textarea>
-            <button 
-              class="send-btn" 
-              :disabled="!canSend || isSending"
-              @click="sendMessage"
-            >
-              <span v-if="isSending">发送中...</span>
-              <span v-else>发送</span>
-            </button>
+            <div class="input-wrapper">
+              <textarea 
+                v-model="inputText" 
+                placeholder="请输入与物品相关的消息..."
+                :rows="1"
+                maxlength="200"
+                @keydown.enter.prevent="sendMessage"
+                @input="handleInputChange"
+                ref="chatInputRef"
+                class="message-input"
+              ></textarea>
+              <div class="input-actions">
+                <span class="char-count">{{ inputText.length }}/200</span>
+                <button 
+                  class="send-btn" 
+                  :disabled="!canSend || isSending"
+                  @click="sendMessage"
+                >
+                  <svg v-if="isSending" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="loading-icon">
+                    <path d="M12 2v4m0 12v4m8-10h-4M6 12H2m15.3-7.3l-2.8 2.8m-9.8 9.8l-2.8 2.8m15.3-2.8l-2.8-2.8M4.7 7.7L2 5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  </svg>
+                  <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="currentColor" class="send-icon">
+                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -488,16 +523,53 @@ const formatMessageTime = (timeStr: string) => {
     const date = new Date(timeStr)
     const now = new Date()
     if (date.toDateString() === now.toDateString()) {
-      return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+      return '今天'
     }
     const diff = now.getTime() - date.getTime()
     if (diff < 24 * 60 * 60 * 1000) {
-      return '昨天 ' + date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+      return '昨天'
     }
-    return date.toLocaleDateString('zh-CN')
+    return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
   } catch {
     return timeStr
   }
+}
+
+const formatTime = (timeStr: string) => {
+  if (!timeStr) return ''
+  try {
+    const date = new Date(timeStr)
+    return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+  } catch {
+    return timeStr
+  }
+}
+
+const shouldShowTimestamp = (message: any) => {
+  const index = messages.value.indexOf(message)
+  if (index === 0) return true
+  
+  const prevMessage = messages.value[index - 1]
+  if (!prevMessage) return true
+  
+  const currentTime = new Date(message.createTime)
+  const prevTime = new Date(prevMessage.createTime)
+  const timeDiff = currentTime.getTime() - prevTime.getTime()
+  
+  // 如果两条消息时间差超过5分钟，显示时间戳
+  return timeDiff > 5 * 60 * 1000
+}
+
+const handleInputChange = () => {
+  validateMessage()
+  // 自动调整文本框高度
+  nextTick(() => {
+    const textarea = chatInputRef.value
+    if (textarea) {
+      textarea.style.height = 'auto'
+      textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px'
+    }
+  })
 }
 
 const showErrorMessage = (message: string) => {
@@ -528,124 +600,203 @@ const getCurrentUser = () => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  padding: 20px;
 }
 
 .chat-dialog {
-  background: white;
-  border-radius: 12px;
-  width: 500px;
-  max-width: 90vw;
-  max-height: 80vh;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border-radius: 20px;
+  width: 600px;
+  max-width: 95vw;
+  max-height: 85vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  overflow: hidden;
 }
 
 .chat-header {
-  padding: 20px;
-  border-bottom: 1px solid #eee;
+  padding: 24px;
+  background: linear-gradient(135deg, #f38181 0%, #f77d5f 100%);
+  color: white;
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
+  box-shadow: 0 2px 10px rgba(243, 129, 129, 0.3);
 }
 
 .chat-title {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
+  flex: 1;
 }
 
 .participant-role {
-  font-size: 16px;
-  font-weight: 600;
-  color: #333;
+  font-size: 18px;
+  font-weight: 700;
+  font-family: "Comic Sans MS", "Marker Felt", cursive;
 }
 
 .chat-hint {
-  font-size: 12px;
-  color: #666;
+  font-size: 13px;
+  opacity: 0.9;
+  font-family: "Comic Sans MS", cursive;
 }
 
+.connection-status {
+  font-size: 12px;
+  margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
 
+.connection-status.connected {
+  color: #4ade80;
+}
 
-
+.connection-status.disconnected {
+  color: #f87171;
+}
 
 .close-btn {
-  background: none;
+  background: rgba(255, 255, 255, 0.2);
   border: none;
-  font-size: 24px;
+  border-radius: 50%;
   cursor: pointer;
-  color: #999;
-  padding: 0;
-  width: 30px;
-  height: 30px;
+  color: white;
+  padding: 8px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
 }
 
 .close-btn:hover {
-  color: #333;
+  background: rgba(255, 255, 255, 0.3);
+  transform: rotate(90deg);
 }
 
 .chat-messages {
   flex: 1;
-  padding: 20px;
+  padding: 0;
   overflow-y: auto;
   max-height: 400px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
 }
 
-.message-item {
+.message-container {
   display: flex;
   flex-direction: column;
-  max-width: 80%;
+  padding: 0 20px;
+  margin: 8px 0;
 }
 
-.message-item.own-message {
-  align-self: flex-end;
+.message-container.own-message {
   align-items: flex-end;
 }
 
-.message-item.system-message {
+.message-container.system-message {
+  align-items: center;
+}
+
+.message-timestamp {
+  text-align: center;
+  font-size: 12px;
+  color: #94a3b8;
+  margin: 16px 0 8px;
+  padding: 4px 12px;
+  background: rgba(148, 163, 184, 0.1);
+  border-radius: 12px;
+  display: inline-block;
   align-self: center;
+  font-family: "Comic Sans MS", cursive;
+}
+
+.message-bubble {
+  max-width: 70%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.own-message .message-bubble {
+  align-items: flex-end;
+}
+
+.system-message .message-bubble {
   align-items: center;
   max-width: 90%;
 }
 
 .message-content {
-  background: #f0f0f0;
-  padding: 8px 12px;
-  border-radius: 12px;
+  padding: 12px 16px;
+  border-radius: 18px;
   word-break: break-word;
-  line-height: 1.4;
+  line-height: 1.5;
+  font-size: 14px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  position: relative;
+  animation: messageSlideIn 0.3s ease-out;
+}
+
+.message-container:not(.own-message):not(.system-message) .message-content {
+  background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%);
+  color: #334155;
+  border: 1px solid #e2e8f0;
+  border-bottom-left-radius: 6px;
 }
 
 .own-message .message-content {
-  background: #007bff;
+  background: linear-gradient(135deg, #f38181 0%, #f77d5f 100%);
   color: white;
+  border-bottom-right-radius: 6px;
 }
 
 .system-message .message-content {
-  background: #ffc107;
-  color: #333;
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  color: white;
   font-size: 12px;
+  border-radius: 12px;
 }
 
-.message-time {
-  font-size: 11px;
-  color: #999;
-  margin-top: 4px;
+.message-footer {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  font-size: 11px;
+  color: #94a3b8;
+  padding: 0 4px;
+}
+
+.own-message .message-footer {
+  justify-content: flex-end;
+}
+
+.message-status {
+  display: flex;
+  align-items: center;
+}
+
+.message-status.sent {
+  color: #10b981;
+}
+
+.message-status.error {
+  color: #ef4444;
 }
 
 .sending-indicator {
@@ -657,7 +808,7 @@ const getCurrentUser = () => {
 .sending-indicator .dot {
   width: 4px;
   height: 4px;
-  background-color: #999;
+  background-color: #94a3b8;
   border-radius: 50%;
   animation: dot-blink 1.4s infinite both;
 }
@@ -670,6 +821,122 @@ const getCurrentUser = () => {
   animation-delay: 0.4s;
 }
 
+.no-messages {
+  text-align: center;
+  padding: 60px 20px;
+  color: #94a3b8;
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.empty-text {
+  font-size: 14px;
+  font-family: "Comic Sans MS", cursive;
+}
+
+.chat-input-area {
+  padding: 20px;
+  background: #ffffff;
+  border-top: 1px solid #f1f5f9;
+}
+
+.input-wrapper {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  background: #f8fafc;
+  border-radius: 20px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  transition: all 0.3s ease;
+}
+
+.input-wrapper:focus-within {
+  border-color: #f38181;
+  box-shadow: 0 0 0 3px rgba(243, 129, 129, 0.1);
+}
+
+.message-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  resize: none;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  outline: none;
+  max-height: 120px;
+  min-height: 20px;
+}
+
+.input-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.char-count {
+  font-size: 12px;
+  color: #94a3b8;
+  min-width: 50px;
+  text-align: right;
+}
+
+.send-btn {
+  background: linear-gradient(135deg, #f38181 0%, #f77d5f 100%);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(243, 129, 129, 0.3);
+}
+
+.send-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(243, 129, 129, 0.4);
+}
+
+.send-btn:disabled {
+  background: #cbd5e1;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.send-icon, .loading-icon {
+  transition: transform 0.3s ease;
+}
+
+.send-btn:hover:not(:disabled) .send-icon {
+  transform: translateX(2px);
+}
+
+.loading-icon {
+  animation: spin 1s linear infinite;
+}
+
+/* 动画效果 */
+@keyframes messageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @keyframes dot-blink {
   0%, 80%, 100% {
     opacity: 0.2;
@@ -679,60 +946,13 @@ const getCurrentUser = () => {
   }
 }
 
-.error-indicator {
-  color: #ef4444;
-  font-size: 10px;
-  cursor: help;
-}
-
-.no-messages {
-  text-align: center;
-  color: #999;
-  font-size: 14px;
-  padding: 40px 0;
-}
-
-.chat-input-area {
-  padding: 20px;
-  border-top: 1px solid #eee;
-  display: flex;
-  gap: 12px;
-  align-items: flex-end;
-}
-
-.chat-input-area textarea {
-  flex: 1;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  padding: 12px;
-  resize: none;
-  font-family: inherit;
-  font-size: 14px;
-}
-
-.chat-input-area textarea:focus {
-  outline: none;
-  border-color: #007bff;
-}
-
-.send-btn {
-  background: #007bff;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  padding: 12px 20px;
-  cursor: pointer;
-  font-size: 14px;
-  min-width: 60px;
-}
-
-.send-btn:hover:not(:disabled) {
-  background: #0056b3;
-}
-
-.send-btn:disabled {
-  background: #ccc;
-  cursor: not-allowed;
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* 过渡动画 */
@@ -754,5 +974,60 @@ const getCurrentUser = () => {
 .dialog-fade-enter-from .chat-dialog,
 .dialog-fade-leave-to .chat-dialog {
   transform: scale(0.9);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .chat-dialog-mask {
+    padding: 10px;
+  }
+  
+  .chat-dialog {
+    border-radius: 16px;
+    max-height: 90vh;
+  }
+  
+  .chat-header {
+    padding: 20px;
+  }
+  
+  .participant-role {
+    font-size: 16px;
+  }
+  
+  .message-bubble {
+    max-width: 85%;
+  }
+  
+  .message-content {
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+  
+  .chat-input-area {
+    padding: 16px;
+  }
+  
+  .input-wrapper {
+    padding: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .chat-dialog {
+    border-radius: 12px;
+  }
+  
+  .chat-header {
+    padding: 16px;
+  }
+  
+  .message-container {
+    padding: 0 16px;
+  }
+  
+  .message-bubble {
+    max-width: 90%;
+  }
 }
 </style>
