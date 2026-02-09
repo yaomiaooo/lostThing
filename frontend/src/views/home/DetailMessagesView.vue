@@ -8,9 +8,7 @@
             <div class="chat-title">
               <span class="participant-role">{{ dialogTitle }}</span>
               <span class="chat-hint">仅可沟通物品相关事宜，违规消息将被禁止发送</span>
-              <div class="connection-status" :class="{ connected: isConnected }">
-                {{ isConnected ? '✓ 实时连接' : '↻ 轮询中...' }}
-              </div>
+
             </div>
             <button class="close-btn" @click="closeDialog">×</button>
           </div>
@@ -573,21 +571,9 @@ const getCurrentUser = () => {
   color: #666;
 }
 
-.connection-status {
-  font-size: 11px;
-  padding: 2px 6px;
-  border-radius: 10px;
-  display: inline-block;
-  margin-top: 4px;
-  font-weight: 500;
-  background-color: #f0f0f0;
-  color: #666;
-}
 
-.connection-status.connected {
-  background-color: #e7f7ed;
-  color: #0ca750;
-}
+
+
 
 .close-btn {
   background: none;
