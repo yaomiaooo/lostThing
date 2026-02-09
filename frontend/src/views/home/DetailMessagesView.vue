@@ -58,7 +58,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick, computed } from 'vue'
+import { ref, watch, nextTick, computed, onMounted } from 'vue'
 import axios from 'axios'
 
 // ==================== Props & Emits ====================
@@ -84,6 +84,8 @@ const canSend = ref(true)
 const currentConversationId = ref<number | null>(props.conversationId || null)
 const chatMessagesRef = ref<HTMLElement | null>(null)
 const chatInputRef = ref<HTMLTextAreaElement | null>(null)
+const isLoading = ref(false)
+const itemOwnerInfo = ref<{userId: number, userRole: number} | null>(null)
 
 // ==================== 计算属性 ====================
 const currentUser = computed(() => {
@@ -102,18 +104,24 @@ const currentUser = computed(() => {
 })
 
 // ==================== 生命周期 ====================
+onMounted(() => {
+  if (props.visible) {
+    initDialog()
+  }
+})
+
 watch(() => props.visible, async (newVal) => {
   if (newVal) {
-    await nextTick()
-    if (!currentConversationId.value) {
-      await enterConversation()
-    } else {
-      await loadMessages()
-    }
-    focusInput()
-    scrollToBottom()
+    await initDialog()
   } else {
     resetDialog()
+  }
+})
+
+watch(() => props.conversationId, (newId) => {
+  if (newId && props.visible) {
+    currentConversationId.value = newId
+    loadMessages()
   }
 })
 
@@ -126,7 +134,30 @@ const closeDialog = () => {
 const resetDialog = () => {
   messages.value = []
   inputText.value = ''
-  currentConversationId.value = props.conversationId || null
+  isLoading.value = false
+}
+
+const initDialog = async () => {
+  if (isLoading.value) return
+  
+  isLoading.value = true
+  await nextTick()
+  
+  // 首先检查物品信息，获取发布者信息
+  await checkItemInfo()
+  
+  // 如果有conversationId，直接加载消息
+  if (currentConversationId.value) {
+    await loadMessages()
+  } 
+  // 如果没有conversationId，检查是否可以创建对话
+  else if (props.itemId) {
+    await checkAndCreateConversation()
+  }
+  
+  focusInput()
+  scrollToBottom()
+  isLoading.value = false
 }
 
 const focusInput = () => {
@@ -144,9 +175,66 @@ const scrollToBottom = () => {
   })
 }
 
-// ==================== 对话管理 ====================
-const enterConversation = async () => {
+// ==================== 物品信息检查 ====================
+const checkItemInfo = async () => {
   if (!props.itemId || !currentUser.value) return
+  
+  try {
+    const res = await axios.get(`/api/item/info`, {
+      params: { itemId: props.itemId }
+    })
+    
+    if (res.data.code === 0 || res.data.code === 200) {
+      const itemData = res.data.data
+      itemOwnerInfo.value = {
+        userId: itemData.userId || itemData.publisherId,
+        userRole: itemData.userRole || 0
+      }
+      
+      console.log('物品信息:', itemData, '当前用户:', currentUser.value.id)
+    }
+  } catch (error) {
+    console.error('获取物品信息失败:', error)
+  }
+}
+
+// ==================== 对话管理 ====================
+const checkAndCreateConversation = async () => {
+  if (!props.itemId || !currentUser.value) return
+  
+  // 首先检查是否已有对话存在
+  try {
+    const checkRes = await axios.get('/api/chat/conversation/check', {
+      params: { 
+        itemId: props.itemId,
+        userId: currentUser.value.id
+      }
+    })
+    
+    if (checkRes.data.code === 0 && checkRes.data.data?.conversationId) {
+      // 已有对话，使用现有对话ID
+      currentConversationId.value = checkRes.data.data.conversationId
+      await loadMessages()
+      return
+    }
+  } catch (error) {
+    console.warn('检查对话失败，尝试创建新对话:', error)
+  }
+  
+  // 没有现有对话，检查是否可以创建新对话
+  await createNewConversation()
+}
+
+const createNewConversation = async () => {
+  // 检查是否是自己的物品
+  if (itemOwnerInfo.value && currentUser.value) {
+    if (itemOwnerInfo.value.userId === currentUser.value.id) {
+      // 不能与自己发起对话
+      showErrorMessage('不能与自己发起对话')
+      closeDialog()
+      return
+    }
+  }
   
   try {
     const enterRes = await axios.post('/api/chat/conversation/enter', { 
@@ -158,10 +246,15 @@ const enterConversation = async () => {
       await loadMessages()
     } else {
       const errorMsg = enterRes.data.message || enterRes.data.msg || '进入对话失败'
-      alert(`进入对话失败: ${errorMsg}`)
+      if (errorMsg.includes('自己') || errorMsg.includes('本人')) {
+        showErrorMessage('不能与自己发起对话')
+        closeDialog()
+      } else {
+        showErrorMessage(`进入对话失败: ${errorMsg}`)
+      }
     }
   } catch (e) {
-    alert('网络错误，请检查网络连接后重试')
+    showErrorMessage('网络错误，请检查网络连接后重试')
   }
 }
 
@@ -174,20 +267,17 @@ const loadMessages = async () => {
     })
     
     if (messagesRes.data.code === 0) {
-      // 处理不同类型的返回数据
       let rawMessages = messagesRes.data.data
       
-      // 如果数据不是数组，尝试转换为数组
+      // 处理不同类型的返回数据
       if (!Array.isArray(rawMessages)) {
         if (rawMessages && typeof rawMessages === 'object') {
-          // 如果是对象，检查是否有messages字段
           rawMessages = rawMessages.messages || rawMessages.list || []
         } else {
           rawMessages = []
         }
       }
       
-      // 确保是数组后再进行map操作
       if (Array.isArray(rawMessages)) {
         messages.value = rawMessages.map((msg: any) => ({
           ...msg,
@@ -207,7 +297,12 @@ const loadMessages = async () => {
 
 // ==================== 消息发送 ====================
 const sendMessage = async () => {
-  if (!inputText.value.trim() || !currentConversationId.value) return
+  if (!inputText.value.trim() || !currentConversationId.value) {
+    if (!currentConversationId.value) {
+      showErrorMessage('对话未建立，无法发送消息')
+    }
+    return
+  }
   
   try {
     const sendRes = await axios.post('/api/chat/conversation/message/send', { 
@@ -221,17 +316,28 @@ const sendMessage = async () => {
       focusInput()
     } else {
       const errorMsg = sendRes.data.message || sendRes.data.msg || '发送失败'
-      alert(`消息发送失败: ${errorMsg}`)
+      
+      // 如果是权限错误，重新检查对话状态
+      if (errorMsg.includes('权限') || errorMsg.includes('不允许') || errorMsg.includes('无效')) {
+        showErrorMessage('对话状态异常，请重新打开')
+        // 重置对话状态，重新加载
+        currentConversationId.value = null
+        await initDialog()
+      } else {
+        showErrorMessage(`消息发送失败: ${errorMsg}`)
+      }
     }
   } catch (e) {
-    alert('网络错误，请检查网络连接后重试')
+    showErrorMessage('网络错误，请检查网络连接后重试')
   }
 }
 
 const validateMessage = () => {
   const content = inputText.value.trim()
-  const forbiddenKeywords = ['广告','骚扰','违法','垃圾']
-  canSend.value = content.length > 0 && !forbiddenKeywords.some(k => content.includes(k))
+  const forbiddenKeywords = ['广告', '骚扰', '违法', '垃圾', '诈骗']
+  canSend.value = content.length > 0 && 
+                  content.length <= 200 && 
+                  !forbiddenKeywords.some(k => content.includes(k))
 }
 
 // ==================== 工具函数 ====================
@@ -241,16 +347,22 @@ const formatMessageTime = (timeStr: string) => {
     const date = new Date(timeStr)
     const now = new Date()
     if (date.toDateString() === now.toDateString()) {
-      return date.toLocaleTimeString('zh-CN', { hour:'2-digit', minute:'2-digit' })
+      return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
     }
     const diff = now.getTime() - date.getTime()
-    if (diff < 24*60*60*1000) {
-      return '昨天 ' + date.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})
+    if (diff < 24 * 60 * 60 * 1000) {
+      return '昨天 ' + date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
     }
     return date.toLocaleDateString('zh-CN')
-  } catch { 
-    return timeStr 
+  } catch {
+    return timeStr
   }
+}
+
+const showErrorMessage = (message: string) => {
+  // 这里可以使用更友好的提示方式，如Element UI的Message
+  console.error(message)
+  alert(message)
 }
 </script>
 
