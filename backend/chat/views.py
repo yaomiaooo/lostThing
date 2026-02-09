@@ -407,9 +407,8 @@ def can_send_message(request):
     item = conversation.item
 
     """
-    ★ 这里根据你的物品状态字段改 ★
     例如：
-    item.status == 4  表示 已认领 / 已结束
+    item.status == 4  表示 已认领 
     """
 
     if hasattr(item, 'current_status') and item.current_status == 4:
