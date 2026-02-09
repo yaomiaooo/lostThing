@@ -232,6 +232,25 @@
                   <span class="label">归档说明：</span>
                   <span>{{ item.archiveDesc }}</span>
                 </div>
+
+                <!-- 沟通操作按钮区域 -->
+                <div v-if="showChatButton" class="action-buttons">
+                  <button 
+                    class="chat-btn primary"
+                    @click="openChatDialog"
+                  >
+                    {{ chatButtonText }}
+                  </button>
+                  
+                  <!-- 认领按钮（仅失主可见） -->
+                  <button 
+                    v-if="showClaimButton" 
+                    class="claim-btn secondary"
+                    @click="handleClaim"
+                  >
+                    认领申请
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -245,13 +264,46 @@
       </div>
     </transition>
   </teleport>
+
+  <!-- 沟通对话框 -->
+  <DetailMessagesView
+    :visible="chatDialogVisible"
+    :item-id="item?.id || 0"
+    :dialog-title="chatButtonText"
+    @update:visible="chatDialogVisible = $event"
+    @close="closeChatDialog"
+  />
 </template>
 
 <script setup lang="ts">
 import { ref, watch, onMounted, onBeforeUnmount, computed, nextTick } from 'vue'
 import type { CSSProperties } from 'vue'
 import axios from 'axios'
+import DetailMessagesView from './DetailMessagesView.vue'
 
+// ==================== 用户状态管理 ====================
+const isLoggedIn = computed(() => {
+  const userId = sessionStorage.getItem('userId')
+  const userRole = sessionStorage.getItem('role')
+  return !!(userId && userRole)
+})
+
+const getCurrentUserInfo = () => {
+  const userId = sessionStorage.getItem('userId')
+  const userRole = sessionStorage.getItem('role')
+  const realName = sessionStorage.getItem('realName')
+  if (!userId || !userRole) return null
+  return {
+    id: parseInt(userId),
+    role: parseInt(userRole),
+    realName: realName || '',
+    username: userId,
+    phone: '',
+    status: 1
+  }
+}
+
+// ==================== 类型定义 ====================
 interface ImageItem {
   id?: number
   url: string
@@ -295,6 +347,7 @@ interface ImageSize {
   loaded: boolean
 }
 
+// ==================== Props & Emits ====================
 const props = defineProps<{
   visible: boolean
   itemId: number | null
@@ -302,13 +355,12 @@ const props = defineProps<{
 
 const emit = defineEmits(['close'])
 
-// 状态管理
+// ==================== 状态管理 ====================
 const ready = ref(false)
 const item = ref<ItemData>({} as ItemData)
 const location = ref<LocationData | null>(null)
 const images = ref<ImageItem[]>([])
 
-// 轮播图状态
 const currentIndex = ref(0)
 const isDragging = ref(false)
 const startX = ref(0)
@@ -316,34 +368,25 @@ const currentX = ref(0)
 const dragOffset = ref(0)
 const isTransitionEnabled = ref(true)
 const loadedImages = ref<Set<number>>(new Set())
-
-// 图片尺寸信息
 const imageSizes = ref<ImageSize[]>([])
 const maxImageWidth = ref(0)
-const carouselHeight = ref(500) // 固定高度
-
-// 单张图片相关
+const carouselHeight = ref(500)
 const singleImageRef = ref<HTMLImageElement | null>(null)
 const singleImageSize = ref<{width: number, height: number} | null>(null)
-
-// DOM引用
 const carouselContainer = ref<HTMLElement | null>(null)
 const carouselTrack = ref<HTMLElement | null>(null)
 
-// 新增：隐私保护和文本折叠
+// 隐私保护 & 特征折叠
 const showFullPhone = ref(false)
 const isFeatureCollapsed = ref(true)
 const featureTextLength = computed(() => item.value.feature?.length || 0)
 
-// 新增：鼠标悬停控制导航元素显示
+// 鼠标悬停
 const isHovering = ref(false)
 
-// 计算属性
+// ==================== 计算属性 ====================
 const trackStyle = computed(() => {
-  if (images.value.length <= 1) {
-    return { transform: 'translateX(0%)', transition: 'none' }
-  }
-  
+  if (images.value.length <= 1) return { transform: 'translateX(0%)', transition: 'none' }
   const offset = -(currentIndex.value * 100) + (dragOffset.value / (carouselContainer.value?.offsetWidth || 1)) * 100
   return {
     transform: `translateX(${offset}%)`,
@@ -351,147 +394,83 @@ const trackStyle = computed(() => {
   }
 })
 
-// 卡片样式
 const cardStyle = computed(() => {
   if (images.value.length === 1 && singleImageSize.value) {
     const aspectRatio = singleImageSize.value.width / singleImageSize.value.height
     const imageWidth = Math.min(carouselHeight.value * aspectRatio, window.innerWidth * 0.8 - 400)
-    
-    return {
-      width: `${imageWidth + 400}px`, // 图片宽度 + 右侧信息栏宽度
-      maxWidth: '90vw'
-    }
+    return { width: `${imageWidth + 400}px`, maxWidth: '90vw' }
   }
-  return {
-    width: '900px',
-    maxWidth: '90vw'
-  }
+  return { width: '900px', maxWidth: '90vw' }
 })
 
-// 单张图片容器样式
 const singleImageStyle = computed(() => {
   if (!singleImageSize.value) return {}
-  
   const aspectRatio = singleImageSize.value.width / singleImageSize.value.height
   const width = Math.min(carouselHeight.value * aspectRatio, window.innerWidth * 0.8 - 400)
-  
-  return {
-    width: `${width}px`,
-    height: `${carouselHeight.value}px`
-  }
+  return { width: `${width}px`, height: `${carouselHeight.value}px` }
 })
 
-// 获取多张图片样式
+// 多图样式
 const getMultiImageStyle = (index: number): CSSProperties => {
   const size = getImageSize(index)
-  
   if (size.width > 0 && maxImageWidth.value > 0) {
     const scale = maxImageWidth.value / size.width
-    const scaledHeight = size.height * scale
-    
-    return {
-      width: `${maxImageWidth.value}px`,
-      height: `${scaledHeight}px`,
-      objectFit: 'contain' as const
-    }
+    return { width: `${maxImageWidth.value}px`, height: `${size.height * scale}px`, objectFit: 'contain' }
   }
-  
-  return {
-    width: '100%',
-    height: '100%',
-    objectFit: 'contain' as const
-  }
+  return { width: '100%', height: '100%', objectFit: 'contain' }
 }
 
-// 获取图片尺寸信息
 const getImageSize = (index: number): ImageSize => {
-  if (index < 0 || index >= imageSizes.value.length) {
-    return { width: 0, height: 0, aspectRatio: 1, loaded: false }
-  }
+  if (index < 0 || index >= imageSizes.value.length) return { width: 0, height: 0, aspectRatio: 1, loaded: false }
   return imageSizes.value[index]
 }
 
-// 图片懒加载策略
 const shouldLoadImage = (index: number) => {
   if (loadedImages.value.has(index)) return true
-  
   const distance = Math.abs(index - currentIndex.value)
   return distance <= 1
 }
 
 const getImageUrl = (img: ImageItem) => {
-  if (img.url && img.url.startsWith('data:image')) {
-    return img.url
-  }
-  if (img.id) {
-    return `/api/item/image/${img.id}`
-  }
+  if (img.url?.startsWith('data:image')) return img.url
+  if (img.id) return `/api/item/image/${img.id}`
   return img.url || ''
 }
 
-// 计算最宽图片宽度
+// ==================== 图片加载 ====================
 const calculateMaxImageWidth = () => {
   if (images.value.length <= 1) return
-  
   let maxWidth = 0
-  imageSizes.value.forEach(size => {
-    if (size.width > maxWidth) {
-      maxWidth = size.width
-    }
-  })
-  
+  imageSizes.value.forEach(size => { if (size.width > maxWidth) maxWidth = size.width })
   const containerWidth = carouselContainer.value?.offsetWidth || 500
   maxImageWidth.value = Math.min(maxWidth, containerWidth * 0.9)
 }
 
-// 单张图片加载完成
 const onSingleImageLoad = (e: Event) => {
   const img = e.target as HTMLImageElement
-  singleImageSize.value = {
-    width: img.naturalWidth,
-    height: img.naturalHeight
-  }
+  singleImageSize.value = { width: img.naturalWidth, height: img.naturalHeight }
 }
 
-// 多张图片加载完成
 const onMultiImageLoad = (e: Event, index: number) => {
   const img = e.target as HTMLImageElement
   loadedImages.value.add(index)
-  
-  if (index < imageSizes.value.length) {
-    imageSizes.value[index] = {
-      width: img.naturalWidth,
-      height: img.naturalHeight,
-      aspectRatio: img.naturalWidth / img.naturalHeight,
-      loaded: true
-    }
-  } else {
-    imageSizes.value[index] = {
-      width: img.naturalWidth,
-      height: img.naturalHeight,
-      aspectRatio: img.naturalWidth / img.naturalHeight,
-      loaded: true
-    }
+  imageSizes.value[index] = {
+    width: img.naturalWidth,
+    height: img.naturalHeight,
+    aspectRatio: img.naturalWidth / img.naturalHeight,
+    loaded: true
   }
-  
-  if (loadedImages.value.size === images.value.length) {
-    calculateMaxImageWidth()
-  }
+  if (loadedImages.value.size === images.value.length) calculateMaxImageWidth()
 }
 
-// 鼠标悬停事件处理
-const handleMouseEnter = () => {
-  isHovering.value = true
-}
+const handleImageError = (index: number) => console.error(`图片 ${index + 1} 加载失败`)
 
-const handleMouseLeave = () => {
-  isHovering.value = false
-}
+// ==================== 鼠标 & 触摸事件 ====================
+const handleMouseEnter = () => { isHovering.value = true }
+const handleMouseLeave = () => { isHovering.value = false }
 
-// 触摸事件处理
 const handleTouchStart = (e: TouchEvent) => {
   if (images.value.length <= 1) return
-  
   isDragging.value = true
   isTransitionEnabled.value = false
   startX.value = e.touches[0].clientX
@@ -501,263 +480,115 @@ const handleTouchStart = (e: TouchEvent) => {
 
 const handleTouchMove = (e: TouchEvent) => {
   if (!isDragging.value || images.value.length <= 1) return
-  
   e.preventDefault()
   currentX.value = e.touches[0].clientX
-  dragOffset.value = currentX.value - startX.value
-  
-  const containerWidth = carouselContainer.value?.offsetWidth || 1
-  const maxOffset = containerWidth * 0.3
-  dragOffset.value = Math.max(-maxOffset, Math.min(maxOffset, dragOffset.value))
+  dragOffset.value = Math.max(-0.3 * (carouselContainer.value?.offsetWidth || 1),
+                              Math.min(0.3 * (carouselContainer.value?.offsetWidth || 1), currentX.value - startX.value))
 }
 
 const handleTouchEnd = () => {
   if (!isDragging.value || images.value.length <= 1) return
-  
   isDragging.value = false
   isTransitionEnabled.value = true
-  
-  const containerWidth = carouselContainer.value?.offsetWidth || 1
-  const threshold = containerWidth * 0.15
-  
-  if (Math.abs(dragOffset.value) > threshold) {
-    if (dragOffset.value > 0) {
-      prevImage()
-    } else {
-      nextImage()
-    }
-  }
-  
-  setTimeout(() => {
-    dragOffset.value = 0
-  }, 300)
+  const threshold = 0.15 * (carouselContainer.value?.offsetWidth || 1)
+  if (Math.abs(dragOffset.value) > threshold) dragOffset.value > 0 ? prevImage() : nextImage()
+  setTimeout(() => dragOffset.value = 0, 300)
 }
 
-// 鼠标事件处理（桌面端）
 const handleMouseDown = (e: MouseEvent) => {
-  if (images.value.length <= 1) return
-  
-  const target = e.target as HTMLElement
-  if (target.closest('.arrow-btn')) {
-    return
-  }
-  
+  if (images.value.length <= 1 || (e.target as HTMLElement).closest('.arrow-btn')) return
   isDragging.value = true
   isTransitionEnabled.value = false
   startX.value = e.clientX
   currentX.value = startX.value
   dragOffset.value = 0
-  
+
   const handleMouseMove = (moveEvent: MouseEvent) => {
     if (!isDragging.value) return
-    
     currentX.value = moveEvent.clientX
-    dragOffset.value = currentX.value - startX.value
-    
-    const containerWidth = carouselContainer.value?.offsetWidth || 1
-    const maxOffset = containerWidth * 0.3
-    dragOffset.value = Math.max(-maxOffset, Math.min(maxOffset, dragOffset.value))
+    dragOffset.value = Math.max(-0.3 * (carouselContainer.value?.offsetWidth || 1),
+                                Math.min(0.3 * (carouselContainer.value?.offsetWidth || 1), currentX.value - startX.value))
   }
-  
+
   const handleMouseUp = () => {
     if (!isDragging.value) return
-    
     isDragging.value = false
     isTransitionEnabled.value = true
-    
-    const containerWidth = carouselContainer.value?.offsetWidth || 1
-    const threshold = containerWidth * 0.15
-    
-    if (Math.abs(dragOffset.value) > threshold) {
-      if (dragOffset.value > 0) {
-        prevImage()
-      } else {
-        nextImage()
-      }
-    }
-    
+    const threshold = 0.15 * (carouselContainer.value?.offsetWidth || 1)
+    if (Math.abs(dragOffset.value) > threshold) dragOffset.value > 0 ? prevImage() : nextImage()
     dragOffset.value = 0
-    
     document.removeEventListener('mousemove', handleMouseMove)
     document.removeEventListener('mouseup', handleMouseUp)
   }
-  
+
   document.addEventListener('mousemove', handleMouseMove)
   document.addEventListener('mouseup', handleMouseUp)
 }
 
-// 图片切换方法
-const nextImage = () => {
-  if (images.value.length <= 1) return
-  
-  if (currentIndex.value < images.value.length - 1) {
-    currentIndex.value++
-    preloadAdjacentImages()
-  }
-}
-
-const prevImage = () => {
-  if (images.value.length <= 1) return
-  
-  if (currentIndex.value > 0) {
-    currentIndex.value--
-    preloadAdjacentImages()
-  }
-}
-
-const goToImage = (index: number) => {
-  if (index < 0 || index >= images.value.length) return
-  
-  currentIndex.value = index
-  preloadAdjacentImages()
-}
-
-// 预加载相邻图片
+// ==================== 图片切换 ====================
+const nextImage = () => { if (currentIndex.value < images.value.length - 1) { currentIndex.value++; preloadAdjacentImages() } }
+const prevImage = () => { if (currentIndex.value > 0) { currentIndex.value--; preloadAdjacentImages() } }
+const goToImage = (index: number) => { if (index >= 0 && index < images.value.length) { currentIndex.value = index; preloadAdjacentImages() } }
 const preloadAdjacentImages = () => {
   if (images.value.length === 0) return
-  
-  const indicesToLoad = [
-    currentIndex.value - 1,
-    currentIndex.value,
-    currentIndex.value + 1
-  ].filter(index => index >= 0 && index < images.value.length)
-  
-  indicesToLoad.forEach(index => {
-    if (!loadedImages.value.has(index) && images.value[index]) {
-      const img = new Image()
-      img.src = getImageUrl(images.value[index])
-      img.onload = () => {
-        loadedImages.value.add(index)
+  [currentIndex.value - 1, currentIndex.value, currentIndex.value + 1]
+    .filter(i => i >= 0 && i < images.value.length)
+    .forEach(i => {
+      if (!loadedImages.value.has(i) && images.value[i]) {
+        const img = new Image()
+        img.src = getImageUrl(images.value[i])
+        img.onload = () => loadedImages.value.add(i)
       }
-    }
-  })
+    })
 }
 
-const handleImageError = (index: number) => {
-  console.error(`图片 ${index + 1} 加载失败`)
-}
-
-// 格式化时间
+// ==================== 时间 & 手机号格式化 ====================
 const formatTime = (timeStr: string) => {
   if (!timeStr) return ''
   try {
     const date = new Date(timeStr)
-    return date.toLocaleString('zh-CN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  } catch (e) {
-    return timeStr
-  }
+    return date.toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+  } catch { return timeStr }
 }
 
-// 新增：手机号脱敏
-const maskPhone = (phone: string) => {
-  if (!phone || phone.length !== 11) return phone
-  return phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')
-}
+const maskPhone = (phone: string) => phone?.length === 11 ? phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2') : phone
 
-// 新增：校区信息
+// ==================== 校区与分类 ====================
 function getCampusName(locationId: number): string {
   const campusCode = Math.floor(locationId / 10000)
-  switch (campusCode) {
-    case 1:
-      return '朝晖校区'
-    case 2:
-      return '屏峰校区'
-    case 3:
-      return '莫干山校区'
-    default:
-      return '未知校区'
-  }
+  return {1:'朝晖校区',2:'屏峰校区',3:'莫干山校区'}[campusCode] || '未知校区'
 }
 
-// // 新增：获取状态文本
-// const getStatusText = () => {
-//   const statusMap = {
-//     1: '待审核',
-//     2: '已通过',
-//     3: '已匹配',
-//     4: '已认领',
-//     5: '已驳回',
-//     6: '已取消',
-//     7: '已归档',
-//     8: '无效'
-//   }
-//   return statusMap[item.value.currentStatus] || '未知状态'
-// }
-
-// // 新增：获取状态样式类
-// const getStatusClass = () => {
-//   const statusClassMap = {
-//     1: 'status-pending',
-//     2: 'status-success',
-//     3: 'status-matched',
-//     4: 'status-claimed',
-//     5: 'status-rejected',
-//     6: 'status-canceled',
-//     7: 'status-archived',
-//     8: 'status-invalid'
-//   }
-//   return statusClassMap[item.value.currentStatus] || 'status-default'
-// }
-
-// 新增：分类数据
 const categoryTree = ref<any[]>([])
-
-// 新增：获取分类树数据
 const loadCategoryTree = async () => {
   try {
-    const response = await fetch('/api/item/category/tree')
-    if (response.ok) {
-      const result = await response.json()
-      if (result.code === 200) {
-        categoryTree.value = result.data
-      }
+    const res = await fetch('/api/item/category/tree')
+    if (res.ok) {
+      const result = await res.json()
+      if (result.code === 200) categoryTree.value = result.data
     }
-  } catch (error) {
-    console.error('获取分类树失败:', error)
-  }
+  } catch (e) { console.error('获取分类树失败', e) }
 }
-
-// 新增：根据分类ID获取分类名称
 const getCategoryNameById = (categoryId: number) => {
-  if (!categoryTree.value.length) return '未知分类'
-  
-  // 递归查找分类
   const findCategory = (categories: any[], id: number): string | null => {
-    for (const category of categories) {
-      if (category.id === id) {
-        return category.name
-      }
-      if (category.children && category.children.length > 0) {
-        const found = findCategory(category.children, id)
-        if (found) return found
-      }
+    for (const cat of categories) {
+      if (cat.id === id) return cat.name
+      if (cat.children?.length) { const found = findCategory(cat.children, id); if (found) return found }
     }
     return null
   }
-  
   return findCategory(categoryTree.value, categoryId) || '未知分类'
 }
+const getItemCategoryText = () => item.value?.itemType ? getCategoryNameById(item.value.itemType) : '未知分类'
 
-// 修改：获取物品分类文本，使用后端数据
-const getItemCategoryText = () => {
-  if (!item.value || !item.value.itemType) return '未知分类'
-  return getCategoryNameById(item.value.itemType)
-}
-
+// ==================== 关闭 ====================
 const close = () => {
-  // 重置隐私状态
   showFullPhone.value = false
   isFeatureCollapsed.value = true
   emit('close')
 }
 
-// 加载详情数据
+// ==================== 加载物品详情 ====================
 const loadDetail = async () => {
   if (!props.itemId) return
   ready.value = false
@@ -769,85 +600,100 @@ const loadDetail = async () => {
   singleImageSize.value = null
   showFullPhone.value = false
   isFeatureCollapsed.value = true
-  
-  // 加载分类树数据
   await loadCategoryTree()
 
   try {
-    const res = await axios.get('/api/item/detail', {
-      params: { itemId: props.itemId }
-    })
-
+    const res = await axios.get('/api/item/detail', { params: { itemId: props.itemId } })
     const data = res.data.data
     item.value = data.item || data
     location.value = data.location || null
-    
-    if (Array.isArray(data.images)) {
-      images.value = data.images
-    } else {
-      images.value = []
-    }
-    
-    imageSizes.value = new Array(images.value.length).fill(null).map(() => ({
-      width: 0,
-      height: 0,
-      aspectRatio: 1,
-      loaded: false
-    }))
-
+    images.value = Array.isArray(data.images) ? data.images : []
+    imageSizes.value = new Array(images.value.length).fill(null).map(() => ({ width: 0, height: 0, aspectRatio: 1, loaded: false }))
     ready.value = true
-    
     await nextTick()
-    
-    if (images.value.length > 0) {
-      preloadAdjacentImages()
-    }
+    if (images.value.length) preloadAdjacentImages()
   } catch (e) {
-    console.error('加载详情失败:', e)
+    console.error('加载详情失败', e)
     ready.value = true
     images.value = []
   }
 }
 
-// 监听变化
-watch(
-  () => props.itemId,
-  () => {
-    if (props.visible) loadDetail()
-  }
-)
+watch(() => props.itemId, () => { if (props.visible) loadDetail() })
+watch(() => props.visible, (v) => {
+  if (v && props.itemId) loadDetail()
+  else { currentIndex.value = 0; dragOffset.value = 0; isDragging.value = false; singleImageSize.value = null; showFullPhone.value = false; isFeatureCollapsed.value = true }
+})
 
-watch(
-  () => props.visible,
-  (v) => {
-    if (v && props.itemId) {
-      loadDetail()
-    } else {
-      currentIndex.value = 0
-      dragOffset.value = 0
-      isDragging.value = false
-      singleImageSize.value = null
-      showFullPhone.value = false
-      isFeatureCollapsed.value = true
-    }
-  }
-)
-
-// ESC 关闭和键盘切换
+// ==================== 键盘操作 ====================
 const onKeydown = (e: KeyboardEvent) => {
   if (e.key === 'Escape') close()
   if (e.key === 'ArrowLeft' && images.value.length > 1) prevImage()
   if (e.key === 'ArrowRight' && images.value.length > 1) nextImage()
 }
 
-onMounted(() => {
-  window.addEventListener('keydown', onKeydown)
+onMounted(() => window.addEventListener('keydown', onKeydown))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
+
+// ==================== 沟通功能 ====================
+const chatDialogVisible = ref(false)
+
+const showChatButton = computed(() => {
+  if (!item.value) return false
+  const user = getCurrentUserInfo()
+  if (!user) return false
+  const validStatuses = [2,3]
+  const isOwner = item.value.userId === user.id
+  const isAdmin = user.role === 4
+  return validStatuses.includes(item.value.currentStatus) && (isAdmin || !isOwner || isOwner)
 })
 
-onBeforeUnmount(() => {
-  window.removeEventListener('keydown', onKeydown)
+const chatButtonText = computed(() => {
+  if (!item.value) return ''
+  const user = getCurrentUserInfo(); if (!user) return ''
+  const isOwner = item.value.userId === user.id
+  const isAdmin = user.role === 4
+  if (isAdmin) return '联系相关人员'
+  else if (isOwner) return item.value.itemCategory === 1 ? '查看询问（失主）' : '查看询问（拾主）'
+  else return item.value.itemCategory === 1 ? '去询问（失主）' : '去询问（拾主）'
 })
+
+const showClaimButton = computed(() => {
+  if (!item.value) return false
+  const user = getCurrentUserInfo(); if (!user) return false
+  const isOwner = item.value.userId === user.id
+  return item.value.itemCategory === 1 && !isOwner
+})
+
+const openChatDialog = () => {
+  if (!item.value) return
+  const user = getCurrentUserInfo(); if (!user) return
+  chatDialogVisible.value = true
+}
+
+const closeChatDialog = () => { 
+  chatDialogVisible.value = false 
+}
+
+// ==================== 认领功能 ====================
+const handleClaim = () => {
+  console.log('处理认领申请，物品ID:', item.value?.id)
+}
+
+// ==================== 消息时间格式化 ====================
+const formatMessageTime = (timeStr: string) => {
+  if (!timeStr) return ''
+  try {
+    const date = new Date(timeStr)
+    const now = new Date()
+    const diff = now.getTime() - date.getTime()
+    if (date.toDateString() === now.toDateString()) return date.toLocaleTimeString('zh-CN', { hour:'2-digit', minute:'2-digit' })
+    if (diff < 24*60*60*1000) return '昨天 ' + date.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})
+    return date.toLocaleDateString('zh-CN')
+  } catch { return timeStr }
+}
 </script>
+
 
 <style scoped>
 /* 遮罩 */
@@ -1434,5 +1280,237 @@ onBeforeUnmount(() => {
   .single-image-wrapper {
     height: 45vh;
   }
+}
+
+/* ==================== 沟通对话框样式 ==================== */
+
+.chat-dialog-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chat-dialog {
+  width: 400px;
+  max-width: 90vw;
+  height: 500px;
+  background: white;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.chat-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.chat-title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.participant-role {
+  font-weight: 600;
+  font-size: 16px;
+  color: #333;
+}
+
+.chat-hint {
+  font-size: 12px;
+  color: #666;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #999;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.close-btn:hover {
+  background: #f5f5f5;
+}
+
+.chat-messages {
+  flex: 1;
+  padding: 16px 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.message-item {
+  display: flex;
+  flex-direction: column;
+  max-width: 80%;
+}
+
+.message-item.own-message {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.message-item.system-message {
+  align-self: center;
+  align-items: center;
+  max-width: 90%;
+}
+
+.message-content {
+  background: #f0f0f0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+.own-message .message-content {
+  background: #007bff;
+  color: white;
+}
+
+.system-message .message-content {
+  background: #ffc107;
+  color: #333;
+  font-size: 12px;
+}
+
+.message-time {
+  font-size: 11px;
+  color: #999;
+  margin-top: 4px;
+}
+
+.no-messages {
+  text-align: center;
+  color: #999;
+  font-size: 14px;
+  margin-top: 50%;
+}
+
+.chat-input-area {
+  padding: 16px 20px;
+  border-top: 1px solid #e0e0e0;
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.chat-input-area textarea {
+  flex: 1;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 8px 12px;
+  resize: none;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.chat-input-area textarea:focus {
+  outline: none;
+  border-color: #007bff;
+}
+
+.send-btn {
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  height: fit-content;
+  transition: background-color 0.2s;
+}
+
+.send-btn:hover:not(:disabled) {
+  background: #0056b3;
+}
+
+.send-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+/* 操作按钮样式 */
+.action-buttons {
+  margin-top: 20px;
+  display: flex;
+  gap: 12px;
+}
+
+.chat-btn, .claim-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.chat-btn.primary {
+  background: #007bff;
+  color: white;
+}
+
+.chat-btn.primary:hover {
+  background: #0056b3;
+}
+
+.claim-btn.secondary {
+  background: #6c757d;
+  color: white;
+}
+
+.claim-btn.secondary:hover {
+  background: #545b62;
+}
+
+/* 对话框动画 */
+.dialog-fade-enter-active,
+.dialog-fade-leave-active {
+  transition: opacity 0.3s;
+}
+
+.dialog-fade-enter-from,
+.dialog-fade-leave-to {
+  opacity: 0;
+}
+
+.dialog-fade-enter-active .chat-dialog,
+.dialog-fade-leave-active .chat-dialog {
+  transition: transform 0.3s;
+}
+
+.dialog-fade-enter-from .chat-dialog {
+  transform: scale(0.9);
+}
+
+.dialog-fade-leave-to .chat-dialog {
+  transform: scale(0.9);
 }
 </style>
