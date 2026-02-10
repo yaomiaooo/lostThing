@@ -181,7 +181,8 @@ import { ref, onMounted, reactive, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import DetailMessagesView from './DetailMessagesView.vue'
-
+// 导入实时消息服务
+import { useRealtimeMessages, type RealtimeCallback } from '../../utils/realtimeService'
 // 路由实例
 const router = useRouter()
 
@@ -195,6 +196,7 @@ const hasMore = ref(true)
 const currentPage = ref(1)
 const pageSize = 20
 const activeConversationId = ref<number | null>(null)
+
 
 // ==================== 聊天对话框状态 ====================
 const chatDialogVisible = ref(false)
@@ -289,27 +291,64 @@ async function loadUser() {
   }
 }
 
+// 实时消息 Hook
+const { subscribe, unsubscribe } = useRealtimeMessages()
+
+// ==================== 核心逻辑：处理实时更新 ====================
+const handleGlobalRealtimeUpdate: RealtimeCallback = (update) => {
+  if (!update.messages || update.messages.length === 0) return
+
+  const latestMsg = update.messages[update.messages.length - 1]
+  const targetId = update.conversationId
+
+  // 1. 找到对应的会话索引
+  const index = conversations.value.findIndex(c => c.conversationId === targetId)
+
+  if (index !== -1) {
+    // 获取旧会话数据
+    const conv = conversations.value[index]
+    
+    // 2. 更新该会话的预览内容和时间
+    conv.lastMessage = latestMsg.content
+    conv.lastTime = latestMsg.createTime || latestMsg.createdAt
+    
+    // 如果当前不是正在进行的对话，增加未读数（可选）
+    if (activeConversationId.value !== targetId) {
+      conv.unreadCount = (conv.unreadCount || 0) + update.messages.length
+    }
+
+    // 3. 立即移至列表顶部
+    conversations.value.splice(index, 1)
+    conversations.value.unshift(conv)
+  } else {
+    // 如果列表中没有（可能是新发起的），则重新加载列表
+    loadConversations()
+  }
+}
+
 const loadConversations = async () => {
   if (loading.value) return
-  
   loading.value = true
   error.value = ''
   
   try {
     const response = await axios.get('/api/chat/conversation/list')
-    
     if (response.data.code === 0) {
       const data = response.data.data || []
-      conversations.value = data.map((conv: any) => ({
-        ...conv,
-        unreadCount: 0 // 实际项目中需要从接口获取未读数量
-      }))
+      conversations.value = data
+      
+      // 加载完成后，确保所有会话都已订阅
+      data.forEach((conv: any) => {
+        subscribe(conv.conversationId, handleGlobalRealtimeUpdate)
+      })
+      
       hasMore.value = data.length === pageSize
     } else {
       error.value = response.data.msg || '加载失败'
     }
   } catch (err) {
-    error.value = '网络错误，请检查网络连接'
+    // 错误处理机制
+    error.value = '网络不稳定，请点击重试'
     console.error('加载会话列表失败:', err)
   } finally {
     loading.value = false
@@ -350,6 +389,9 @@ const refreshList = async () => {
 // ==================== 会话操作 ====================
 const openConversation = (conversation: any) => {
   activeConversationId.value = conversation.conversationId
+  // 打开对话框时，清除本地未读数
+  conversation.unreadCount = 0 
+  
   currentConversationId.value = conversation.conversationId
   currentItemId.value = conversation.itemId || 0
   dialogTitle.value = `${conversation.itemName} - ${conversation.myRole === 'owner' ? '失主' : '拾主'}`
