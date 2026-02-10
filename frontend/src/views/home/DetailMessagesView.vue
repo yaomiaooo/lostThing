@@ -316,19 +316,26 @@ const checkItemInfo = async () => {
   if (!props.itemId || !currentUser.value) return
   
   try {
-    const res = await axios.get(`/api/item/info`, {
+    // 使用可用的 /api/item/detail 接口替代不存在的 /api/item/info
+    const res = await axios.get(`/api/item/detail`, {
       params: { itemId: props.itemId }
     })
     
     if (res.data.code === 0 || res.data.code === 200) {
       const itemData = res.data.data
+      // 根据后端返回的数据结构调整字段映射
       itemOwnerInfo.value = {
-        userId: itemData.userId || itemData.publisherId,
+        userId: itemData.userId || itemData.publisherId || itemData.creatorId,
         userRole: itemData.userRole || 0
       }
     }
   } catch (error) {
     console.error('获取物品信息失败:', error)
+    // 如果获取失败，设置默认值避免后续逻辑错误
+    itemOwnerInfo.value = {
+      userId: currentUser.value.id,
+      userRole: 0
+    }
   }
 }
 
