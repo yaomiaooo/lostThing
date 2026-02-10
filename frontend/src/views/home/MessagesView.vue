@@ -300,28 +300,25 @@ const handleGlobalRealtimeUpdate: RealtimeCallback = (update) => {
 
   const latestMsg = update.messages[update.messages.length - 1]
   const targetId = update.conversationId
-
-  // 1. 找到对应的会话索引
   const index = conversations.value.findIndex(c => c.conversationId === targetId)
 
   if (index !== -1) {
-    // 获取旧会话数据
     const conv = conversations.value[index]
-    
-    // 2. 更新该会话的预览内容和时间
     conv.lastMessage = latestMsg.content
     conv.lastTime = latestMsg.createTime || latestMsg.createdAt
     
-    // 如果当前不是正在进行的对话，增加未读数（可选）
-    if (activeConversationId.value !== targetId) {
-      conv.unreadCount = (conv.unreadCount || 0) + update.messages.length
+    // --- 核心修改：未读数逻辑 ---
+    // 只有当“聊天弹窗未打开”或者“打开的不是当前这个会话”时，才增加未读数
+    if (!chatDialogVisible.value || activeConversationId.value !== targetId) {
+      // 如果后端没返回 unreadCount 字段，前端初始化它
+      if (conv.unreadCount === undefined) conv.unreadCount = 0
+      conv.unreadCount += update.messages.length
     }
 
-    // 3. 立即移至列表顶部
+    // 移至顶部
     conversations.value.splice(index, 1)
     conversations.value.unshift(conv)
   } else {
-    // 如果列表中没有（可能是新发起的），则重新加载列表
     loadConversations()
   }
 }
@@ -387,14 +384,15 @@ const refreshList = async () => {
 }
 
 // ==================== 会话操作 ====================
+// 修改打开会话的函数，点击后清空红点
 const openConversation = (conversation: any) => {
   activeConversationId.value = conversation.conversationId
-  // 打开对话框时，清除本地未读数
+  // --- 核心修改：清除未读数 ---
   conversation.unreadCount = 0 
   
   currentConversationId.value = conversation.conversationId
   currentItemId.value = conversation.itemId || 0
-  dialogTitle.value = `${conversation.itemName} - ${conversation.myRole === 'owner' ? '失主' : '拾主'}`
+  dialogTitle.value = `${conversation.itemName}`
   chatDialogVisible.value = true
 }
 
