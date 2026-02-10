@@ -116,7 +116,7 @@ router.beforeEach((to, from, next) => {
       return
     }
 
-    // 未登录，记录返回地址（本次会话有效）
+    // 未登录,记录返回地址(本次会话有效)
     sessionStorage.setItem('returnUrl', to.fullPath)
     next('/login')
     return
