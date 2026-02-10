@@ -2,7 +2,6 @@
   <div class="home-page">
     <!-- 纯色背景 -->
     <div class="background-container">
-      <!-- 背景层 -->
       <div class="solid-background"></div>
     </div>
 
@@ -35,6 +34,10 @@
                 <img :src="nav.icon" :alt="nav.name" class="nav-svg" />
               </span>
               <span class="nav-text">{{ nav.name }}</span>
+              <!-- 消息红点 -->
+              <span v-if="nav.name === '消息' && totalUnreadCount > 0" class="nav-badge">
+                {{ totalUnreadCount > 99 ? '99+' : totalUnreadCount }}
+              </span>
             </button>
         </div>
 
@@ -104,11 +107,11 @@
           </div>
 
           <div 
-            v-for="conversation in conversations" 
+            v-for="conversation in sortedConversations" 
             :key="conversation.conversationId"
             class="conversation-item"
             :class="{ 
-              'unread': conversation.unreadCount > 0,
+              'unread': getConversationUnreadCount(conversation.conversationId) > 0,
               'active': activeConversationId === conversation.conversationId 
             }"
             @click="openConversation(conversation)"
@@ -117,8 +120,14 @@
               <div class="avatar-placeholder">
                 {{ conversation.itemName ? conversation.itemName.charAt(0) : '物' }}
               </div>
-              <div v-if="conversation.unreadCount > 0" class="unread-badge">
-                {{ conversation.unreadCount > 99 ? '99+' : Math.max(1, conversation.unreadCount) }}
+              <div 
+                v-if="getConversationUnreadCount(conversation.conversationId) > 0" 
+                class="unread-badge"
+              >
+                {{ getConversationUnreadCount(conversation.conversationId) > 99 
+                  ? '99+' 
+                  : getConversationUnreadCount(conversation.conversationId) 
+                }}
               </div>
             </div>
 
@@ -136,7 +145,12 @@
               </div>
 
               <div class="conversation-preview">
-                <span class="last-message" :class="{ 'unread-text': conversation.unreadCount > 0 }">
+                <span 
+                  class="last-message" 
+                  :class="{ 
+                    'unread-text': getConversationUnreadCount(conversation.conversationId) > 0 
+                  }"
+                >
                   {{ conversation.lastMessage || '暂无消息' }}
                 </span>
               </div>
@@ -172,18 +186,32 @@
       :dialog-title="dialogTitle"
       @update:visible="chatDialogVisible = $event"
       @close="closeChatDialog"
+      @message-sent="handleMessageSent"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, reactive, computed, watch, onUnmounted, onActivated, onDeactivated, nextTick } from 'vue'
-import { useRoute } from 'vue-router'
-import { useRouter } from 'vue-router'
+import { 
+  ref, 
+  onMounted, 
+  reactive, 
+  computed, 
+  watch, 
+  onUnmounted, 
+  onActivated, 
+  onDeactivated, 
+  nextTick 
+} from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 import DetailMessagesView from './DetailMessagesView.vue'
-// 导入实时消息服务
-import { useRealtimeMessages, type RealtimeCallback } from '../../utils/realtimeService'
+// 导入实时消息服务和未读计数管理器
+import { 
+  useRealtimeMessages, 
+  UnreadCountManager, 
+  type RealtimeCallback 
+} from '../../utils/realtimeService'
 
 // 路由实例
 const router = useRouter()
@@ -199,7 +227,7 @@ const hasMore = ref(true)
 const currentPage = ref(1)
 const pageSize = 20
 const activeConversationId = ref<number | null>(null)
-const isMessagesPage = ref(false)
+const isMessagesPageActive = ref(false) // 重命名以避免混淆
 
 // ==================== 聊天对话框状态 ====================
 const chatDialogVisible = ref(false)
@@ -218,17 +246,41 @@ const user = ref({
 })
 
 // ==================== 实时消息服务 ====================
-const { subscribe, unsubscribe, triggerUpdate } = useRealtimeMessages()
+const { subscribe, unsubscribe, unsubscribeAll, triggerUpdate } = useRealtimeMessages()
 
-// 存储已订阅的对话ID,避免重复订阅
-const subscribedConversationIds = ref<Set<number>>(new Set())
-// 标记是否已初始化全局订阅
-const globalSubscriptionInitialized = ref(false)
+// ==================== 未读计数计算属性 ====================
+const totalUnreadCount = computed(() => {
+  if (!user.value.id) return 0
+  return UnreadCountManager.getTotalUnreadCount(user.value.id)
+})
+
+// 获取单个对话的未读计数
+const getConversationUnreadCount = (conversationId: number): number => {
+  if (!user.value.id || !conversationId) return 0
+  return UnreadCountManager.getUnreadCount(user.value.id, conversationId)
+}
+
+// 按未读状态和时间排序的会话列表
+const sortedConversations = computed(() => {
+  return [...conversations.value].sort((a, b) => {
+    const unreadA = getConversationUnreadCount(a.conversationId)
+    const unreadB = getConversationUnreadCount(b.conversationId)
+    
+    // 未读优先
+    if (unreadA > 0 && unreadB === 0) return -1
+    if (unreadA === 0 && unreadB > 0) return 1
+    
+    // 然后按时间排序
+    const timeA = new Date(a.lastTime || 0).getTime()
+    const timeB = new Date(b.lastTime || 0).getTime()
+    return timeB - timeA
+  })
+})
 
 // ==================== 统计信息 ====================
 const stats = computed(() => {
   const total = conversations.value.length
-  const unread = conversations.value.reduce((sum, conv) => sum + (conv.unreadCount || 0), 0)
+  const unread = totalUnreadCount.value // 使用计算属性获取准确值
   const active = conversations.value.filter(conv => conv.lastTime).length
   
   return { total, unread, active }
@@ -237,173 +289,65 @@ const stats = computed(() => {
 // ==================== 导航函数 ====================
 const goHome = () => router.push('/home')
 const goPublish = () => router.push('/publish')
-const goMessages = () => {}
+const goMessages = () => {
+  // 如果已经在消息页面，刷新列表
+  if (route.path === '/messages') {
+    refreshList()
+  } else {
+    router.push('/messages')
+  }
+}
 const goMyPosts = () => router.push('/my-posts')
 const goSettings = () => router.push('/settings')
 
 // ==================== 左侧导航栏 ====================
 const navItems = reactive([
-  {
-    name: '发现',
-    icon: '/home/发现.svg',
-    active: false,
-    handler: goHome
-  },
-  {
-    name: '发布',
-    icon: '/home/发布.svg',
-    active: false,
-    handler: goPublish
-  },
-  {
-    name: '消息',
-    icon: '/home/消息.svg',
-    active: true,
-    handler: goMessages
-  },
-  {
-    name: '我的',
-    icon: '/home/我的.svg',
-    active: false,
-    handler: goMyPosts
-  },
-  {
-    name: '设置',
-    icon: '/home/设置.svg',
-    active: false,
-    handler: goSettings
-  }
+  { name: '发现', icon: '/home/发现.svg', active: false, handler: goHome },
+  { name: '发布', icon: '/home/发布.svg', active: false, handler: goPublish },
+  { name: '消息', icon: '/home/消息.svg', active: true, handler: goMessages },
+  { name: '我的', icon: '/home/我的.svg', active: false, handler: goMyPosts },
+  { name: '设置', icon: '/home/设置.svg', active: false, handler: goSettings }
 ])
 
 // ==================== 全局实时消息处理器 ====================
-const handleGlobalRealtimeUpdate: RealtimeCallback = (update) => {
+const handleRealtimeUpdate: RealtimeCallback = (update) => {
   if (!update.messages || update.messages.length === 0) return
-
-  // 获取当前用户ID
-  const currentUserId = user.value.id || parseInt(sessionStorage.getItem('userId') || '0')
-  if (!currentUserId) return
+  if (!user.value.id) return
   
+  const currentUserId = user.value.id
+  const conversationId = update.conversationId
   const latestMsg = update.messages[update.messages.length - 1]
-  const targetId = update.conversationId
   
-  if (!targetId) return
-  
-  // 更新会话存储中的未读计数(无论是否在消息页面都执行)
-  const storageKey = `unread_${currentUserId}_${targetId}`
-  
-  // 检查消息发送者,只有对方发送的消息才增加未读计数
+  // 只处理对方发送的消息
   if (latestMsg.senderId && latestMsg.senderId !== currentUserId) {
-    // 是对方发送的消息
-    let currentUnread = 0
+    // 使用 UnreadCountManager 增加未读计数
+    const newCount = UnreadCountManager.incrementUnreadCount(
+      currentUserId, 
+      conversationId, 
+      update.messages.length
+    )
     
-    // 从会话存储中获取当前未读数
-    const storedUnread = sessionStorage.getItem(storageKey)
-    if (storedUnread) {
-      currentUnread = parseInt(storedUnread)
+    console.log(`[MessagesView] 收到新消息，对话 ${conversationId} 未读数: ${newCount}`)
+    
+    // 更新会话列表中的显示信息
+    const convIndex = conversations.value.findIndex(
+      c => c.conversationId === conversationId
+    )
+    
+    if (convIndex !== -1) {
+      // 更新现有会话的最后消息信息
+      conversations.value[convIndex] = {
+        ...conversations.value[convIndex],
+        lastMessage: latestMsg.content,
+        lastTime: latestMsg.createTime || latestMsg.createdAt
+      }
     } else {
-      // 如果没有存储,尝试从当前会话列表中获取
-      const existingConv = conversations.value.find(c => c.conversationId === targetId)
-      if (existingConv && typeof existingConv.unreadCount === 'number') {
-        currentUnread = existingConv.unreadCount
-      }
-    }
-    
-    // 增加未读数(但避免重复计数)
-    // 检查消息时间,避免同一消息重复计数
-    const msgTime = new Date(latestMsg.createTime || latestMsg.createdAt).getTime()
-    const lastMsgTimeKey = `last_msg_${currentUserId}_${targetId}`
-    const lastMsgTimeStr = sessionStorage.getItem(lastMsgTimeKey)
-    const lastMsgTime = lastMsgTimeStr ? parseInt(lastMsgTimeStr) : 0
-    
-    if (msgTime > lastMsgTime) {
-      // 是新消息,增加未读计数
-      currentUnread += 1
-      
-      // 更新会话存储
-      sessionStorage.setItem(storageKey, currentUnread.toString())
-      sessionStorage.setItem(lastMsgTimeKey, msgTime.toString())
-      
-      console.log(`更新全局未读计数: 对话 ${targetId}, 未读数: ${currentUnread}`)
-      
-      // 如果在消息页面,同步更新界面
-      if (isMessagesPage.value) {
-        updateConversationInList(targetId, {
-          unreadCount: currentUnread,
-          lastMessage: latestMsg.content,
-          lastTime: latestMsg.createTime || latestMsg.createdAt
-        })
+      // 如果是新会话，重新加载列表
+      if (isMessagesPageActive.value) {
+        loadConversations(false) // 静默加载，不显示loading
       }
     }
   }
-}
-
-// 更新会话列表中的会话信息
-const updateConversationInList = (conversationId: number, updates: any) => {
-  const index = conversations.value.findIndex(c => c.conversationId === conversationId)
-  if (index !== -1) {
-    // 更新现有会话
-    conversations.value[index] = {
-      ...conversations.value[index],
-      ...updates
-    }
-    
-    // 移至顶部
-    const updatedConv = { ...conversations.value[index] }
-    conversations.value.splice(index, 1)
-    conversations.value.unshift(updatedConv)
-    
-    // 触发响应式更新
-    conversations.value = [...conversations.value]
-  }
-}
-
-// ==================== 初始化全局订阅 ====================
-const initializeGlobalSubscriptions = async () => {
-  if (globalSubscriptionInitialized.value) return
-  
-  try {
-    // 加载用户的所有对话
-    const response = await axios.get('/api/chat/conversation/list')
-    if (response.data.code === 0) {
-      const data = response.data.data || []
-      
-      // 为每个对话订阅实时更新(全局)
-      data.forEach((conv: any) => {
-        if (conv.conversationId && !subscribedConversationIds.value.has(conv.conversationId)) {
-          subscribe(conv.conversationId, handleGlobalRealtimeUpdate)
-          subscribedConversationIds.value.add(conv.conversationId)
-        }
-      })
-      
-      globalSubscriptionInitialized.value = true
-      console.log(`全局订阅初始化完成,订阅了 ${data.length} 个对话`)
-    }
-  } catch (err) {
-    console.error('初始化全局订阅失败:', err)
-  }
-}
-
-// ==================== 订阅管理 ====================
-const subscribeToConversation = (conversationId: number) => {
-  if (!subscribedConversationIds.value.has(conversationId)) {
-    subscribe(conversationId, handleGlobalRealtimeUpdate)
-    subscribedConversationIds.value.add(conversationId)
-  }
-}
-
-const unsubscribeFromConversation = (conversationId: number) => {
-  if (subscribedConversationIds.value.has(conversationId)) {
-    unsubscribe(conversationId, handleGlobalRealtimeUpdate)
-    subscribedConversationIds.value.delete(conversationId)
-  }
-}
-
-const unsubscribeAllConversations = () => {
-  subscribedConversationIds.value.forEach(conversationId => {
-    unsubscribe(conversationId, handleGlobalRealtimeUpdate)
-  })
-  subscribedConversationIds.value.clear()
-  globalSubscriptionInitialized.value = false
 }
 
 // ==================== 数据加载 ====================
@@ -413,86 +357,101 @@ async function loadUser() {
     if (res.data.code === 0) {
       user.value = res.data.data
       
-      // 加载用户信息后,确保初始化全局订阅
+      // 加载用户信息后，初始化所有对话的订阅
       setTimeout(() => {
-        initializeGlobalSubscriptions()
+        initializeConversationsSubscription()
       }, 100)
     }
   } catch (error) {
     console.error('加载用户信息失败:', error)
-    // 模拟数据用于演示
-    user.value = {
-      id: 1,
-      username: '2023123456',
-      realName: '齐司礼',
-      phone: '13800000001',
-      role: 1,
-      status: 1
+    // 开发环境使用模拟数据
+    if (import.meta.env.DEV) {
+      user.value = {
+        id: 1,
+        username: '2023123456',
+        realName: '齐司礼',
+        phone: '13800000001',
+        role: 1,
+        status: 1
+      }
+      setTimeout(() => initializeConversationsSubscription(), 100)
     }
   }
 }
 
-const loadConversations = async () => {
+// 初始化所有对话的订阅
+const initializeConversationsSubscription = async () => {
+  if (!user.value.id) return
+  
+  try {
+    // 获取用户的所有对话列表
+    const response = await axios.get('/api/chat/conversation/list')
+    if (response.data.code === 0) {
+      const data = response.data.data || []
+      
+      // 为每个对话订阅实时更新
+      data.forEach((conv: any) => {
+        if (conv.conversationId) {
+          subscribe(conv.conversationId, handleRealtimeUpdate)
+        }
+      })
+      
+      console.log(`[MessagesView] 初始化了 ${data.length} 个对话的订阅`)
+    }
+  } catch (err) {
+    console.error('[MessagesView] 初始化对话订阅失败:', err)
+  }
+}
+
+const loadConversations = async (showLoading = true) => {
   if (loading.value) return
   
-  loading.value = true
+  if (showLoading) {
+    loading.value = true
+  }
   error.value = ''
   
   try {
     const response = await axios.get('/api/chat/conversation/list')
     if (response.data.code === 0) {
       const data = response.data.data || []
+      const currentUserId = user.value.id
       
-      // 获取当前用户ID
-      const currentUserId = user.value.id || parseInt(sessionStorage.getItem('userId') || '0')
-      
-      // 处理每个会话的未读状态
+      // 处理每个会话
       const processedConversations = data.map((conv: any) => {
         const conversationId = conv.conversationId
         
-        // 优先使用会话存储中的未读状态(这是关键修复)
-        const storageKey = `unread_${currentUserId}_${conversationId}`
-        const storedUnread = sessionStorage.getItem(storageKey)
-        
-        let unreadCount = 0
-        
-        if (storedUnread) {
-          // 使用存储中的未读状态
-          unreadCount = parseInt(storedUnread)
-          console.log(`从存储恢复未读状态: 对话 ${conversationId}, 未读数: ${unreadCount}`)
-        } else if (typeof conv.unreadCount === 'number') {
-          // 使用接口返回的未读数量
-          unreadCount = conv.unreadCount
-          // 更新会话存储
-          sessionStorage.setItem(storageKey, unreadCount.toString())
-        } else {
-          // 默认未读数量
-          unreadCount = 0
+        // 确保订阅该对话
+        if (conversationId) {
+          subscribe(conversationId, handleRealtimeUpdate)
         }
         
-        // 确保订阅了该对话的实时更新
-        if (conversationId) {
-          subscribeToConversation(conversationId)
+        // 同步服务端返回的未读数（如果本地没有）
+        const localUnread = UnreadCountManager.getUnreadCount(currentUserId, conversationId)
+        let unreadCount = localUnread
+        
+        // 如果本地没有未读数，但服务端有，以服务端为准（首次加载）
+        if (localUnread === 0 && typeof conv.unreadCount === 'number' && conv.unreadCount > 0) {
+          unreadCount = conv.unreadCount
+          UnreadCountManager.setUnreadCount(currentUserId, conversationId, unreadCount)
         }
         
         return {
           ...conv,
-          unreadCount: unreadCount
+          unreadCount // 保留这个字段用于兼容，但显示时优先使用 UnreadCountManager
         }
       })
       
-      // 更新会话列表
       conversations.value = processedConversations
-      
       hasMore.value = data.length === pageSize
-      console.log(`加载了 ${data.length} 个会话,未读总数: ${stats.value.unread}`)
+      
+      console.log(`[MessagesView] 加载了 ${data.length} 个会话，总未读: ${totalUnreadCount.value}`)
     } else {
       error.value = response.data.msg || '加载失败'
     }
   } catch (err) {
-    // 错误处理机制
-    error.value = '网络不稳定,请点击重试'
-    console.error('加载会话列表失败:', err)
+    error.value = '网络不稳定，请点击重试'
+    console.error('[MessagesView] 加载会话列表失败:', err)
   } finally {
     loading.value = false
     refreshing.value = false
@@ -506,11 +465,6 @@ const loadMore = async () => {
   
   try {
     // 实际项目中需要分页接口
-    // const response = await axios.get('/api/chat/conversation/list', {
-    //   params: { page: currentPage.value + 1, size: pageSize }
-    // })
-    
-    // 模拟加载更多
     setTimeout(() => {
       hasMore.value = false
       loadingMore.value = false
@@ -526,31 +480,34 @@ const refreshList = async () => {
   
   refreshing.value = true
   currentPage.value = 1
+  // 清除缓存，强制重新检查
+  conversations.value.forEach(conv => {
+    if (conv.conversationId) {
+      triggerUpdate(conv.conversationId)
+    }
+  })
   await loadConversations()
 }
 
 // ==================== 会话操作 ====================
 const openConversation = (conversation: any) => {
   const conversationId = conversation.conversationId
-  const currentUserId = user.value.id || parseInt(sessionStorage.getItem('userId') || '0')
+  const currentUserId = user.value.id
+  
+  if (!conversationId || !currentUserId) return
   
   activeConversationId.value = conversationId
   
-  // 清除未读数并更新会话存储(这是关键)
-  conversation.unreadCount = 0
-  const storageKey = `unread_${currentUserId}_${conversationId}`
-  sessionStorage.removeItem(storageKey)
+  // 清除该对话的未读计数
+  UnreadCountManager.clearUnreadCount(currentUserId, conversationId)
   
-  // 清除最后消息时间戳
-  const lastMsgTimeKey = `last_msg_${currentUserId}_${conversationId}`
-  sessionStorage.removeItem(lastMsgTimeKey)
-  
-  // 强制更新视图,确保红点立即消失
+  // 更新视图（虽然计算属性会自动更新，但这里强制刷新确保UI同步）
   conversations.value = [...conversations.value]
   
+  // 打开对话框
   currentConversationId.value = conversationId
   currentItemId.value = conversation.itemId || 0
-  dialogTitle.value = `${conversation.itemName}`
+  dialogTitle.value = conversation.itemName || '聊天'
   chatDialogVisible.value = true
 }
 
@@ -561,12 +518,20 @@ const closeChatDialog = () => {
   dialogTitle.value = ''
   activeConversationId.value = null
   
-  // 对话框关闭后,重新加载列表以同步状态
+  // 对话框关闭后，触发一次更新检查
   setTimeout(() => {
-    if (isMessagesPage.value) {
-      loadConversations()
+    if (isMessagesPageActive.value && currentConversationId.value) {
+      triggerUpdate(currentConversationId.value)
     }
-  }, 100)
+  }, 300)
+}
+
+// 处理消息发送事件（由 DetailMessagesView 触发）
+const handleMessageSent = (data: { conversationId: number }) => {
+  // 发送消息后，触发立即更新以确保对方能及时收到
+  setTimeout(() => {
+    triggerUpdate(data.conversationId)
+  }, 500)
 }
 
 // ==================== 工具函数 ====================
@@ -598,87 +563,96 @@ async function logout() {
   } catch (error) {
     console.error('退出登录失败:', error)
   } finally {
-    // 清理所有存储
+    // 清理未读计数
+    if (user.value.id) {
+      UnreadCountManager.clearAll(user.value.id)
+    }
+    // 重置实时服务
+    unsubscribeAll()
     localStorage.clear()
     sessionStorage.clear()
-    
-    // 使用 replace 而不是 push,避免路由守卫拦截
     router.replace('/login')
   }
 }
 
 // ==================== 生命周期 ====================
 onMounted(async () => {
-  console.log('MessagesView 组件挂载, 当前路径:', route.path)
+  console.log('[MessagesView] 组件挂载')
   
   // 先加载用户信息
   await loadUser()
   
-  // 立即检查当前路径并设置状态 - 修改这里,匹配 /messages 路径
-  isMessagesPage.value = route.path === '/messages'
-  console.log('是否在消息页面:', isMessagesPage.value)
+  // 标记当前页面为消息页面
+  isMessagesPageActive.value = true
   
-  // 如果在消息页面,立即加载会话列表
-  if (isMessagesPage.value) {
-    console.log('组件挂载时在消息页面,立即加载会话列表')
-    await loadConversations()
-  }
+  // 立即加载会话列表
+  await loadConversations()
   
-  // 初始化全局订阅(无论是否在消息页面)
-  await initializeGlobalSubscriptions()
-  
-  // 监听路由变化 - 修改这里,匹配 /messages 路径
-  watch(() => route.path, async (newPath, oldPath) => {
-    const wasMessagesPage = isMessagesPage.value
-    isMessagesPage.value = newPath === '/messages'
-    
-    console.log('路由变化:', { oldPath, newPath, wasMessagesPage, isMessagesPage: isMessagesPage.value })
-    
-    // 切换到消息页面时加载会话列表
-    if (isMessagesPage.value && !wasMessagesPage) {
-      console.log('切换到消息页面,立即加载会话列表')
-      // 使用 nextTick 确保 DOM 更新后再加载
-      await nextTick()
-      await loadConversations()
-    }
-  }, { immediate: false })
-  
-  // 监听聊天对话框状态变化
-  watch(chatDialogVisible, (newVal, oldVal) => {
-    if (!newVal && oldVal) {
-      // 对话框关闭时,重新加载列表以获取最新状态
-      setTimeout(() => {
-        if (isMessagesPage.value) {
-          loadConversations()
-        }
-      }, 300)
-    }
-  })
+  // 监听未读计数变化事件（用于跨组件同步）
+  window.addEventListener('unread-count-changed', handleUnreadCountChanged as EventListener)
 })
 
-onActivated(async () => {
-  console.log('MessagesView 组件激活, 当前路径:', route.path)
-  
-  // 组件被激活时(例如从其他页面切换回来)
-  // 检查是否在消息页面 - 修改这里,匹配 /messages 路径
-  isMessagesPage.value = route.path === '/messages'
-  
-  if (isMessagesPage.value) {
-    console.log('消息页面被激活,刷新会话列表')
-    await nextTick()
-    await loadConversations()
+// 监听未读计数变化事件
+const handleUnreadCountChanged = (event: CustomEvent) => {
+  const { userId, conversationId, count } = event.detail
+  if (userId === user.value.id) {
+    // 强制更新视图
+    conversations.value = [...conversations.value]
+    console.log(`[MessagesView] 未读计数变化事件: 对话 ${conversationId} = ${count}`)
   }
+}
+
+onActivated(async () => {
+  console.log('[MessagesView] 组件激活')
+  isMessagesPageActive.value = true
+  
+  // 每次激活时刷新列表（从其他页面返回时）
+  await nextTick()
+  await loadConversations(false) // 静默刷新
+})
+
+onDeactivated(() => {
+  console.log('[MessagesView] 组件失活')
+  isMessagesPageActive.value = false
 })
 
 onUnmounted(() => {
-  console.log('MessagesView 组件卸载')
-  // 清理实时消息订阅
-  // 注意:这里不清除全局订阅,因为我们需要在非消息页面也能接收更新
+  console.log('[MessagesView] 组件卸载')
+  isMessagesPageActive.value = false
+  window.removeEventListener('unread-count-changed', handleUnreadCountChanged as EventListener)
+  // 注意：不在这里调用 unsubscribeAll，因为我们需要在离开页面后继续接收通知
 })
 </script>
 
 <style scoped>
-/* 继承 HomeView.vue 的基础样式 */
+/* 添加导航栏红点样式 */
+.nav-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: #ff6b6b;
+  color: white;
+  border-radius: 10px;
+  padding: 2px 6px;
+  font-family: "Comic Sans MS", cursive;
+  font-size: 10px;
+  font-weight: 600;
+  min-width: 18px;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(255, 107, 107, 0.3);
+  animation: pulse-badge 2s infinite;
+}
+
+@keyframes pulse-badge {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+.left-nav-btn {
+  position: relative; /* 确保红点定位正确 */
+}
+
+/* 其他样式保持不变... */
 .home-page {
   width: 100vw;
   min-height: 100vh;
@@ -820,6 +794,7 @@ onUnmounted(() => {
   font-weight: 500;
   width: 100%;
   text-align: left;
+  position: relative;
 }
 
 .left-nav-btn.active {
@@ -1352,6 +1327,15 @@ onUnmounted(() => {
   .left-nav-btn .nav-text {
     font-size: 10px;
     text-align: center;
+  }
+  
+  /* 移动端红点位置调整 */
+  .nav-badge {
+    top: 2px;
+    right: 2px;
+    padding: 1px 4px;
+    font-size: 9px;
+    min-width: 14px;
   }
 
   /* 底部操作按钮组 */
