@@ -118,7 +118,7 @@
                 {{ conversation.itemName ? conversation.itemName.charAt(0) : '物' }}
               </div>
               <div v-if="conversation.unreadCount > 0" class="unread-badge">
-                {{ conversation.unreadCount > 99 ? '99+' : conversation.unreadCount }}
+                {{ conversation.unreadCount > 99 ? '99+' : Math.max(1, conversation.unreadCount) }}
               </div>
             </div>
 
@@ -307,12 +307,26 @@ const handleGlobalRealtimeUpdate: RealtimeCallback = (update) => {
     conv.lastMessage = latestMsg.content
     conv.lastTime = latestMsg.createTime || latestMsg.createdAt
     
-    // --- 核心修改：未读数逻辑 ---
+    // --- 修复未读数逻辑：避免重复计数 ---
     // 只有当“聊天弹窗未打开”或者“打开的不是当前这个会话”时，才增加未读数
     if (!chatDialogVisible.value || activeConversationId.value !== targetId) {
-      // 如果后端没返回 unreadCount 字段，前端初始化它
-      if (conv.unreadCount === undefined) conv.unreadCount = 0
-      conv.unreadCount += update.messages.length
+      // 确保 unreadCount 存在且为数字
+      if (typeof conv.unreadCount !== 'number' || isNaN(conv.unreadCount)) {
+        conv.unreadCount = 0
+      }
+      
+      // 只增加新消息的数量，避免重复计数
+      // 假设 update.messages 只包含新收到的消息
+      const newMessagesCount = update.messages.filter(msg => {
+        // 检查消息时间是否比当前最后消息时间新
+        const msgTime = new Date(msg.createTime || msg.createdAt)
+        const lastTime = new Date(conv.lastTime)
+        return msgTime > lastTime
+      }).length
+      
+      // 如果没有找到更新的消息，默认增加1条
+      const actualNewCount = newMessagesCount > 0 ? newMessagesCount : 1
+      conv.unreadCount += actualNewCount
     }
 
     // 移至顶部
@@ -332,7 +346,11 @@ const loadConversations = async () => {
     const response = await axios.get('/api/chat/conversation/list')
     if (response.data.code === 0) {
       const data = response.data.data || []
-      conversations.value = data
+      // 确保每个会话都有正确的 unreadCount 字段
+      conversations.value = data.map((conv: any) => ({
+        ...conv,
+        unreadCount: typeof conv.unreadCount === 'number' ? conv.unreadCount : 0
+      }))
       
       // 加载完成后，确保所有会话都已订阅
       data.forEach((conv: any) => {
