@@ -95,7 +95,7 @@
           <div class="error-icon">⚠️</div>
           <div class="error-title">加载失败</div>
           <div class="error-desc">{{ error }}</div>
-          <button class="error-action-btn" @click="loadConversations">重试</button>
+          <button class="error-action-btn" @click="() => loadConversations()">重试</button>
         </div>
 
         <!-- 会话列表 -->

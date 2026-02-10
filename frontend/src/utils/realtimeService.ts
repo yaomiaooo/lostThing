@@ -358,7 +358,9 @@ class RealtimeMessageService {
 
               if (processedIds!.size > 1000) {
                 const first = processedIds!.values().next().value
-                processedIds!.delete(first)
+                if (first !== undefined) {
+                  processedIds!.delete(first)
+                }
               }
             })
 
