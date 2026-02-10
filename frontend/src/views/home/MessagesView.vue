@@ -111,7 +111,7 @@
             :key="conversation.conversationId"
             class="conversation-item"
             :class="{ 
-              'unread': getConversationUnreadCount(conversation.conversationId) > 0,
+              'unread': conversation.unreadCount > 0,
               'active': activeConversationId === conversation.conversationId 
             }"
             @click="openConversation(conversation)"
@@ -121,12 +121,12 @@
                 {{ conversation.itemName ? conversation.itemName.charAt(0) : '物' }}
               </div>
               <div 
-                v-if="getConversationUnreadCount(conversation.conversationId) > 0" 
+                v-if="conversation.unreadCount > 0" 
                 class="unread-badge"
               >
-                {{ getConversationUnreadCount(conversation.conversationId) > 99 
+                {{ conversation.unreadCount > 99 
                   ? '99+' 
-                  : getConversationUnreadCount(conversation.conversationId) 
+                  : Math.max(1, conversation.unreadCount) 
                 }}
               </div>
             </div>
@@ -148,7 +148,7 @@
                 <span 
                   class="last-message" 
                   :class="{ 
-                    'unread-text': getConversationUnreadCount(conversation.conversationId) > 0 
+                    'unread-text': conversation.unreadCount > 0 
                   }"
                 >
                   {{ conversation.lastMessage || '暂无消息' }}
@@ -249,21 +249,33 @@ const { subscribe, unsubscribe, unsubscribeAll, triggerUpdate, addProcessedMessa
 
 // ==================== 未读计数计算属性 ====================
 const totalUnreadCount = computed(() => {
-  if (!user.value.id) return 0
-  return UnreadCountManager.getTotalUnreadCount(user.value.id)
+  // 直接计算所有会话的未读计数之和，确保与各会话红点同步
+  return conversations.value.reduce((sum, conv) => {
+    const unreadCount = typeof conv.unreadCount === 'number' ? Math.max(0, conv.unreadCount) : 0
+    return sum + unreadCount
+  }, 0)
 })
 
 // 获取单个对话的未读计数
 const getConversationUnreadCount = (conversationId: number): number => {
-  if (!user.value.id || !conversationId) return 0
-  return UnreadCountManager.getUnreadCount(user.value.id, conversationId)
+  if (!conversationId) return 0
+  
+  // 直接从会话数据中获取未读计数，确保与数据同步
+  const conversation = conversations.value.find(c => c.conversationId === conversationId)
+  if (!conversation) return 0
+  
+  const unreadCount = typeof conversation.unreadCount === 'number' 
+    ? Math.max(0, conversation.unreadCount) 
+    : 0
+  
+  return unreadCount
 }
 
 // 按未读状态和时间排序的会话列表
 const sortedConversations = computed(() => {
   return [...conversations.value].sort((a, b) => {
-    const unreadA = getConversationUnreadCount(a.conversationId)
-    const unreadB = getConversationUnreadCount(b.conversationId)
+    const unreadA = typeof a.unreadCount === 'number' ? Math.max(0, a.unreadCount) : 0
+    const unreadB = typeof b.unreadCount === 'number' ? Math.max(0, b.unreadCount) : 0
 
     if (unreadA > 0 && unreadB === 0) return -1
     if (unreadA === 0 && unreadB > 0) return 1
@@ -308,62 +320,46 @@ const navItems = reactive([
 // ==================== 全局实时消息处理器（关键修复）====================
 const handleRealtimeUpdate: RealtimeCallback = (update) => {
   if (!update.messages || update.messages.length === 0) return
-  if (!user.value.id) return
 
-  const currentUserId = user.value.id
-  const conversationId = update.conversationId
+  const latestMsg = update.messages[update.messages.length - 1]
+  const targetId = update.conversationId
+  const index = conversations.value.findIndex(c => c.conversationId === targetId)
 
-  // 过滤出对方发送的消息
-  const otherMessages = update.messages.filter(msg => msg.senderId && msg.senderId !== currentUserId)
-
-  if (otherMessages.length === 0) {
-    // 全是自己发的消息，只更新界面不增加未读
-    const latestMsg = update.messages[update.messages.length - 1]
-    const convIndex = conversations.value.findIndex(c => c.conversationId === conversationId)
-    if (convIndex !== -1) {
-      conversations.value[convIndex] = {
-        ...conversations.value[convIndex],
-        lastMessage: latestMsg.content,
-        lastTime: latestMsg.createTime || latestMsg.createdAt
+  if (index !== -1) {
+    const conv = conversations.value[index]
+    conv.lastMessage = latestMsg.content
+    conv.lastTime = latestMsg.createTime || latestMsg.createdAt
+    
+    // --- 修复未读数逻辑：避免重复计数 ---
+    // 只有当"聊天弹窗未打开"或者"打开的不是当前这个会话"时，才增加未读数
+    if (!chatDialogVisible.value || activeConversationId.value !== targetId) {
+      // 确保 unreadCount 存在且为数字
+      if (typeof conv.unreadCount !== 'number' || isNaN(conv.unreadCount)) {
+        conv.unreadCount = 0
       }
+      
+      // 只增加新消息的数量，避免重复计数
+      // 假设 update.messages 只包含新收到的消息
+      const newMessagesCount = update.messages.filter(msg => {
+        // 检查消息时间是否比当前最后消息时间新
+        const msgTime = new Date(msg.createTime || msg.createdAt)
+        const lastTime = new Date(conv.lastTime)
+        return msgTime > lastTime
+      }).length
+      
+      // 如果没有找到更新的消息，默认增加1条
+      const actualNewCount = newMessagesCount > 0 ? newMessagesCount : 1
+      conv.unreadCount += actualNewCount
+      
+      // 强制更新计算属性，确保消息按钮红点同步更新
+      conversations.value = [...conversations.value]
     }
-    return
-  }
 
-  // 关键修复：通过时间戳检查真正未读的消息
-  const lastReadTime = UnreadCountManager.getLastReadTime(currentUserId, conversationId)
-
-  const trulyUnreadMessages = otherMessages.filter(msg => {
-    const msgTime = new Date(msg.createTime || msg.createdAt).getTime()
-    return msgTime > lastReadTime
-  })
-
-  if (trulyUnreadMessages.length === 0) {
-    console.log(`[MessagesView] 消息已读，跳过计数`)
-    return
-  }
-
-  // 增加未读计数
-  const newCount = UnreadCountManager.incrementUnreadCount(
-    currentUserId,
-    conversationId,
-    trulyUnreadMessages.length
-  )
-
-  console.log(`[MessagesView] 收到 ${trulyUnreadMessages.length} 条新消息，对话 ${conversationId} 未读数: ${newCount}`)
-
-  // 更新会话列表
-  const latestMsg = trulyUnreadMessages[trulyUnreadMessages.length - 1]
-  const convIndex = conversations.value.findIndex(c => c.conversationId === conversationId)
-
-  if (convIndex !== -1) {
-    conversations.value[convIndex] = {
-      ...conversations.value[convIndex],
-      lastMessage: latestMsg.content,
-      lastTime: latestMsg.createTime || latestMsg.createdAt
-    }
-  } else if (isMessagesPageActive.value) {
-    loadConversations(false)
+    // 移至顶部
+    conversations.value.splice(index, 1)
+    conversations.value.unshift(conv)
+  } else {
+    loadConversations()
   }
 }
 
@@ -523,6 +519,11 @@ const openConversation = async (conversation: any) => {
   if (!conversationId || !currentUserId) return
 
   activeConversationId.value = conversationId
+  // --- 核心修改：清除未读数 ---
+  conversation.unreadCount = 0 
+  
+  // 强制更新视图，确保红点立即消失
+  conversations.value = [...conversations.value]
 
   // 记录打开时间戳
   const now = Date.now()
@@ -534,9 +535,6 @@ const openConversation = async (conversation: any) => {
 
   // 关键修复：将当前对话的现有消息标记为已处理
   await markConversationMessagesAsProcessed(conversationId)
-
-  // 刷新视图
-  conversations.value = [...conversations.value]
 
   // 打开对话框
   currentConversationId.value = conversationId
