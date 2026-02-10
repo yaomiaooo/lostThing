@@ -7,38 +7,14 @@
 
     <!-- 整体布局：左侧导航 + 右侧主内容 -->
     <div class="layout-container">
-      <!-- 左侧导航栏（与首页一致） -->
-      <aside class="left-nav">
-        <!-- 用户信息区域 -->
-        <div class="user-info-container">
-          <div class="user-avatar-container">
-            <img class="user-avatar" src="/home/avatar.png" />
-            <div class="user-avatar-border"></div>
-          </div>
-          <div class="user-text">
-            <div class="user-nickname">{{ user.realName }}</div>
-            <div class="user-subtitle">欢迎回来^_^</div>
-          </div>
-        </div>
-
-        <!-- 左侧上半区：核心导航 -->
-        <div class="nav-top-group">
-          <button 
-            v-for="nav in navItems" 
-            :key="nav.name"
-            class="left-nav-btn"
-            :class="{ active: nav.name === '我的' }"
-            @click="nav.handler"
-          >
-            <span class="nav-icon">
-              <img :src="nav.icon" :alt="nav.name" class="nav-svg" />
-            </span>
-            <span class="nav-text">{{ nav.name }}</span>
-          </button>
-        </div>
-
-        <!-- 左侧中间：统计卡片 -->
-        <div class="left-notice-card bubble">
+      <!-- 左侧导航栏组件 -->
+      <Navigation 
+        subtitle="欢迎回来^_^"
+        active-nav="我的"
+        :custom-content="true"
+        @logout="handleLogout"
+      >
+        <template #custom-content>
           <div class="notice-content">
             <div class="notice-title">📊 发布统计</div>
             <div class="stat-item">
@@ -55,18 +31,8 @@
             </div>
           </div>
           <div class="notice-time">今日更新</div>
-        </div>
-
-        <!-- 左侧下半区：操作按钮 -->
-        <div class="nav-bottom-group">
-          <button 
-            class="left-action-btn logout-btn"
-            @click="logout"
-          >
-            <span class="btn-text">退出登录</span>
-          </button>
-        </div>
-      </aside>
+        </template>
+      </Navigation>
 
       <!-- 右侧主内容区域 -->
       <main class="main-content">
@@ -459,6 +425,7 @@ import { ref, onMounted, reactive, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import ItemDetailView from './ItemDetailView.vue'
+import Navigation from './navigation.vue'
 
 const router = useRouter()
 
@@ -507,34 +474,7 @@ const categoryTree = ref<any[]>([])
 const locationTree = ref<any[]>([])
 const locationOptions = ref<any[]>([])
 
-/* ================= 左侧导航栏 ================= */
-const navItems = [
-  {
-    name: '发现',
-    icon: '/home/发现.svg',
-    handler: () => router.push('/home')
-  },
-  {
-    name: '发布',
-    icon: '/home/发布.svg',
-    handler: goPublish
-  },
-  {
-    name: '消息',
-    icon: '/home/消息.svg',
-    handler: () => router.push('/messages')
-  },
-  {
-    name: '我的',
-    icon: '/home/我的.svg',
-    handler: () => {} // 当前页面
-  },
-  {
-    name: '设置',
-    icon: '/home/设置.svg',
-    handler: () => router.push('/settings')
-  }
-]
+
 
 /* ================= 工具函数 ================= */
 function getCampusName(locationId: number): string {
@@ -585,6 +525,22 @@ async function loadUser() {
       role: 1,
       status: 1
     }
+  }
+}
+
+// 退出登录处理
+const handleLogout = async () => {
+  try {
+    const userId = user.value.id
+    if (userId) {
+      await axios.post('/api/user/logout', { userId })
+    }
+  } catch (error) {
+    console.error('退出登录失败:', error)
+  } finally {
+    localStorage.clear()
+    sessionStorage.clear()
+    router.push('/login')
   }
 }
 
@@ -948,20 +904,7 @@ function goPublish() {
   router.push('/publish')
 }
 
-async function logout() {
-  try {
-    const userId = user.value.id
-    if (userId) {
-      await axios.post('/api/user/logout', { userId })
-    }
-  } catch (error) {
-    console.error('退出登录失败:', error)
-  } finally {
-    localStorage.clear()
-    sessionStorage.clear()
-    router.replace('/login')
-  }
-}
+
 </script>
 
 <style scoped>

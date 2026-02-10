@@ -7,61 +7,27 @@
 
     <!-- 整体布局：左侧导航 + 右侧主内容 -->
     <div class="layout-container">
-      <!-- 左侧导航栏 -->
-      <aside class="left-nav">
-        <!-- 用户信息区域 -->
-        <div class="user-info-container">
-          <div class="user-avatar-container">
-            <img class="user-avatar" src="/home/avatar.png" />
-            <div class="user-avatar-border"></div>
+      <!-- 左侧导航栏组件 -->
+    <Navigation 
+      subtitle="发布物品"
+      active-nav="发布"
+      :custom-content="true"
+      @logout="handleLogout"
+    >
+      <template #custom-content>
+        <div class="notice-content">
+          <div class="notice-title">📝 发布须知</div>
+          <div class="notice-desc">
+            1. 请如实填写物品信息<br>
+            2. 上传清晰照片有助于匹配<br>
+            3. 失物可设置悬赏金额<br>
+            4. 招领请说明领取地点<br>
+            5. 信息审核通过后显示
           </div>
-          <div class="user-text">
-            <div class="user-nickname">{{ user.realName }}</div>
-            <div class="user-subtitle">发布物品</div>
-          </div>
         </div>
-
-        <!-- 左侧上半区：核心导航 -->
-        <div class="nav-top-group">
-          <button 
-            v-for="nav in navItems" 
-            :key="nav.name"
-            class="left-nav-btn"
-            :class="{ active: nav.active }"
-            @click="nav.handler"
-          >
-            <span class="nav-icon">
-              <img :src="nav.icon" :alt="nav.name" class="nav-svg" />
-            </span>
-            <span class="nav-text">{{ nav.name }}</span>
-          </button>
-        </div>
-
-        <!-- 左侧中间：发布提示 -->
-        <div class="left-notice-card bubble">
-          <div class="notice-content">
-            <div class="notice-title">📝 发布须知</div>
-            <div class="notice-desc">
-              1. 请如实填写物品信息<br>
-              2. 上传清晰照片有助于匹配<br>
-              3. 失物可设置悬赏金额<br>
-              4. 招领请说明领取地点<br>
-              5. 信息审核通过后显示
-            </div>
-          </div>
-          <div class="notice-time">{{ currentDate }}</div>
-        </div>
-
-        <!-- 左侧下半区：操作按钮 -->
-        <div class="nav-bottom-group">
-          <button 
-            class="left-action-btn logout-btn"
-            @click="logout"
-          >
-            <span class="btn-text">退出登录</span>
-          </button>
-        </div>
-      </aside>
+        <div class="notice-time">{{ currentDate }}</div>
+      </template>
+    </Navigation>
 
       <!-- 右侧主内容区域 -->
       <main class="main-content">
@@ -569,6 +535,7 @@
 import { ref, onMounted, reactive, computed, onBeforeMount, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import axios from 'axios'
+import Navigation from './navigation.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -583,39 +550,7 @@ const user = ref({
   status: 0
 })
 
-/* ================= 导航栏 ================= */
-const navItems = reactive([
-  {
-    name: '发现',
-    icon: '/home/发现.svg',
-    active: false,
-    handler: () => router.push('/')
-  },
-  {
-    name: '发布',
-    icon: '/home/发布.svg',
-    active: true,
-    handler: () => {}
-  },
-  {
-    name: '消息',
-    icon: '/home/消息.svg',
-    active: false,
-    handler: () => router.push('/messages')
-  },
-  {
-    name: '我的',
-    icon: '/home/我的.svg',
-    active: false,
-    handler: () => router.push('/my-posts')
-  },
-  {
-    name: '设置',
-    icon: '/home/设置.svg',
-    active: false,
-    handler: () => router.push('/settings')
-  }
-])
+
 
 /* ================= 表单数据 ================= */
 const formData = reactive({
@@ -1563,7 +1498,8 @@ function goBack() {
   }
 }
 
-async function logout() {
+// 退出登录处理
+const handleLogout = async () => {
   try {
     const userId = user.value.id
     if (userId) {

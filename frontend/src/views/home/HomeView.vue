@@ -8,55 +8,21 @@
 
     <!-- 整体布局：左侧导航 + 右侧主内容 -->
     <div class="layout-container">
-      <!-- 左侧导航栏 -->
-      <aside class="left-nav">
-        <!-- 用户信息区域 -->
-        <div class="user-info-container">
-          <div class="user-avatar-container">
-            <img class="user-avatar" src="/home/avatar.png" />
-            <div class="user-avatar-border"></div>
-          </div>
-          <div class="user-text">
-            <div class="user-nickname">{{ user.realName }}</div>
-            <div class="user-subtitle">欢迎回来^_^</div>
-          </div>
+      <!-- 左侧导航栏组件 -->
+    <Navigation 
+      subtitle="欢迎回来^_^"
+      active-nav="发现"
+      :custom-content="true"
+      @logout="handleLogout"
+    >
+      <template #custom-content>
+        <div class="notice-content">
+          <div class="notice-title">📢 毕业季失物招领专场</div>
+          <div class="notice-desc">别问，问就是捡到的～ 毕业季专属失物找回通道已开启！</div>
         </div>
-
-        <!-- 左侧上半区：核心导航 -->
-        <div class="nav-top-group">
-          <button 
-              v-for="nav in navItems" 
-              :key="nav.name"
-              class="left-nav-btn"
-              :class="{ active: nav.active }"
-              @click="nav.handler"
-            >
-              <span class="nav-icon">
-                <img :src="nav.icon" :alt="nav.name" class="nav-svg" />
-              </span>
-              <span class="nav-text">{{ nav.name }}</span>
-            </button>
-        </div>
-
-        <!-- 左侧中间：公告栏 -->
-        <div class="left-notice-card bubble">
-          <div class="notice-content">
-            <div class="notice-title">📢 毕业季失物招领专场</div>
-            <div class="notice-desc">别问，问就是捡到的～ 毕业季专属失物找回通道已开启！</div>
-          </div>
-          <div class="notice-time">2024-06-15</div>
-        </div>
-
-        <!-- 左侧下半区：操作按钮 -->
-        <div class="nav-bottom-group">
-          <button 
-            class="left-action-btn logout-btn"
-            @click="logout"
-          >
-            <span class="btn-text">退出登录</span>
-          </button>
-        </div>
-      </aside>
+        <div class="notice-time">2024-06-15</div>
+      </template>
+    </Navigation>
 
       <!-- 右侧主内容区域 -->
       <main class="main-content">
@@ -307,6 +273,7 @@ import { ref, onMounted, reactive, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import ItemDetailView from './ItemDetailView.vue'
+import Navigation from './navigation.vue'
 
 const router = useRouter()
 
@@ -566,39 +533,7 @@ watch(filterParams, () => {
   // 筛选参数变化时，计算属性会自动重新计算
 }, { deep: true })
 
-/* ================= 左侧导航栏 ================= */
-const navItems = reactive([
-  {
-    name: '发现',
-    icon: '/home/发现.svg',
-    active: true,
-    handler: () => {}
-  },
-  {
-    name: '发布',
-    icon: '/home/发布.svg',
-    active: false,
-    handler: goPublish
-  },
-  {
-    name: '消息',
-    icon: '/home/消息.svg',
-    active: false,
-    handler: goMessages
-  },
-  {
-    name: '我的',
-    icon: '/home/我的.svg',
-    active: false,
-    handler: goMyPosts
-  },
-  {
-    name: '设置',
-    icon: '/home/设置.svg',
-    active: false,
-    handler: goSettings
-  }
-])
+
 
 /* ================= 物品详情卡片 ================= */
 const showItemDetail = ref(false)
@@ -629,6 +564,22 @@ async function loadUser() {
       role: 1,
       status: 1
     }
+  }
+}
+
+// 退出登录处理
+const handleLogout = async () => {
+  try {
+    const userId = user.value.id
+    if (userId) {
+      await axios.post('/api/user/logout', { userId })
+    }
+  } catch (error) {
+    console.error('退出登录失败:', error)
+  } finally {
+    localStorage.clear()
+    sessionStorage.clear()
+    router.push('/login')
   }
 }
 
@@ -855,23 +806,7 @@ function setFilter(filter: 'all' | 'lost' | 'found') {
   currentFilter.value = filter
 }
 
-async function logout() {
-  try {
-    const userId = user.value.id
-    if (userId) {
-      await axios.post('/api/user/logout', { userId })
-    }
-  } catch (error) {
-    console.error('退出登录失败:', error)
-  } finally {
-    // 清理所有存储
-    localStorage.clear()
-    sessionStorage.clear()
-    
-    // 使用 replace 而不是 push，避免路由守卫拦截
-    router.replace('/login')
-  }
-}
+
 </script>
 
 <style scoped>
@@ -1053,50 +988,32 @@ async function logout() {
   font-size: 20px;
 }
 
-/* 左侧中间：公告栏 */
-.left-notice-card {
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 14.4px;
-  padding: 16px;
-  margin: 15px 0;
-  border: 1.6px solid rgba(166, 124, 82, 0.2);
+/* 导航组件中的公告栏样式 */
+.left-notice-card .notice-content {
   display: flex;
   flex-direction: column;
-  width: 85%;
-  /* 高度自适应设置 */
-  max-height: 300px; /* 限制最大高度 */
-  min-height: 96px; /* 确保最小高度 */
-  /* 滚动设置 */
-  overflow-y: auto; /* 启用滚动 */
-  scrollbar-width: thin;
-  scrollbar-color: rgba(166, 124, 82, 0.15) transparent;
-  /* 确保内部元素布局正确 */
-  box-sizing: border-box;
+  gap: 8px;
 }
 
-/* 内部元素 */
 .left-notice-card .notice-title {
   font-family: "Comic Sans MS", cursive;
-  font-size: 18px;
-  color: #a67c52;
-  margin-bottom: 15px;
+  font-size: 16px;
   font-weight: 600;
-  text-align: center;
-  flex-shrink: 0; /* 标题不压缩 */
+  color: #a67c52;
 }
 
 .left-notice-card .notice-desc {
   font-family: "Comic Sans MS", cursive;
-  font-size: 16px;
+  font-size: 14px;
   color: rgba(166, 124, 82, 0.8);
-  line-height: 1.5;
+  line-height: 1.4;
   text-align: center;
   margin-bottom: 20px;
-  flex: 1; /* 占据剩余空间 */
-  min-height: 0; /* 关键：允许内容区域滚动 */
-  overflow-y: auto; /* 描述区域可以滚动 */
-  padding-right: 5px; /* 给滚动条留空间 */
-  word-wrap: break-word; /* 确保长文本换行 */
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 5px;
+  word-wrap: break-word;
 }
 
 .left-notice-card .notice-time {
@@ -1104,8 +1021,8 @@ async function logout() {
   font-size: 12px;
   color: rgba(166, 124, 82, 0.6);
   text-align: right;
-  flex-shrink: 0; /* 时间不压缩 */
-  margin-top: 10px; /* 与描述保持距离 */
+  flex-shrink: 0;
+  margin-top: 10px;
 }
 
 /* 左侧下半区：操作按钮组 */
@@ -1602,8 +1519,7 @@ body {
     z-index: 100;
   }
 
-  /* 移动端隐藏用户信息、公告栏 */
-  .user-info-container,
+  /* 移动端隐藏导航组件中的公告栏 */
   .left-notice-card {
     display: none;
   }

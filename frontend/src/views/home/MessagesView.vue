@@ -7,59 +7,22 @@
 
     <!-- 整体布局：左侧导航 + 右侧主内容 -->
     <div class="layout-container">
-      <!-- 左侧导航栏 -->
-      <aside class="left-nav">
-        <!-- 用户信息区域 -->
-        <div class="user-info-container">
-          <div class="user-avatar-container">
-            <img class="user-avatar" src="/home/avatar.png" />
-            <div class="user-avatar-border"></div>
-          </div>
-          <div class="user-text">
-            <div class="user-nickname">{{ user.realName }}</div>
-            <div class="user-subtitle">欢迎回来^_^</div>
-          </div>
+      <!-- 左侧导航栏组件 -->
+    <Navigation 
+      subtitle="欢迎回来^_^"
+      active-nav="消息"
+      :unread-count="totalUnreadCount"
+      :custom-content="true"
+      @logout="handleLogout"
+    >
+      <template #custom-content>
+        <div class="notice-content">
+          <div class="notice-title">💬 消息统计</div>
+          <div class="notice-desc">总会话：{{ stats.total }} | 未读：{{ stats.unread }} | 活跃：{{ stats.active }}</div>
         </div>
-
-        <!-- 左侧上半区：核心导航 -->
-        <div class="nav-top-group">
-          <button 
-              v-for="nav in navItems" 
-              :key="nav.name"
-              class="left-nav-btn"
-              :class="{ active: nav.active }"
-              @click="nav.handler"
-            >
-              <span class="nav-icon">
-                <img :src="nav.icon" :alt="nav.name" class="nav-svg" />
-              </span>
-              <span class="nav-text">{{ nav.name }}</span>
-              <!-- 消息红点 -->
-              <span v-if="nav.name === '消息' && totalUnreadCount > 0" class="nav-badge">
-                {{ totalUnreadCount > 99 ? '99+' : totalUnreadCount }}
-              </span>
-            </button>
-        </div>
-
-        <!-- 左侧中间：公告栏 -->
-        <div class="left-notice-card bubble">
-          <div class="notice-content">
-            <div class="notice-title">💬 消息统计</div>
-            <div class="notice-desc">总会话：{{ stats.total }} | 未读：{{ stats.unread }} | 活跃：{{ stats.active }}</div>
-          </div>
-          <div class="notice-time">今日更新</div>
-        </div>
-
-        <!-- 左侧下半区：操作按钮 -->
-        <div class="nav-bottom-group">
-          <button 
-            class="left-action-btn logout-btn"
-            @click="logout"
-          >
-            <span class="btn-text">退出登录</span>
-          </button>
-        </div>
-      </aside>
+        <div class="notice-time">今日更新</div>
+      </template>
+    </Navigation>
 
       <!-- 右侧主内容区域 -->
       <main class="main-content">
@@ -206,6 +169,7 @@ import {
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 import DetailMessagesView from './DetailMessagesView.vue'
+import Navigation from './navigation.vue'
 import {
   useRealtimeMessages,
   UnreadCountManager,
@@ -308,14 +272,7 @@ const goMessages = () => {
 const goMyPosts = () => router.push('/my-posts')
 const goSettings = () => router.push('/settings')
 
-// ==================== 左侧导航栏 ====================
-const navItems = reactive([
-  { name: '发现', icon: '/home/发现.svg', active: false, handler: goHome },
-  { name: '发布', icon: '/home/发布.svg', active: false, handler: goPublish },
-  { name: '消息', icon: '/home/消息.svg', active: true, handler: goMessages },
-  { name: '我的', icon: '/home/我的.svg', active: false, handler: goMyPosts },
-  { name: '设置', icon: '/home/设置.svg', active: false, handler: goSettings }
-])
+
 
 // ==================== 全局实时消息处理器（关键修复）====================
 const handleRealtimeUpdate: RealtimeCallback = (update) => {
@@ -603,7 +560,8 @@ const formatTime = (timeStr: string) => {
   }
 }
 
-async function logout() {
+// 退出登录处理
+const handleLogout = async () => {
   const userId = user.value.id
 
   try {
