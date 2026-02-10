@@ -325,8 +325,8 @@ onMounted(() => {
 /* 消息红点 */
 .nav-badge {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 12px;
+  right: 12px;
   background: #ff6b6b;
   color: white;
   border-radius: 10px;
@@ -335,14 +335,21 @@ onMounted(() => {
   font-size: 10px;
   font-weight: 600;
   min-width: 18px;
+  height: 16px;
+  line-height: 16px;
   text-align: center;
   box-shadow: 0 2px 6px rgba(255, 107, 107, 0.3);
   animation: pulse-badge 2s infinite;
+  z-index: 1;
 }
 
 @keyframes pulse-badge {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.1); }
+}
+
+.left-nav-btn {
+  position: relative;
 }
 
 /* 左侧中间：公告栏/自定义内容 */
