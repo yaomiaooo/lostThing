@@ -192,25 +192,24 @@
 </template>
 
 <script setup lang="ts">
-import { 
-  ref, 
-  onMounted, 
-  reactive, 
-  computed, 
-  watch, 
-  onUnmounted, 
-  onActivated, 
-  onDeactivated, 
-  nextTick 
+import {
+  ref,
+  onMounted,
+  reactive,
+  computed,
+  watch,
+  onUnmounted,
+  onActivated,
+  onDeactivated,
+  nextTick
 } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 import DetailMessagesView from './DetailMessagesView.vue'
-// 导入实时消息服务和未读计数管理器
-import { 
-  useRealtimeMessages, 
-  UnreadCountManager, 
-  type RealtimeCallback 
+import {
+  useRealtimeMessages,
+  UnreadCountManager,
+  type RealtimeCallback
 } from '../../utils/realtimeService'
 
 // 路由实例
@@ -227,7 +226,7 @@ const hasMore = ref(true)
 const currentPage = ref(1)
 const pageSize = 20
 const activeConversationId = ref<number | null>(null)
-const isMessagesPageActive = ref(false) // 重命名以避免混淆
+const isMessagesPageActive = ref(false)
 
 // ==================== 聊天对话框状态 ====================
 const chatDialogVisible = ref(false)
@@ -246,7 +245,7 @@ const user = ref({
 })
 
 // ==================== 实时消息服务 ====================
-const { subscribe, unsubscribe, unsubscribeAll, triggerUpdate } = useRealtimeMessages()
+const { subscribe, unsubscribe, unsubscribeAll, triggerUpdate, addProcessedMessageId, setUserId } = useRealtimeMessages()
 
 // ==================== 未读计数计算属性 ====================
 const totalUnreadCount = computed(() => {
@@ -265,12 +264,10 @@ const sortedConversations = computed(() => {
   return [...conversations.value].sort((a, b) => {
     const unreadA = getConversationUnreadCount(a.conversationId)
     const unreadB = getConversationUnreadCount(b.conversationId)
-    
-    // 未读优先
+
     if (unreadA > 0 && unreadB === 0) return -1
     if (unreadA === 0 && unreadB > 0) return 1
-    
-    // 然后按时间排序
+
     const timeA = new Date(a.lastTime || 0).getTime()
     const timeB = new Date(b.lastTime || 0).getTime()
     return timeB - timeA
@@ -280,9 +277,9 @@ const sortedConversations = computed(() => {
 // ==================== 统计信息 ====================
 const stats = computed(() => {
   const total = conversations.value.length
-  const unread = totalUnreadCount.value // 使用计算属性获取准确值
+  const unread = totalUnreadCount.value
   const active = conversations.value.filter(conv => conv.lastTime).length
-  
+
   return { total, unread, active }
 })
 
@@ -290,7 +287,6 @@ const stats = computed(() => {
 const goHome = () => router.push('/home')
 const goPublish = () => router.push('/publish')
 const goMessages = () => {
-  // 如果已经在消息页面，刷新列表
   if (route.path === '/messages') {
     refreshList()
   } else {
@@ -309,72 +305,102 @@ const navItems = reactive([
   { name: '设置', icon: '/home/设置.svg', active: false, handler: goSettings }
 ])
 
-// ==================== 全局实时消息处理器 ====================
+// ==================== 全局实时消息处理器（关键修复）====================
 const handleRealtimeUpdate: RealtimeCallback = (update) => {
   if (!update.messages || update.messages.length === 0) return
   if (!user.value.id) return
-  
+
   const currentUserId = user.value.id
   const conversationId = update.conversationId
-  const latestMsg = update.messages[update.messages.length - 1]
-  
-  // 只处理对方发送的消息
-  if (latestMsg.senderId && latestMsg.senderId !== currentUserId) {
-    // 使用 UnreadCountManager 增加未读计数
-    const newCount = UnreadCountManager.incrementUnreadCount(
-      currentUserId, 
-      conversationId, 
-      update.messages.length
-    )
-    
-    console.log(`[MessagesView] 收到新消息，对话 ${conversationId} 未读数: ${newCount}`)
-    
-    // 更新会话列表中的显示信息
-    const convIndex = conversations.value.findIndex(
-      c => c.conversationId === conversationId
-    )
-    
+
+  // 过滤出对方发送的消息
+  const otherMessages = update.messages.filter(msg => msg.senderId && msg.senderId !== currentUserId)
+
+  if (otherMessages.length === 0) {
+    // 全是自己发的消息，只更新界面不增加未读
+    const latestMsg = update.messages[update.messages.length - 1]
+    const convIndex = conversations.value.findIndex(c => c.conversationId === conversationId)
     if (convIndex !== -1) {
-      // 更新现有会话的最后消息信息
       conversations.value[convIndex] = {
         ...conversations.value[convIndex],
         lastMessage: latestMsg.content,
         lastTime: latestMsg.createTime || latestMsg.createdAt
       }
-    } else {
-      // 如果是新会话，重新加载列表
-      if (isMessagesPageActive.value) {
-        loadConversations(false) // 静默加载，不显示loading
-      }
     }
+    return
+  }
+
+  // 关键修复：通过时间戳检查真正未读的消息
+  const lastReadTime = UnreadCountManager.getLastReadTime(currentUserId, conversationId)
+
+  const trulyUnreadMessages = otherMessages.filter(msg => {
+    const msgTime = new Date(msg.createTime || msg.createdAt).getTime()
+    return msgTime > lastReadTime
+  })
+
+  if (trulyUnreadMessages.length === 0) {
+    console.log(`[MessagesView] 消息已读，跳过计数`)
+    return
+  }
+
+  // 增加未读计数
+  const newCount = UnreadCountManager.incrementUnreadCount(
+    currentUserId,
+    conversationId,
+    trulyUnreadMessages.length
+  )
+
+  console.log(`[MessagesView] 收到 ${trulyUnreadMessages.length} 条新消息，对话 ${conversationId} 未读数: ${newCount}`)
+
+  // 更新会话列表
+  const latestMsg = trulyUnreadMessages[trulyUnreadMessages.length - 1]
+  const convIndex = conversations.value.findIndex(c => c.conversationId === conversationId)
+
+  if (convIndex !== -1) {
+    conversations.value[convIndex] = {
+      ...conversations.value[convIndex],
+      lastMessage: latestMsg.content,
+      lastTime: latestMsg.createTime || latestMsg.createdAt
+    }
+  } else if (isMessagesPageActive.value) {
+    loadConversations(false)
   }
 }
 
-// ==================== 数据加载 ====================
+// ==================== 数据加载（关键修复）====================
 async function loadUser() {
   try {
     const res = await axios.get('/api/user/info')
     if (res.data.code === 0) {
       user.value = res.data.data
-      
-      // 加载用户信息后，初始化所有对话的订阅
+
+      // 同步到 sessionStorage
+      sessionStorage.setItem('userId', user.value.id.toString())
+      sessionStorage.setItem('userInfo', JSON.stringify(user.value))
+
+      // 关键修复：设置 userId 到 realtimeService
+      setUserId(user.value.id)
+
+      // 同步服务端未读数（覆盖本地旧数据）
+      await UnreadCountManager.syncWithServer(user.value.id)
+
+      // 初始化订阅
       setTimeout(() => {
         initializeConversationsSubscription()
       }, 100)
     }
   } catch (error) {
     console.error('加载用户信息失败:', error)
-    // 开发环境使用模拟数据
-    if (import.meta.env.DEV) {
-      user.value = {
-        id: 1,
-        username: '2023123456',
-        realName: '齐司礼',
-        phone: '13800000001',
-        role: 1,
-        status: 1
+    const cachedUser = sessionStorage.getItem('userInfo')
+    const cachedUserId = sessionStorage.getItem('userId')
+    if (cachedUser && cachedUserId) {
+      try {
+        user.value = JSON.parse(cachedUser)
+        setUserId(parseInt(cachedUserId))
+        await UnreadCountManager.syncWithServer(parseInt(cachedUserId))
+      } catch (e) {
+        console.error('恢复用户信息失败')
       }
-      setTimeout(() => initializeConversationsSubscription(), 100)
     }
   }
 }
@@ -382,20 +408,18 @@ async function loadUser() {
 // 初始化所有对话的订阅
 const initializeConversationsSubscription = async () => {
   if (!user.value.id) return
-  
+
   try {
-    // 获取用户的所有对话列表
     const response = await axios.get('/api/chat/conversation/list')
     if (response.data.code === 0) {
       const data = response.data.data || []
-      
-      // 为每个对话订阅实时更新
+
       data.forEach((conv: any) => {
         if (conv.conversationId) {
           subscribe(conv.conversationId, handleRealtimeUpdate)
         }
       })
-      
+
       console.log(`[MessagesView] 初始化了 ${data.length} 个对话的订阅`)
     }
   } catch (err) {
@@ -405,46 +429,43 @@ const initializeConversationsSubscription = async () => {
 
 const loadConversations = async (showLoading = true) => {
   if (loading.value) return
-  
+
   if (showLoading) {
     loading.value = true
   }
   error.value = ''
-  
+
   try {
     const response = await axios.get('/api/chat/conversation/list')
     if (response.data.code === 0) {
       const data = response.data.data || []
       const currentUserId = user.value.id
-      
-      // 处理每个会话
+
+      // 关键修复：以服务端未读数为准，重置本地数据
+      UnreadCountManager.clearAll(currentUserId)
+
       const processedConversations = data.map((conv: any) => {
         const conversationId = conv.conversationId
-        
-        // 确保订阅该对话
+
         if (conversationId) {
           subscribe(conversationId, handleRealtimeUpdate)
         }
-        
-        // 同步服务端返回的未读数（如果本地没有）
-        const localUnread = UnreadCountManager.getUnreadCount(currentUserId, conversationId)
-        let unreadCount = localUnread
-        
-        // 如果本地没有未读数，但服务端有，以服务端为准（首次加载）
-        if (localUnread === 0 && typeof conv.unreadCount === 'number' && conv.unreadCount > 0) {
-          unreadCount = conv.unreadCount
+
+        // 使用服务端未读数
+        const unreadCount = typeof conv.unreadCount === 'number' ? conv.unreadCount : 0
+        if (unreadCount > 0) {
           UnreadCountManager.setUnreadCount(currentUserId, conversationId, unreadCount)
         }
-        
+
         return {
           ...conv,
-          unreadCount // 保留这个字段用于兼容，但显示时优先使用 UnreadCountManager
+          unreadCount
         }
       })
-      
+
       conversations.value = processedConversations
       hasMore.value = data.length === pageSize
-      
+
       console.log(`[MessagesView] 加载了 ${data.length} 个会话，总未读: ${totalUnreadCount.value}`)
     } else {
       error.value = response.data.msg || '加载失败'
@@ -460,11 +481,10 @@ const loadConversations = async (showLoading = true) => {
 
 const loadMore = async () => {
   if (loadingMore.value || !hasMore.value) return
-  
+
   loadingMore.value = true
-  
+
   try {
-    // 实际项目中需要分页接口
     setTimeout(() => {
       hasMore.value = false
       loadingMore.value = false
@@ -477,38 +497,72 @@ const loadMore = async () => {
 
 const refreshList = async () => {
   if (refreshing.value) return
-  
+
   refreshing.value = true
   currentPage.value = 1
-  // 清除缓存，强制重新检查
+
+  // 关键修复：刷新时重新同步服务端数据
+  if (user.value.id) {
+    await UnreadCountManager.syncWithServer(user.value.id)
+  }
+
   conversations.value.forEach(conv => {
     if (conv.conversationId) {
       triggerUpdate(conv.conversationId)
     }
   })
+
   await loadConversations()
 }
 
-// ==================== 会话操作 ====================
-const openConversation = (conversation: any) => {
+// ==================== 会话操作（关键修复）====================
+const openConversation = async (conversation: any) => {
   const conversationId = conversation.conversationId
   const currentUserId = user.value.id
-  
+
   if (!conversationId || !currentUserId) return
-  
+
   activeConversationId.value = conversationId
-  
-  // 清除该对话的未读计数
+
+  // 记录打开时间戳
+  const now = Date.now()
+  const lastReadKey = `last_read_time_${currentUserId}_${conversationId}`
+  localStorage.setItem(lastReadKey, now.toString())
+
+  // 清除未读计数
   UnreadCountManager.clearUnreadCount(currentUserId, conversationId)
-  
-  // 更新视图（虽然计算属性会自动更新，但这里强制刷新确保UI同步）
+
+  // 关键修复：将当前对话的现有消息标记为已处理
+  await markConversationMessagesAsProcessed(conversationId)
+
+  // 刷新视图
   conversations.value = [...conversations.value]
-  
+
   // 打开对话框
   currentConversationId.value = conversationId
   currentItemId.value = conversation.itemId || 0
   dialogTitle.value = conversation.itemName || '聊天'
   chatDialogVisible.value = true
+}
+
+// 标记对话消息为已处理
+const markConversationMessagesAsProcessed = async (conversationId: number) => {
+  try {
+    const response = await axios.get('/api/chat/conversation/messages', {
+      params: { conversationId, limit: 50 }
+    })
+
+    if (response.data.code === 0 && response.data.data.messages) {
+      const messages = response.data.data.messages
+      messages.forEach((msg: any) => {
+        const messageId = msg.id || msg.messageId || `${msg.senderId}_${msg.createTime}_${msg.content?.slice(0, 30)}_${msg.sequence || 0}`
+        addProcessedMessageId(conversationId, messageId)
+      })
+      console.log(`[MessagesView] 已标记 ${messages.length} 条消息为已处理`)
+    }
+  } catch (err) {
+    console.error('标记消息已处理失败:', err)
+  }
 }
 
 const closeChatDialog = () => {
@@ -517,18 +571,15 @@ const closeChatDialog = () => {
   currentItemId.value = 0
   dialogTitle.value = ''
   activeConversationId.value = null
-  
-  // 对话框关闭后，触发一次更新检查
+
   setTimeout(() => {
-    if (isMessagesPageActive.value && currentConversationId.value) {
-      triggerUpdate(currentConversationId.value)
+    if (isMessagesPageActive.value) {
+      loadConversations(false)
     }
   }, 300)
 }
 
-// 处理消息发送事件（由 DetailMessagesView 触发）
 const handleMessageSent = (data: { conversationId: number }) => {
-  // 发送消息后，触发立即更新以确保对方能及时收到
   setTimeout(() => {
     triggerUpdate(data.conversationId)
   }, 500)
@@ -537,17 +588,17 @@ const handleMessageSent = (data: { conversationId: number }) => {
 // ==================== 工具函数 ====================
 const formatTime = (timeStr: string) => {
   if (!timeStr) return ''
-  
+
   try {
     const date = new Date(timeStr)
     const now = new Date()
     const diff = now.getTime() - date.getTime()
-    
+
     if (diff < 60 * 1000) return '刚刚'
     if (diff < 60 * 60 * 1000) return `${Math.floor(diff / (60 * 1000))}分钟前`
     if (diff < 24 * 60 * 60 * 1000) return `${Math.floor(diff / (60 * 60 * 1000))}小时前`
     if (diff < 7 * 24 * 60 * 60 * 1000) return `${Math.floor(diff / (24 * 60 * 60 * 1000))}天前`
-    
+
     return date.toLocaleDateString('zh-CN')
   } catch {
     return timeStr
@@ -555,8 +606,9 @@ const formatTime = (timeStr: string) => {
 }
 
 async function logout() {
+  const userId = user.value.id
+
   try {
-    const userId = user.value.id
     if (userId) {
       await axios.post('/api/user/logout', { userId })
     }
@@ -564,13 +616,16 @@ async function logout() {
     console.error('退出登录失败:', error)
   } finally {
     // 清理未读计数
-    if (user.value.id) {
-      UnreadCountManager.clearAll(user.value.id)
+    if (userId) {
+      UnreadCountManager.clearAll(userId)
     }
+
+    // 清理登录态
+    sessionStorage.clear()
+
     // 重置实时服务
     unsubscribeAll()
-    localStorage.clear()
-    sessionStorage.clear()
+
     router.replace('/login')
   }
 }
@@ -578,37 +633,47 @@ async function logout() {
 // ==================== 生命周期 ====================
 onMounted(async () => {
   console.log('[MessagesView] 组件挂载')
-  
-  // 先加载用户信息
+
+  // 关键修复：先设置 userId 到 realtimeService
+  const cachedUserId = sessionStorage.getItem('userId')
+  if (cachedUserId) {
+    setUserId(parseInt(cachedUserId))
+  }
+
   await loadUser()
-  
-  // 标记当前页面为消息页面
+
   isMessagesPageActive.value = true
-  
-  // 立即加载会话列表
   await loadConversations()
-  
-  // 监听未读计数变化事件（用于跨组件同步）
+
   window.addEventListener('unread-count-changed', handleUnreadCountChanged as EventListener)
+  window.addEventListener('storage', handleStorageChange as EventListener)
 })
 
-// 监听未读计数变化事件
 const handleUnreadCountChanged = (event: CustomEvent) => {
-  const { userId, conversationId, count } = event.detail
-  if (userId === user.value.id) {
-    // 强制更新视图
+  const { userId: eventUserId, conversationId, count } = event.detail
+  if (eventUserId === user.value.id) {
     conversations.value = [...conversations.value]
-    console.log(`[MessagesView] 未读计数变化事件: 对话 ${conversationId} = ${count}`)
+    console.log(`[MessagesView] 未读计数变化: 对话 ${conversationId} = ${count}`)
+  }
+}
+
+const handleStorageChange = (e: StorageEvent) => {
+  if (e.key?.startsWith('unread_count_')) {
+    conversations.value = [...conversations.value]
   }
 }
 
 onActivated(async () => {
   console.log('[MessagesView] 组件激活')
   isMessagesPageActive.value = true
-  
-  // 每次激活时刷新列表（从其他页面返回时）
+
+  // 关键修复：激活时重新同步服务端数据
+  if (user.value.id) {
+    await UnreadCountManager.syncWithServer(user.value.id)
+  }
+
   await nextTick()
-  await loadConversations(false) // 静默刷新
+  await loadConversations(false)
 })
 
 onDeactivated(() => {
@@ -620,12 +685,12 @@ onUnmounted(() => {
   console.log('[MessagesView] 组件卸载')
   isMessagesPageActive.value = false
   window.removeEventListener('unread-count-changed', handleUnreadCountChanged as EventListener)
-  // 注意：不在这里调用 unsubscribeAll，因为我们需要在离开页面后继续接收通知
+  window.removeEventListener('storage', handleStorageChange as EventListener)
 })
 </script>
 
 <style scoped>
-/* 添加导航栏红点样式 */
+/* 样式部分保持不变，添加导航栏红点样式 */
 .nav-badge {
   position: absolute;
   top: 8px;
@@ -649,7 +714,7 @@ onUnmounted(() => {
 }
 
 .left-nav-btn {
-  position: relative; /* 确保红点定位正确 */
+  position: relative;
 }
 
 /* 其他样式保持不变... */
@@ -660,7 +725,6 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-/* 背景容器 */
 .background-container {
   position: fixed;  
   top: 0;
@@ -671,7 +735,6 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-/* 纯色背景层 */
 .solid-background {
   position: absolute;
   top: 0;
@@ -682,7 +745,6 @@ onUnmounted(() => {
   pointer-events: none;
 }
 
-/* 整体布局：左侧导航 + 右侧主内容 */
 .layout-container {
   position: relative;
   z-index: 2;
@@ -691,7 +753,6 @@ onUnmounted(() => {
   display: flex;
 }
 
-/* 左侧导航栏 */
 .left-nav {
   width: 288px;
   height: 100vh;
@@ -706,7 +767,6 @@ onUnmounted(() => {
   box-sizing: border-box;
 }
 
-/* 左侧用户信息区域 */
 .user-info-container {
   border-radius: 12.8px;
   padding: 16px;
@@ -768,7 +828,6 @@ onUnmounted(() => {
   color: rgba(166, 124, 82, 0.7);
 }
 
-/* 左侧上半区：核心导航组 */
 .nav-top-group {
   display: flex;
   flex-direction: column;
@@ -776,7 +835,6 @@ onUnmounted(() => {
   margin-top: 8px;
 }
 
-/* 左侧导航按钮样式 */
 .left-nav-btn {
   background: transparent;
   border: none;
@@ -794,7 +852,6 @@ onUnmounted(() => {
   font-weight: 500;
   width: 100%;
   text-align: left;
-  position: relative;
 }
 
 .left-nav-btn.active {
@@ -827,7 +884,6 @@ onUnmounted(() => {
   font-size: 20px;
 }
 
-/* 左侧中间：公告栏 */
 .left-notice-card {
   background: rgba(255, 255, 255, 0.15);
   border-radius: 14.4px;
@@ -878,7 +934,6 @@ onUnmounted(() => {
   margin-top: 10px;
 }
 
-/* 左侧下半区：操作按钮组 */
 .nav-bottom-group {
   display: flex;
   flex-direction: column;
@@ -886,7 +941,6 @@ onUnmounted(() => {
   margin-top: auto;
 }
 
-/* 左侧操作按钮样式 */
 .left-action-btn {
   height: 54.4px;
   padding: 0 25.6px;
@@ -916,7 +970,6 @@ onUnmounted(() => {
   width: 75%;
 }
 
-/* 右侧主内容区 */
 .main-content {
   flex: 1;
   min-height: 100vh;
@@ -926,7 +979,6 @@ onUnmounted(() => {
   box-sizing: border-box;
 }
 
-/* 页面标题和操作区 */
 .page-header {
   background: rgba(255, 255, 255, 0.25);
   backdrop-filter: blur(15px);
@@ -958,7 +1010,6 @@ onUnmounted(() => {
   color: rgba(166, 124, 82, 0.8);
 }
 
-/* 刷新按钮 */
 .refresh-btn {
   padding: 12.8px 22.4px;
   border-radius: 19.2px;
@@ -985,7 +1036,6 @@ onUnmounted(() => {
   box-shadow: 0 4px 12px rgba(243, 129, 129, 0.2);
 }
 
-/* 状态容器样式 */
 .loading-container,
 .empty-container,
 .error-container {
@@ -1078,7 +1128,6 @@ onUnmounted(() => {
   box-shadow: 0 4px 12px rgba(243, 129, 129, 0.2);
 }
 
-/* 会话列表容器 */
 .conversations-container {
   background: rgba(255, 255, 255, 0.25);
   backdrop-filter: blur(15px);
@@ -1107,7 +1156,6 @@ onUnmounted(() => {
   margin: 0 8px 0 0;
 }
 
-/* 会话项样式 */
 .conversation-item {
   background: rgba(255, 255, 255, 0.35);
   border-radius: 16px;
@@ -1254,7 +1302,6 @@ onUnmounted(() => {
   transform: translateX(3px);
 }
 
-/* 加载更多容器 */
 .load-more-container,
 .no-more-container {
   display: flex;
@@ -1268,13 +1315,11 @@ onUnmounted(() => {
   color: rgba(166, 124, 82, 0.6);
 }
 
-/* 响应式设计：移动端（768px以下） */
 @media (max-width: 768px) {
   .layout-container {
     flex-direction: column;
   }
 
-  /* 左侧导航移至底部，横向布局 */
   .left-nav {
     width: 100%;
     height: auto;
@@ -1292,13 +1337,11 @@ onUnmounted(() => {
     z-index: 100;
   }
 
-  /* 移动端隐藏用户信息、公告栏 */
   .user-info-container,
   .left-notice-card {
     display: none;
   }
 
-  /* 导航组调整为横向 */
   .nav-top-group {
     flex-direction: row;
     flex: 1;
@@ -1329,7 +1372,6 @@ onUnmounted(() => {
     text-align: center;
   }
   
-  /* 移动端红点位置调整 */
   .nav-badge {
     top: 2px;
     right: 2px;
@@ -1338,7 +1380,6 @@ onUnmounted(() => {
     min-width: 14px;
   }
 
-  /* 底部操作按钮组 */
   .nav-bottom-group {
     flex-direction: row;
     margin-top: 0;
@@ -1352,12 +1393,11 @@ onUnmounted(() => {
     min-width: 80px;
   }
 
-  /* 右侧主内容区 */
   .main-content {
     margin-left: 0;
     max-width: 100vw;
     padding: 25px 20px;
-    padding-bottom: 90px; /* 给底部导航留空间 */
+    padding-bottom: 90px;
   }
 
   .page-header {
@@ -1393,7 +1433,6 @@ onUnmounted(() => {
   }
 }
 
-/* 平板端适配（769px-1024px） */
 @media (min-width: 769px) and (max-width: 1024px) {
   .left-nav {
     width: 300px;
