@@ -1515,7 +1515,17 @@ const handleLogout = async () => {
 
 function goToDetail() {
   if (publishedItemId.value) {
-    router.push(`/item/detail?itemId=${publishedItemId.value}`)
+    // 直接跳转到首页并显示物品详情
+    router.push('/')
+    // 使用setTimeout确保路由跳转完成后再显示详情
+    setTimeout(() => {
+      const detailEvent = new CustomEvent('show-item-detail', {
+        detail: { itemId: publishedItemId.value }
+      })
+      window.dispatchEvent(detailEvent)
+    }, 100)
+    // 关闭成功模态框
+    showSuccessModal.value = false
   } else {
     router.push('/')
   }

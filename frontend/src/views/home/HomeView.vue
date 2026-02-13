@@ -269,7 +269,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, reactive, computed, watch } from 'vue'
+import { ref, onMounted, reactive, computed, watch, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import ItemDetailView from './ItemDetailView.vue'
@@ -573,11 +573,28 @@ watch(filterParams, () => {
 const showItemDetail = ref(false)
 const currentItemId = ref<number | null>(null)
 
+// 监听显示物品详情的事件
+const handleShowItemDetail = (event: CustomEvent) => {
+  const { itemId } = event.detail
+  if (itemId) {
+    currentItemId.value = itemId
+    showItemDetail.value = true
+  }
+}
+
 /* ================= 生命周期 ================= */
 onMounted(() => {
   loadUser()
   loadCategoryTree() // 先加载分类树
   loadItems()
+  
+  // 注册事件监听器
+  window.addEventListener('show-item-detail', handleShowItemDetail as EventListener)
+})
+
+onBeforeUnmount(() => {
+  // 清理事件监听器
+  window.removeEventListener('show-item-detail', handleShowItemDetail as EventListener)
 })
 
 /* ================= 数据加载 ================= */
