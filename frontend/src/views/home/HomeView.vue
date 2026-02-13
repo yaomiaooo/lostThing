@@ -380,6 +380,31 @@ const filteredLostItems = computed(() => {
     })
   }
   
+  // 时间范围筛选
+  if (filterParams.value.timeRange) {
+    const now = new Date()
+    items = items.filter(item => {
+      if (!item.happenTime) return false
+      const happenTime = new Date(item.happenTime)
+      
+      switch (filterParams.value.timeRange) {
+        case 'today':
+          return happenTime.toDateString() === now.toDateString()
+        case 'week':
+          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+          return happenTime >= weekAgo
+        case 'month':
+          const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+          return happenTime >= monthAgo
+        case '3month':
+          const threeMonthsAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
+          return happenTime >= threeMonthsAgo
+        default:
+          return true
+      }
+    })
+  }
+  
   // 根据当前筛选器类型过滤
   if (currentFilter.value === 'lost') {
     return items
@@ -430,6 +455,31 @@ const filteredFoundItems = computed(() => {
       if (!item.locationId) return false
       const campusCode = Math.floor(item.locationId / 10000)
       return campusCode === parseInt(filterParams.value.campus)
+    })
+  }
+  
+  // 时间范围筛选
+  if (filterParams.value.timeRange) {
+    const now = new Date()
+    items = items.filter(item => {
+      if (!item.happenTime) return false
+      const happenTime = new Date(item.happenTime)
+      
+      switch (filterParams.value.timeRange) {
+        case 'today':
+          return happenTime.toDateString() === now.toDateString()
+        case 'week':
+          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+          return happenTime >= weekAgo
+        case 'month':
+          const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+          return happenTime >= monthAgo
+        case '3month':
+          const threeMonthsAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
+          return happenTime >= threeMonthsAgo
+        default:
+          return true
+      }
     })
   }
   
