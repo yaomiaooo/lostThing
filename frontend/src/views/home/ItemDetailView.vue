@@ -645,7 +645,10 @@ const showChatButton = computed(() => {
   const validStatuses = [2,3]
   const isOwner = item.value.userId === user.id
   const isAdmin = user.role === 4
-  return validStatuses.includes(item.value.currentStatus) && (isAdmin || !isOwner || isOwner)
+  
+  // 只有非发布者用户才能看到聊天按钮
+  // 管理员和普通用户（非发布者）可以询问，发布者不能查看询问
+  return validStatuses.includes(item.value.currentStatus) && !isOwner
 })
 
 const chatButtonText = computed(() => {
@@ -653,8 +656,10 @@ const chatButtonText = computed(() => {
   const user = getCurrentUserInfo(); if (!user) return ''
   const isOwner = item.value.userId === user.id
   const isAdmin = user.role === 4
+  
+  // 由于showChatButton已经控制了只有非发布者显示按钮
+  // 这里只需要处理管理员和普通用户的文本
   if (isAdmin) return '联系相关人员'
-  else if (isOwner) return item.value.itemCategory === 1 ? '查看询问（失主）' : '查看询问（拾主）'
   else return item.value.itemCategory === 1 ? '去询问（失主）' : '去询问（拾主）'
 })
 

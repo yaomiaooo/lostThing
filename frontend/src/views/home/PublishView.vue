@@ -9,7 +9,7 @@
     <div class="layout-container">
       <!-- 左侧导航栏组件 -->
     <Navigation 
-      subtitle="发布物品"
+      subtitle="欢迎回来^_^"
       active-nav="发布"
       :custom-content="true"
       @logout="handleLogout"

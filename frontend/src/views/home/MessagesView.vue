@@ -936,12 +936,12 @@ onUnmounted(() => {
 }
 
 .page-header {
-  background: rgba(255, 255, 255, 0.25);
+  /*background: rgba(255, 255, 255, 0.25);*/
   backdrop-filter: blur(15px);
   border-radius: 20px;
-  padding: 25px;
-  border: 2px solid rgba(166, 124, 82, 0.2);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+  padding: 5px;
+  /*border: 2px solid rgba(166, 124, 82, 0.2);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);*/
   margin-bottom: 25px;
   display: flex;
   justify-content: space-between;
@@ -954,7 +954,7 @@ onUnmounted(() => {
 
 .page-title {
   font-family: "Comic Sans MS", "Marker Felt", cursive;
-  font-size: 28px;
+  font-size: 36px;
   color: #a67c52;
   font-weight: 700;
   margin-bottom: 8px;
@@ -962,7 +962,7 @@ onUnmounted(() => {
 
 .subtitle {
   font-family: "Comic Sans MS", cursive;
-  font-size: 16px;
+  font-size: 18px;
   color: rgba(166, 124, 82, 0.8);
 }
 
