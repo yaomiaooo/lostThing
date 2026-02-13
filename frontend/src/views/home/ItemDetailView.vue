@@ -189,12 +189,6 @@
                   </div>
                 </div>
 
-                <!-- 发布时间 -->
-                <div class="info-line text-muted">
-                  <span class="label">发布时间：</span>
-                  <span>{{ formatTime(item.createTime) }}</span>
-                </div>
-
                 <!-- 联系人 -->
                 <div class="info-line">
                   <span class="label">联系人：</span>
@@ -214,6 +208,12 @@
                       查看完整号码
                     </button>
                   </span>
+                </div>
+
+                <!-- 发布时间 -->
+                <div class="info-line text-muted">
+                  <span class="label">发布时间：</span>
+                  <span>{{ formatTime(item.createTime) }}</span>
                 </div>
 
                 <!-- 悬赏信息（仅失物） -->
@@ -1020,7 +1020,7 @@ const formatMessageTime = (timeStr: string) => {
 }
 
 .info-block {
-  margin-bottom: 24px;
+  margin-bottom: 10px;
 }
 
 /* 特征描述优化 */
