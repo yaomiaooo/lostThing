@@ -336,6 +336,34 @@ const itemStatuses = [
   { value: '3', label: '已完成' }
 ]
 
+/* ================= 时间筛选公共函数 ================= */
+const filterByTimeRange = (items: any[], timeRange: string) => {
+  if (!timeRange) return items
+  
+  const now = new Date()
+  return items.filter(item => {
+    if (!item.happenTime) return false
+    const happenTime = new Date(item.happenTime)
+    if (isNaN(happenTime.getTime())) return false
+    
+    switch (timeRange) {
+      case 'today':
+        return happenTime.toDateString() === now.toDateString()
+      case 'week':
+        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+        return happenTime >= weekAgo
+      case 'month':
+        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+        return happenTime >= monthAgo
+      case '3month':
+        const threeMonthsAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
+        return happenTime >= threeMonthsAgo
+      default:
+        return true
+    }
+  })
+}
+
 /* ================= 计算属性：过滤后的物品列表 ================= */
 const filteredLostItems = computed(() => {
   let items = allItems.value.filter(item => item.itemCategory === 1)
@@ -380,30 +408,8 @@ const filteredLostItems = computed(() => {
     })
   }
   
-  // 时间范围筛选
-  if (filterParams.value.timeRange) {
-    const now = new Date()
-    items = items.filter(item => {
-      if (!item.happenTime) return false
-      const happenTime = new Date(item.happenTime)
-      
-      switch (filterParams.value.timeRange) {
-        case 'today':
-          return happenTime.toDateString() === now.toDateString()
-        case 'week':
-          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-          return happenTime >= weekAgo
-        case 'month':
-          const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-          return happenTime >= monthAgo
-        case '3month':
-          const threeMonthsAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
-          return happenTime >= threeMonthsAgo
-        default:
-          return true
-      }
-    })
-  }
+  // 时间范围筛选（使用公共函数）
+  items = filterByTimeRange(items, filterParams.value.timeRange)
   
   // 根据当前筛选器类型过滤
   if (currentFilter.value === 'lost') {
@@ -458,30 +464,8 @@ const filteredFoundItems = computed(() => {
     })
   }
   
-  // 时间范围筛选
-  if (filterParams.value.timeRange) {
-    const now = new Date()
-    items = items.filter(item => {
-      if (!item.happenTime) return false
-      const happenTime = new Date(item.happenTime)
-      
-      switch (filterParams.value.timeRange) {
-        case 'today':
-          return happenTime.toDateString() === now.toDateString()
-        case 'week':
-          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-          return happenTime >= weekAgo
-        case 'month':
-          const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-          return happenTime >= monthAgo
-        case '3month':
-          const threeMonthsAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
-          return happenTime >= threeMonthsAgo
-        default:
-          return true
-      }
-    })
-  }
+  // 时间范围筛选（使用公共函数）
+  items = filterByTimeRange(items, filterParams.value.timeRange)
   
   // 根据当前筛选器类型过滤
   if (currentFilter.value === 'found') {

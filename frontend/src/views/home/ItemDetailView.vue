@@ -955,6 +955,14 @@ const formatMessageTime = (timeStr: string) => {
   overflow-y: auto;
   min-width: 300px;
   max-width: 400px;
+  /* 隐藏滚动条但保持滚动功能 */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+/* 隐藏Webkit浏览器的滚动条 */
+.right-info::-webkit-scrollbar {
+  display: none;
 }
 
 /* 无图片时信息栏全宽 */
