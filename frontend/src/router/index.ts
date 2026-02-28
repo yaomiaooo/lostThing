@@ -63,6 +63,15 @@ const routes: Array<RouteRecordRaw> = [
     }
   },
   {
+    path: '/force-change-password',
+    name: 'ForceChangePassword',
+    component: () => import('../views/home/ForceChangePassword.vue'),
+    meta: {
+      requiresAuth: true,
+      title: '修改密码'
+    }
+  },
+  {
     path: '/item/detail',
     name: 'ItemDetail',
     component: () => import('../views/home/ItemDetailView.vue'),
@@ -84,7 +93,7 @@ const routes: Array<RouteRecordRaw> = [
 const router = createRouter({
   history: createWebHistory(),
   routes,
-  scrollBehavior(to, from, savedPosition) {
+  scrollBehavior(_to, _from, savedPosition) {
     if (savedPosition) {
       return savedPosition
     } else {
@@ -110,8 +119,15 @@ router.beforeEach((to, from, next) => {
   if (to.meta.requiresAuth) {
     const userId = sessionStorage.getItem('userId')
     const role = sessionStorage.getItem('role')
+    const firstLogin = sessionStorage.getItem('firstLogin')
 
     if (userId && role) {
+      // 首次登录用户只能访问密码修改页面
+      if (firstLogin === '1' && to.path !== '/force-change-password') {
+        next('/force-change-password')
+        return
+      }
+      
       next()
       return
     }

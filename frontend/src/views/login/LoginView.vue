@@ -307,6 +307,7 @@ const handleLogin = async () => {
     sessionStorage.setItem('userId', user.id)
     sessionStorage.setItem('realName', user.realName)
     sessionStorage.setItem('role', user.role)
+    sessionStorage.setItem('firstLogin', user.firstLogin)
     sessionStorage.setItem('loginTime', new Date().toISOString())
     
     // 记住我功能 - 所有角色都支持
@@ -314,6 +315,12 @@ const handleLogin = async () => {
       localStorage.setItem(`rememberedUsername_${form.role}`, form.username)
     } else {
       localStorage.removeItem(`rememberedUsername_${form.role}`)
+    }
+
+    // 首次登录强制修改密码
+    if (user.firstLogin) {
+      router.push('/force-change-password')
+      return
     }
 
     // 根据角色跳转
