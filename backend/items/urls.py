@@ -42,4 +42,36 @@ urlpatterns = [
     path('/<int:item_id>/delete', views.delete_item, name='delete_item'),
     # 6.4.14 更新物品图片
     path('/<int:item_id>/images/update', views.update_item_images, name='update_item_images'),
+
+    # ==================== 新增管理员接口 ====================
+    
+    # 6.4.15 获取审核历史记录（增强版，支持多种筛选）
+    path('/audit/history', views.get_audit_history, name='get_audit_history'),
+    
+    # 6.4.16 更新物品状态（已认领、已归档等）
+    path('/<int:item_id>/status', views.update_item_status, name='update_item_status'),
+    
+    # 6.4.17 获取长期无人认领物品列表
+    path('/unclaimed/long-term', views.get_long_term_unclaimed, name='get_long_term_unclaimed'),
+    
+    # 6.4.18 归档单个物品
+    path('/<int:item_id>/archive', views.archive_item, name='archive_item'),
+    
+    # 6.4.19 批量归档物品
+    path('/batch/archive', views.batch_archive_items, name='batch_archive_items'),
+    
+    # 6.4.20 获取统计数据
+    path('/statistics/overview', views.get_statistics, name='get_statistics'),
+    
+    # 6.4.21 导出统计数据
+    path('/statistics/export', views.export_statistics, name='export_statistics'),
+    
+    # 6.4.22 管理员专用物品列表（支持多种条件查询）
+    path('/admin/list', views.admin_item_list, name='admin_item_list'),
+    
+    # 6.4.23 获取认领申请列表
+    path('/claim/list', views.get_claim_list, name='get_claim_list'),
+    
+    # 6.4.24 审核认领申请
+    path('/claim/<int:claim_id>/audit', views.audit_claim, name='audit_claim'),
 ]

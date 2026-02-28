@@ -13,6 +13,8 @@ from django.core.paginator import Paginator
 from django.views.decorators.http import require_POST
 
 from .models import Item, Location, Claim, Category,ItemStatusHistory,ItemImage
+from user.models import User
+# from notice.models import Notification
 
 from django.db import transaction
 from django.utils.dateparse import parse_datetime
@@ -387,12 +389,15 @@ def audit_item(request):
                 "msg": "非法的审核状态"
             })
 
-        # 5. 更新审核信息
+        # 5. 记录旧状态
+        old_status = item.current_status
+
+        # 6. 更新审核信息
         item.current_status = status
         item.audit_time = timezone.now()
         item.audit_user_id = user_id   # 来自 session
 
-        # 6. 驳回必须写原因
+        # 7. 驳回必须写原因
         if status == 5:
             if not reject_reason:
                 return JsonResponse({
@@ -402,6 +407,17 @@ def audit_item(request):
             item.reject_reason = reject_reason
 
         item.save()
+
+        # 8. 记录状态历史
+        ItemStatusHistory.objects.create(
+            item_id=item.id,
+            old_status=old_status,
+            new_status=status,
+            operator_id=user_id,
+            operator_type=2,  # 2=管理员
+            operate_reason=reject_reason if status == 5 else "审核通过",
+            operate_time=timezone.now()
+        )
 
         return JsonResponse({
             "code": 200,
@@ -1255,5 +1271,1140 @@ def update_item_images(request, item_id):
             'deletedCount': deleted_count,
             'uploadedCount': len(images_data),
             'images': images_data
+        }
+    })
+
+
+    # ==================== 管理员专用接口 ====================
+
+@require_GET
+def get_audit_history(request):
+    """
+    获取审核历史记录（管理员）
+    URL: GET /api/item/audit/history?page=1&size=10&startDate=2026-01-01&endDate=2026-02-28&adminId=1&status=2&itemCategory=1
+    支持筛选：时间范围、审核人、审核结果（通过/驳回）、信息类型（失物/招领）
+    """
+    
+    # 1. 登录和权限校验
+    user_id = request.session.get('user_id')
+    role = request.session.get('role')
+    
+    if not user_id:
+        return JsonResponse({
+            "code": 401,
+            "msg": "未登录"
+        })
+    
+    if role not in [3, 4]:
+        return JsonResponse({
+            "code": 403,
+            "msg": "无权限查看审核记录"
+        })
+    
+    # 2. 获取参数
+    page = int(request.GET.get('page', 1))
+    size = int(request.GET.get('size', 10))
+    start_date = request.GET.get('startDate')
+    end_date = request.GET.get('endDate')
+    admin_id = request.GET.get('adminId')
+    status = request.GET.get('status')  # 筛选审核结果：2-通过, 5-驳回
+    item_category = request.GET.get('itemCategory')  # 1-失物, 2-招领
+    keyword = request.GET.get('keyword')  # 物品名称关键词
+    
+    # 3. 查询所有审核相关的状态历史记录
+    # 包括：待审核->已通过(2)、待审核->已驳回(5)
+    queryset = ItemStatusHistory.objects.filter(
+        old_status=1  # 从待审核状态变更的记录
+    ).order_by('-operate_time')
+    
+    # 4. 按新状态筛选（审核结果）
+    if status:
+        queryset = queryset.filter(new_status=status)
+    
+    # 5. 按审核人筛选
+    if admin_id:
+        queryset = queryset.filter(operator_id=admin_id)
+    
+    # 6. 时间范围筛选
+    if start_date:
+        queryset = queryset.filter(operate_time__gte=start_date)
+    if end_date:
+        queryset = queryset.filter(operate_time__lte=end_date)
+    
+    # 7. 分页前先获取总数
+    total_count = queryset.count()
+    
+    # 8. 手动分页（因为需要先关联查询物品信息）
+    start_index = (page - 1) * size
+    end_index = start_index + size
+    histories = list(queryset[start_index:end_index])
+    
+    # 9. 组装数据
+    data_list = []
+    for history in histories:
+        # 查询物品信息
+        try:
+            item = Item.objects.get(id=history.item_id)
+        except Item.DoesNotExist:
+            continue  # 跳过已删除的物品
+        
+        # 按物品类型筛选
+        if item_category and str(item.item_category) != str(item_category):
+            continue
+            
+        # 按关键词筛选
+        if keyword and keyword not in item.name:
+            continue
+        
+        # 查询操作人信息
+        operator = User.objects.filter(id=history.operator_id).first()
+        
+        # 查询地点名称
+        location_name = ""
+        if item.location_id:
+            location = Location.objects.filter(id=item.location_id).first()
+            if location:
+                location_name = location.name
+        
+        # 查询物品图片数量（用于判断照片清晰度审核）
+        image_count = ItemImage.objects.filter(item_id=item.id).count()
+        
+        data_list.append({
+            "historyId": history.id,
+            "itemId": history.item_id,
+            "itemName": item.name,
+            "itemCategory": item.item_category,
+            "itemCategoryName": "失物" if item.item_category == 1 else "招领",
+            "locationName": location_name,
+            "oldStatus": history.old_status,
+            "oldStatusName": "待审核",
+            "newStatus": history.new_status,
+            "newStatusName": "已通过" if history.new_status == 2 else "已驳回",
+            "operatorId": history.operator_id,
+            "operatorName": operator.real_name if operator else "未知",
+            "operatorType": history.operator_type,
+            "operatorTypeName": "管理员" if history.operator_type == 2 else "用户",
+            "reason": history.operate_reason,  # 驳回原因或审核备注
+            "operateTime": history.operate_time.strftime('%Y-%m-%d %H:%M:%S'),
+            "imageCount": image_count,  # 照片数量（审核时参考）
+            "contactName": item.contact_name,
+            "contactPhone": item.contact_phone
+        })
+    
+    # 10. 计算实际返回的总数（经过物品筛选后）
+    actual_total = len(data_list)
+    
+    return JsonResponse({
+        "code": 200,
+        "msg": "success",
+        "data": {
+            "list": data_list,
+            "page": page,
+            "size": size,
+            "total": actual_total,
+            "filters": {
+                "startDate": start_date,
+                "endDate": end_date,
+                "adminId": admin_id,
+                "status": status,
+                "itemCategory": item_category,
+                "keyword": keyword
+            }
+        }
+    })
+
+
+@csrf_exempt
+@require_POST
+def update_item_status(request, item_id):
+    """
+    更新物品状态（管理员专用）
+    URL: POST /api/item/{item_id}/status
+    Body: {
+        "status": 4,  // 3-已匹配, 4-已认领, 7-已归档, 8-无效
+        "remark": "物品已归还失主"  // 状态变更备注/归档说明
+    }
+    """
+    
+    # 1. 登录和权限校验
+    user_id = request.session.get('user_id')
+    role = request.session.get('role')
+    
+    if not user_id:
+        return JsonResponse({
+            "code": 401,
+            "msg": "未登录"
+        })
+    
+    if role not in [3, 4]:
+        return JsonResponse({
+            "code": 403,
+            "msg": "无权限操作"
+        })
+    
+    # 2. 查询物品
+    try:
+        item = Item.objects.get(id=item_id)
+    except Item.DoesNotExist:
+        return JsonResponse({
+            "code": 404,
+            "msg": "物品不存在"
+        })
+    
+    # 3. 解析参数
+    try:
+        body = json.loads(request.body.decode('utf-8'))
+        new_status = body.get('status')
+        remark = body.get('remark', '')
+    except json.JSONDecodeError:
+        return JsonResponse({
+            "code": 400,
+            "msg": "请求数据不是合法的 JSON"
+        })
+    
+    # 4. 状态合法性校验
+    valid_status = [3, 4, 7, 8]  # 已匹配、已认领、已归档、无效
+    if new_status not in valid_status:
+        return JsonResponse({
+            "code": 400,
+            "msg": f"非法的状态值，允许的状态: {valid_status}"
+        })
+    
+    # 5. 状态流转校验
+    # 已归档和无效只能从特定状态流转
+    if new_status == 7 and item.current_status not in [2, 3, 4]:  # 已归档只能从已通过、已匹配、已认领归档
+        return JsonResponse({
+            "code": 400,
+            "msg": "当前状态不可直接归档"
+        })
+    
+    old_status = item.current_status
+    
+    # 6. 更新状态
+    item.current_status = new_status
+    item.update_time = timezone.now()
+    
+    # 7. 如果是归档，记录归档说明
+    if new_status == 7:
+        item.archive_desc = remark
+    
+    try:
+        item.save()
+    except Exception as e:
+        return JsonResponse({
+            "code": 500,
+            "msg": "状态更新失败",
+            "error": str(e)
+        })
+    
+    # 8. 记录状态历史
+    try:
+        ItemStatusHistory.objects.create(
+            item_id=item.id,
+            old_status=old_status,
+            new_status=new_status,
+            operator_id=user_id,
+            operator_type=2,  # 2=管理员
+            operate_reason=remark,
+            operate_time=timezone.now()
+        )
+    except Exception as e:
+        print(f"记录状态历史失败: {e}")
+    
+    return JsonResponse({
+        "code": 200,
+        "msg": "状态更新成功",
+        "data": {
+            "itemId": item.id,
+            "oldStatus": old_status,
+            "newStatus": new_status
+        }
+    })
+
+
+@require_GET
+def get_long_term_unclaimed(request):
+    """
+    获取长期无人认领物品列表（超过30天）
+    URL: GET /api/item/unclaimed/long-term?days=30
+    """
+    
+    # 1. 登录和权限校验
+    user_id = request.session.get('user_id')
+    role = request.session.get('role')
+    
+    if not user_id:
+        return JsonResponse({
+            "code": 401,
+            "msg": "未登录"
+        })
+    
+    if role not in [3, 4]:
+        return JsonResponse({
+            "code": 403,
+            "msg": "无权限查看"
+        })
+    
+    # 2. 获取天数参数（默认30天）
+    days = int(request.GET.get('days', 30))
+    page = int(request.GET.get('page', 1))
+    size = int(request.GET.get('size', 10))
+    
+    # 3. 计算截止日期
+    from datetime import timedelta
+    deadline = timezone.now() - timedelta(days=days)
+    
+    # 4. 查询长期未处理的物品（已通过、已匹配状态，且创建时间超过指定天数）
+    queryset = Item.objects.filter(
+        current_status__in=[2, 3],  # 已通过、已匹配
+        create_time__lte=deadline
+    ).order_by('create_time')  # 按时间升序，最早的在前
+    
+    # 5. 分页
+    paginator = Paginator(queryset, size)
+    page_obj = paginator.get_page(page)
+    
+    # 6. 组装数据
+    data_list = []
+    for item in page_obj:
+        # 获取地点名称
+        location_name = ""
+        if item.location_id:
+            location = Location.objects.filter(id=item.location_id).first()
+            if location:
+                location_name = location.name
+        
+        # 计算已发布天数
+        days_published = (timezone.now() - item.create_time).days
+        
+        # 获取第一张图片
+        first_image = ItemImage.objects.filter(
+            item_id=item.id
+        ).order_by("sort").first()
+        
+        first_image_url = None
+        if first_image:
+            first_image_url = f"/api/item/image/{first_image.id}"
+        
+        data_list.append({
+            "itemId": item.id,
+            "name": item.name,
+            "itemCategory": item.item_category,
+            "locationName": location_name,
+            "createTime": item.create_time.strftime('%Y-%m-%d %H:%M:%S'),
+            "daysPublished": days_published,
+            "currentStatus": item.current_status,
+            "contactName": item.contact_name,
+            "contactPhone": item.contact_phone,
+            "firstImageUrl": first_image_url
+        })
+    
+    return JsonResponse({
+        "code": 200,
+        "msg": "success",
+        "data": {
+            "list": data_list,
+            "page": page_obj.number,
+            "size": size,
+            "total": paginator.count,
+            "daysThreshold": days
+        }
+    })
+
+
+@csrf_exempt
+@require_POST
+def archive_item(request, item_id):
+    """
+    归档单个物品（快捷接口）
+    URL: POST /api/item/{item_id}/archive
+    Body: {
+        "archiveDesc": "超过30天无人认领，已移交保卫处"
+    }
+    """
+    
+    # 1. 登录和权限校验
+    user_id = request.session.get('user_id')
+    role = request.session.get('role')
+    
+    if not user_id:
+        return JsonResponse({
+            "code": 401,
+            "msg": "未登录"
+        })
+    
+    if role not in [3, 4]:
+        return JsonResponse({
+            "code": 403,
+            "msg": "无权限操作"
+        })
+    
+    # 2. 查询物品
+    try:
+        item = Item.objects.get(id=item_id)
+    except Item.DoesNotExist:
+        return JsonResponse({
+            "code": 404,
+            "msg": "物品不存在"
+        })
+    
+    # 3. 解析参数
+    try:
+        body = json.loads(request.body.decode('utf-8'))
+        archive_desc = body.get('archiveDesc', '')
+    except json.JSONDecodeError:
+        archive_desc = ''
+    
+    # 4. 状态校验
+    if item.current_status not in [2, 3, 4]:
+        return JsonResponse({
+            "code": 400,
+            "msg": "当前状态不可归档"
+        })
+    
+    old_status = item.current_status
+    
+    # 5. 更新为已归档
+    item.current_status = 7  # 已归档
+    item.archive_desc = archive_desc
+    item.update_time = timezone.now()
+    
+    try:
+        item.save()
+    except Exception as e:
+        return JsonResponse({
+            "code": 500,
+            "msg": "归档失败",
+            "error": str(e)
+        })
+    
+    # 6. 记录状态历史
+    try:
+        ItemStatusHistory.objects.create(
+            item_id=item.id,
+            old_status=old_status,
+            new_status=7,
+            operator_id=user_id,
+            operator_type=2,
+            operate_reason=f"归档: {archive_desc}",
+            operate_time=timezone.now()
+        )
+    except Exception as e:
+        print(f"记录状态历史失败: {e}")
+    
+    return JsonResponse({
+        "code": 200,
+        "msg": "归档成功",
+        "data": {
+            "itemId": item.id,
+            "archiveDesc": archive_desc
+        }
+    })
+
+
+@require_GET
+def get_statistics(request):
+    """
+    获取失物招领统计数据
+    URL: GET /api/statistics/overview?startDate=2026-01-01&endDate=2026-02-28
+    """
+    
+    # 1. 登录和权限校验
+    user_id = request.session.get('user_id')
+    role = request.session.get('role')
+    
+    if not user_id:
+        return JsonResponse({
+            "code": 401,
+            "msg": "未登录"
+        })
+    
+    if role not in [3, 4]:
+        return JsonResponse({
+            "code": 403,
+            "msg": "无权限查看统计数据"
+        })
+    
+    # 2. 获取时间范围参数
+    start_date = request.GET.get('startDate')
+    end_date = request.GET.get('endDate')
+    
+    # 3. 基础查询集
+    queryset = Item.objects.all()
+    
+    # 4. 时间范围筛选
+    if start_date:
+        queryset = queryset.filter(create_time__gte=start_date)
+    if end_date:
+        queryset = queryset.filter(create_time__lte=end_date)
+    
+    # 5. 统计各类数据
+    total_published = queryset.count()
+    pending_audit = queryset.filter(current_status=1).count()
+    approved = queryset.filter(current_status=2).count()
+    matched = queryset.filter(current_status=3).count()
+    claimed = queryset.filter(current_status=4).count()
+    rejected = queryset.filter(current_status=5).count()
+    canceled = queryset.filter(current_status=6).count()
+    archived = queryset.filter(current_status=7).count()
+    invalid = queryset.filter(current_status=8).count()
+    
+    # 6. 按类型统计
+    lost_items = queryset.filter(item_category=1).count()  # 失物
+    found_items = queryset.filter(item_category=2).count()  # 招领
+    
+    # 7. 认领率计算
+    claim_rate = 0
+    if approved + matched + claimed + archived > 0:
+        claim_rate = round(claimed / (approved + matched + claimed + archived) * 100, 2)
+    
+    # 8. 近期趋势（最近7天每天的新增数量）
+    from datetime import timedelta
+    trend_data = []
+    for i in range(6, -1, -1):
+        date = timezone.now().date() - timedelta(days=i)
+        count = Item.objects.filter(
+            create_time__date=date
+        ).count()
+        trend_data.append({
+            "date": date.strftime('%Y-%m-%d'),
+            "count": count
+        })
+    
+    return JsonResponse({
+        "code": 200,
+        "msg": "success",
+        "data": {
+            "overview": {
+                "totalPublished": total_published,
+                "pendingAudit": pending_audit,
+                "approved": approved,
+                "matched": matched,
+                "claimed": claimed,
+                "rejected": rejected,
+                "canceled": canceled,
+                "archived": archived,
+                "invalid": invalid
+            },
+            "byCategory": {
+                "lostItems": lost_items,
+                "foundItems": found_items
+            },
+            "claimRate": claim_rate,
+            "trend": trend_data,
+            "timeRange": {
+                "startDate": start_date,
+                "endDate": end_date
+            }
+        }
+    })
+
+
+@require_GET
+def export_statistics(request):
+    """
+    导出统计数据（简化版，返回CSV格式数据）
+    URL: GET /api/statistics/export?format=excel&startDate=2026-01-01&endDate=2026-02-28
+    """
+    
+    # 1. 登录和权限校验
+    user_id = request.session.get('user_id')
+    role = request.session.get('role')
+    
+    if not user_id:
+        return JsonResponse({
+            "code": 401,
+            "msg": "未登录"
+        })
+    
+    if role not in [3, 4]:
+        return JsonResponse({
+            "code": 403,
+            "msg": "无权限导出数据"
+        })
+    
+    # 2. 获取参数
+    export_format = request.GET.get('format', 'excel')  # excel 或 csv
+    start_date = request.GET.get('startDate')
+    end_date = request.GET.get('endDate')
+    
+    # 3. 查询数据
+    queryset = Item.objects.all().order_by('-create_time')
+    
+    if start_date:
+        queryset = queryset.filter(create_time__gte=start_date)
+    if end_date:
+        queryset = queryset.filter(create_time__lte=end_date)
+    
+    # 4. 准备导出数据
+    data_list = []
+    for item in queryset:
+        location_name = ""
+        if item.location_id:
+            location = Location.objects.filter(id=item.location_id).first()
+            if location:
+                location_name = location.name
+        
+        data_list.append({
+            "itemId": item.id,
+            "name": item.name,
+            "category": "失物" if item.item_category == 1 else "招领",
+            "status": get_status_text(item.current_status),
+            "location": location_name,
+            "createTime": item.create_time.strftime('%Y-%m-%d %H:%M:%S'),
+            "contactName": item.contact_name,
+            "contactPhone": item.contact_phone
+        })
+    
+    # 5. 返回JSON格式（实际项目中可返回Excel文件）
+    # 这里简化处理，返回数据供前端生成CSV
+    return JsonResponse({
+        "code": 200,
+        "msg": "success",
+        "data": {
+            "format": export_format,
+            "total": len(data_list),
+            "records": data_list,
+            "headers": ["物品ID", "物品名称", "信息类型", "状态", "地点", "创建时间", "联系人", "联系电话"]
+        }
+    })
+
+@csrf_exempt
+@require_POST
+def batch_archive_items(request):
+    """
+    批量归档长期无人认领物品
+    URL: POST /api/item/batch/archive
+    Body: {
+        "itemIds": [1, 2, 3],  // 要归档的物品ID列表
+        "archiveDesc": "超过30天无人认领，统一移交保卫处处理",
+        "archiveType": "移交保卫处"  // 处理方式：移交保卫处/丢弃/捐赠等
+    }
+    """
+    
+    # 1. 登录和权限校验
+    user_id = request.session.get('user_id')
+    role = request.session.get('role')
+    
+    if not user_id:
+        return JsonResponse({
+            "code": 401,
+            "msg": "未登录"
+        })
+    
+    if role not in [3, 4]:
+        return JsonResponse({
+            "code": 403,
+            "msg": "无权限操作"
+        })
+    
+    # 2. 解析参数
+    try:
+        body = json.loads(request.body.decode('utf-8'))
+        item_ids = body.get('itemIds', [])
+        archive_desc = body.get('archiveDesc', '')
+        archive_type = body.get('archiveType', '移交保卫处')  # 处理方式
+    except json.JSONDecodeError:
+        return JsonResponse({
+            "code": 400,
+            "msg": "请求数据不是合法的 JSON"
+        })
+    
+    if not item_ids:
+        return JsonResponse({
+            "code": 400,
+            "msg": "请选择要归档的物品"
+        })
+    
+    # 3. 验证所有物品
+    valid_items = []
+    errors = []
+    
+    for item_id in item_ids:
+        try:
+            item = Item.objects.get(id=item_id)
+            # 检查状态是否允许归档
+            if item.current_status not in [2, 3, 4]:  # 已通过、已匹配、已认领
+                errors.append({
+                    "itemId": item_id,
+                    "itemName": item.name,
+                    "error": f"当前状态为{get_status_text(item.current_status)}，不可归档"
+                })
+                continue
+            valid_items.append(item)
+        except Item.DoesNotExist:
+            errors.append({
+                "itemId": item_id,
+                "error": "物品不存在"
+            })
+    
+    # 4. 批量归档
+    archived_count = 0
+    archived_items = []
+    
+    # 组合完整的归档说明（包含处理方式）
+    full_archive_desc = f"[{archive_type}] {archive_desc}"
+    
+    for item in valid_items:
+        old_status = item.current_status
+        
+        try:
+            # 更新状态
+            item.current_status = 7  # 已归档
+            item.archive_desc = full_archive_desc
+            item.update_time = timezone.now()
+            item.save()
+            
+            # 记录状态历史
+            ItemStatusHistory.objects.create(
+                item_id=item.id,
+                old_status=old_status,
+                new_status=7,
+                operator_id=user_id,
+                operator_type=2,  # 管理员
+                operate_reason=full_archive_desc,
+                operate_time=timezone.now()
+            )
+            
+            archived_count += 1
+            archived_items.append({
+                "itemId": item.id,
+                "itemName": item.name,
+                "oldStatus": old_status,
+                "archiveDesc": full_archive_desc
+            })
+            
+        except Exception as e:
+            errors.append({
+                "itemId": item.id,
+                "itemName": item.name,
+                "error": str(e)
+            })
+    
+    return JsonResponse({
+        "code": 200,
+        "msg": f"成功归档 {archived_count} 个物品",
+        "data": {
+            "archivedCount": archived_count,
+            "errorCount": len(errors),
+            "archivedItems": archived_items,
+            "errors": errors,
+            "archiveType": archive_type,
+            "archiveTime": timezone.now().strftime('%Y-%m-%d %H:%M:%S')
+        }
+    })
+
+
+@require_GET
+def get_claim_list(request):
+    """
+    获取认领申请列表（管理员）
+    URL: GET /api/claim/list?page=1&size=10&status=0&itemId=1
+    支持筛选：状态、物品ID、申请人、时间范围
+    """
+    
+    # 1. 登录和权限校验
+    user_id = request.session.get('user_id')
+    role = request.session.get('role')
+    
+    if not user_id:
+        return JsonResponse({
+            "code": 401,
+            "msg": "未登录"
+        })
+    
+    if role not in [3, 4]:
+        return JsonResponse({
+            "code": 403,
+            "msg": "无权限查看认领申请"
+        })
+    
+    # 2. 获取参数
+    page = int(request.GET.get('page', 1))
+    size = int(request.GET.get('size', 10))
+    status = request.GET.get('status')  # 0-待审核, 1-已通过, 2-已驳回
+    item_id = request.GET.get('itemId')
+    claim_user_id = request.GET.get('claimUserId')
+    start_date = request.GET.get('startDate')
+    end_date = request.GET.get('endDate')
+    
+    # 3. 基础查询
+    queryset = Claim.objects.all().order_by('-create_time')
+    
+    # 4. 筛选条件
+    if status:
+        queryset = queryset.filter(status=status)
+    if item_id:
+        queryset = queryset.filter(item_id=item_id)
+    if claim_user_id:
+        queryset = queryset.filter(claim_user_id=claim_user_id)
+    if start_date:
+        queryset = queryset.filter(create_time__gte=start_date)
+    if end_date:
+        queryset = queryset.filter(create_time__lte=end_date)
+    
+    # 5. 分页
+    paginator = Paginator(queryset, size)
+    page_obj = paginator.get_page(page)
+    
+    # 6. 组装数据
+    data_list = []
+    for claim in page_obj:
+        # 查询物品信息
+        item = Item.objects.filter(id=claim.item_id).first()
+        # 查询申请人信息
+        claim_user = User.objects.filter(id=claim.claim_user_id).first()
+        # 查询审核人信息
+        audit_user = User.objects.filter(id=claim.audit_user_id).first() if claim.audit_user_id else None
+        
+        data_list.append({
+            "claimId": claim.id,
+            "itemId": claim.item_id,
+            "itemName": item.name if item else "未知",
+            "itemCategory": item.item_category if item else None,
+            "itemCategoryName": "失物" if item and item.item_category == 1 else "招领" if item else "未知",
+            "claimUserId": claim.claim_user_id,
+            "claimUserName": claim_user.real_name if claim_user else "未知",
+            "claimUserPhone": claim_user.phone if claim_user else "",
+            "proofFeature": claim.proof_feature,  # 认领人提供的证明特征
+            "status": claim.status,
+            "statusName": {0: '待审核', 1: '已通过', 2: '已驳回'}.get(claim.status, '未知'),
+            "rejectReason": claim.reject_reason,
+            "auditUserId": claim.audit_user_id,
+            "auditUserName": audit_user.real_name if audit_user else None,
+            "auditTime": claim.audit_time.strftime('%Y-%m-%d %H:%M:%S') if claim.audit_time else None,
+            "claimTime": claim.claim_time.strftime('%Y-%m-%d %H:%M:%S') if claim.claim_time else None,
+            "createTime": claim.create_time.strftime('%Y-%m-%d %H:%M:%S'),
+            "updateTime": claim.update_time.strftime('%Y-%m-%d %H:%M:%S')
+        })
+    
+    # 7. 统计各状态数量
+    status_stats = {
+        "pending": Claim.objects.filter(status=0).count(),
+        "approved": Claim.objects.filter(status=1).count(),
+        "rejected": Claim.objects.filter(status=2).count(),
+        "total": Claim.objects.count()
+    }
+    
+    return JsonResponse({
+        "code": 200,
+        "msg": "success",
+        "data": {
+            "list": data_list,
+            "page": page_obj.number,
+            "size": size,
+            "total": paginator.count,
+            "statistics": status_stats
+        }
+    })
+
+
+@csrf_exempt
+@require_POST
+def audit_claim(request, claim_id):
+    """
+    审核认领申请（管理员）
+    URL: POST /api/claim/{claim_id}/audit
+    Body: {
+        "status": 1,  // 1-通过, 2-驳回
+        "rejectReason": "特征描述不符"  // 驳回时必填
+    }
+    """
+    
+    # 1. 登录和权限校验
+    user_id = request.session.get('user_id')
+    role = request.session.get('role')
+    
+    if not user_id:
+        return JsonResponse({
+            "code": 401,
+            "msg": "未登录"
+        })
+    
+    if role not in [3, 4]:
+        return JsonResponse({
+            "code": 403,
+            "msg": "无权限审核认领申请"
+        })
+    
+    # 2. 查询认领申请
+    try:
+        claim = Claim.objects.get(id=claim_id)
+    except Claim.DoesNotExist:
+        return JsonResponse({
+            "code": 404,
+            "msg": "认领申请不存在"
+        })
+    
+    # 3. 解析参数
+    try:
+        body = json.loads(request.body.decode('utf-8'))
+        status = body.get('status')
+        reject_reason = body.get('rejectReason', '')
+    except json.JSONDecodeError:
+        return JsonResponse({
+            "code": 400,
+            "msg": "请求数据不是合法的 JSON"
+        })
+    
+    # 4. 参数校验
+    if status not in [1, 2]:
+        return JsonResponse({
+            "code": 400,
+            "msg": "非法的状态值，1-通过, 2-驳回"
+        })
+    
+    if status == 2 and not reject_reason:
+        return JsonResponse({
+            "code": 400,
+            "msg": "驳回时必须填写驳回原因"
+        })
+    
+    # 5. 状态校验
+    if claim.status != 0:
+        return JsonResponse({
+            "code": 400,
+            "msg": "该认领申请已处理，不可重复审核"
+        })
+    
+    # 6. 查询关联物品
+    try:
+        item = Item.objects.get(id=claim.item_id)
+    except Item.DoesNotExist:
+        return JsonResponse({
+            "code": 404,
+            "msg": "关联物品不存在"
+        })
+    
+    # 7. 更新认领申请
+    claim.status = status
+    claim.audit_user_id = user_id
+    claim.audit_time = timezone.now()
+    
+    if status == 2:
+        claim.reject_reason = reject_reason
+    
+    # 如果通过，记录认领时间
+    if status == 1:
+        claim.claim_time = timezone.now()
+    
+    try:
+        claim.save()
+    except Exception as e:
+        return JsonResponse({
+            "code": 500,
+            "msg": "审核失败",
+            "error": str(e)
+        })
+    
+    # 8. 如果审核通过，更新物品状态为已认领(4)
+    if status == 1:
+        old_status = item.current_status
+        item.current_status = 4  # 已认领
+        item.update_time = timezone.now()
+        item.save()
+        
+        # 记录物品状态历史
+        ItemStatusHistory.objects.create(
+            item_id=item.id,
+            old_status=old_status,
+            new_status=4,
+            operator_id=user_id,
+            operator_type=2,
+            operate_reason=f"认领申请通过，认领人ID: {claim.claim_user_id}",
+            operate_time=timezone.now()
+        )
+        
+        # 发送通知给认领人（可选）
+        Notification.objects.create(
+            user_id=claim.claim_user_id,
+            title="认领申请已通过",
+            content=f"您对物品【{item.name}】的认领申请已通过审核，请联系管理员领取。",
+            type=2,  # 认领相关
+            related_id=item.id
+        )
+    
+    return JsonResponse({
+        "code": 200,
+        "msg": "审核成功",
+        "data": {
+            "claimId": claim.id,
+            "status": status,
+            "statusName": "已通过" if status == 1 else "已驳回",
+            "itemId": item.id,
+            "itemName": item.name,
+            "auditTime": claim.audit_time.strftime('%Y-%m-%d %H:%M:%S')
+        }
+    })
+
+
+@require_GET
+def admin_item_list(request):
+    """
+    管理员专用物品列表查询（支持多种条件筛选）
+    URL: GET /api/item/admin/list?page=1&size=10&status=2&itemCategory=1&locationId=201&startDate=2026-01-01&endDate=2026-02-28&keyword=手机&hasReward=true&sortField=createTime&sortOrder=desc
+    支持筛选：状态、类型、地点、时间范围、关键词、是否有悬赏、排序方式
+    """
+    
+    # 1. 登录和权限校验
+    user_id = request.session.get('user_id')
+    role = request.session.get('role')
+    
+    if not user_id:
+        return JsonResponse({
+            "code": 401,
+            "msg": "未登录"
+        })
+    
+    if role not in [3, 4]:
+        return JsonResponse({
+            "code": 403,
+            "msg": "无权限查看"
+        })
+    
+    # 2. 获取所有参数
+    page = int(request.GET.get('page', 1))
+    size = int(request.GET.get('size', 10))
+    status = request.GET.get('status')  # 状态筛选，支持多个：1,2,3
+    item_category = request.GET.get('itemCategory')  # 1-失物, 2-招领
+    location_id = request.GET.get('locationId')
+    start_date = request.GET.get('startDate')
+    end_date = request.GET.get('endDate')
+    keyword = request.GET.get('keyword')  # 物品名称关键词
+    has_reward = request.GET.get('hasReward')  # true-有悬赏
+    contact_name = request.GET.get('contactName')  # 联系人姓名
+    contact_phone = request.GET.get('contactPhone')  # 联系人电话
+    sort_field = request.GET.get('sortField', 'createTime')  # 排序字段
+    sort_order = request.GET.get('sortOrder', 'desc')  # asc/desc
+    
+    # 3. 基础查询
+    queryset = Item.objects.all()
+    
+    # 4. 状态筛选（支持多个状态，逗号分隔）
+    if status:
+        if status != 'all':
+            status_list = [int(s) for s in status.split(',') if s.isdigit()]
+            if status_list:
+                queryset = queryset.filter(current_status__in=status_list)
+    
+    # 5. 其他筛选条件
+    if item_category:
+        queryset = queryset.filter(item_category=item_category)
+    if location_id:
+        queryset = queryset.filter(location_id=location_id)
+    if start_date:
+        queryset = queryset.filter(create_time__gte=start_date)
+    if end_date:
+        queryset = queryset.filter(create_time__lte=end_date)
+    if keyword:
+        queryset = queryset.filter(name__icontains=keyword)
+    if has_reward == 'true':
+        queryset = queryset.filter(reward_amount__gt=0)
+    if contact_name:
+        queryset = queryset.filter(contact_name__icontains=contact_name)
+    if contact_phone:
+        queryset = queryset.filter(contact_phone__icontains=contact_phone)
+    
+    # 6. 排序
+    order_prefix = '-' if sort_order == 'desc' else ''
+    if sort_field == 'createTime':
+        queryset = queryset.order_by(f'{order_prefix}create_time')
+    elif sort_field == 'happenTime':
+        queryset = queryset.order_by(f'{order_prefix}happen_time')
+    elif sort_field == 'rewardAmount':
+        queryset = queryset.order_by(f'{order_prefix}reward_amount')
+    else:
+        queryset = queryset.order_by(f'{order_prefix}create_time')
+    
+    # 7. 分页
+    paginator = Paginator(queryset, size)
+    page_obj = paginator.get_page(page)
+    
+    # 8. 组装数据
+    data_list = []
+    for item in page_obj:
+        # 获取地点名称
+        location_name = ""
+        if item.location_id:
+            location = Location.objects.filter(id=item.location_id).first()
+            if location:
+                location_name = location.name
+        
+        # 获取分类名称
+        category_name = ""
+        if item.item_type:
+            category = Category.objects.filter(id=item.item_type).first()
+            if category:
+                category_name = category.name
+        
+        # 获取第一张图片
+        first_image = ItemImage.objects.filter(
+            item_id=item.id
+        ).order_by("sort").first()
+        
+        first_image_url = None
+        if first_image:
+            first_image_url = f"/api/item/image/{first_image.id}"
+        
+        # 查询认领申请数量
+        claim_count = Claim.objects.filter(item_id=item.id).count()
+        pending_claim_count = Claim.objects.filter(item_id=item.id, status=0).count()
+        
+        data_list.append({
+            "itemId": item.id,
+            "userId": item.user_id,
+            "name": item.name,
+            "itemCategory": item.item_category,
+            "itemCategoryName": "失物" if item.item_category == 1 else "招领",
+            "itemType": item.item_type,
+            "itemTypeName": category_name,
+            "locationId": item.location_id,
+            "locationName": location_name,
+            "locationDetail": item.location_detail,
+            "pickupLocation": item.pickup_location,
+            "happenTime": item.happen_time.strftime('%Y-%m-%d %H:%M:%S'),
+            "feature": item.feature,
+            "rewardAmount": float(item.reward_amount),
+            "rewardDesc": item.reward_desc,
+            "contactName": item.contact_name,
+            "contactPhone": item.contact_phone,
+            "currentStatus": item.current_status,
+            "currentStatusName": get_status_text(item.current_status),
+            "rejectReason": item.reject_reason,
+            "archiveDesc": item.archive_desc,
+            "auditUserId": item.audit_user_id,
+            "auditTime": item.audit_time.strftime('%Y-%m-%d %H:%M:%S') if item.audit_time else None,
+            "createTime": item.create_time.strftime('%Y-%m-%d %H:%M:%S'),
+            "updateTime": item.update_time.strftime('%Y-%m-%d %H:%M:%S'),
+            "firstImageUrl": first_image_url,
+            "claimCount": claim_count,  # 认领申请总数
+            "pendingClaimCount": pending_claim_count  # 待审核认领数
+        })
+    
+    # 9. 统计各状态数量
+    status_stats = {}
+    for code, name in ITEM_STATUS.items():
+        status_stats[name] = Item.objects.filter(current_status=code).count()
+    
+    return JsonResponse({
+        "code": 200,
+        "msg": "success",
+        "data": {
+            "list": data_list,
+            "page": page_obj.number,
+            "size": size,
+            "total": paginator.count,
+            "statistics": status_stats,
+            "filters": {
+                "status": status,
+                "itemCategory": item_category,
+                "locationId": location_id,
+                "startDate": start_date,
+                "endDate": end_date,
+                "keyword": keyword,
+                "hasReward": has_reward,
+                "sortField": sort_field,
+                "sortOrder": sort_order
+            }
         }
     })
