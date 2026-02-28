@@ -14,7 +14,7 @@ from django.views.decorators.http import require_POST
 
 from .models import Item, Location, Claim, Category,ItemStatusHistory,ItemImage
 from user.models import User
-# from notice.models import Notification
+from notice.models import Notification
 
 from django.db import transaction
 from django.utils.dateparse import parse_datetime
@@ -22,7 +22,17 @@ from django.utils.dateparse import parse_datetime
 from datetime import datetime
 
 
-
+# 物品状态常量
+ITEM_STATUS = {
+    1: '待审核',
+    2: '已通过',
+    3: '已匹配',
+    4: '已认领',
+    5: '已驳回',
+    6: '已取消',
+    7: '已归档',
+    8: '无效',
+}
 
 @csrf_exempt
 def add_item(request):
@@ -1999,7 +2009,7 @@ def batch_archive_items(request):
 def get_claim_list(request):
     """
     获取认领申请列表（管理员）
-    URL: GET /api/claim/list?page=1&size=10&status=0&itemId=1
+    URL: GET /api/item/claim/list?page=1&size=10&status=0&itemId=1
     支持筛选：状态、物品ID、申请人、时间范围
     """
     

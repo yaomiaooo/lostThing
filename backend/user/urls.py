@@ -10,4 +10,6 @@ urlpatterns = [
     path('/password', views.change_password,name="change_password"), # POST /api/user/password
     # 6.3.4 用户退出登录
     path('/logout', views.logout_user, name='logout_user'),  # POST /api/user/logout
+    # 管理员重置用户密码（临时接口）
+    path('/reset-password', views.reset_password, name='reset_password'),  # POST /api/user/reset-password
 ]

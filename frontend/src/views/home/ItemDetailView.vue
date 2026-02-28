@@ -273,6 +273,68 @@
     @update:visible="chatDialogVisible = $event"
     @close="closeChatDialog"
   />
+
+  <!-- 认领申请弹窗 -->
+  <teleport to="body">
+    <transition name="mask-fade">
+      <div v-if="claimDialogVisible" class="claim-mask" @click.self="closeClaimDialog">
+        <transition name="card-pop">
+          <div class="claim-dialog">
+            <!-- 弹窗头部 -->
+            <div class="claim-header">
+              <h3 class="claim-title">认领申请</h3>
+              <button class="claim-close-btn" @click="closeClaimDialog" aria-label="关闭">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                </svg>
+              </button>
+            </div>
+
+            <!-- 弹窗内容 -->
+            <div class="claim-content">
+              <p class="claim-desc">请详细描述物品的特征，以便管理员验证您的认领资格：</p>
+              
+              <div class="input-group">
+                <label for="proofFeature" class="input-label">物品特征描述</label>
+                <textarea
+                  id="proofFeature"
+                  v-model="claimProofFeature"
+                  class="claim-textarea"
+                  placeholder="例如：物品的颜色、尺寸、特殊标记、损坏情况等..."
+                  rows="4"
+                  maxlength="500"
+                ></textarea>
+                <div class="char-counter">{{ claimProofFeature.length }}/500</div>
+              </div>
+
+              <div class="claim-tips">
+                <div class="tip-item">
+                  <span class="tip-icon">💡</span>
+                  <span>描述越详细，审核通过率越高</span>
+                </div>
+                <div class="tip-item">
+                  <span class="tip-icon">⏱️</span>
+                  <span>审核通常需要1-3个工作日</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 弹窗底部 -->
+            <div class="claim-footer">
+              <button class="claim-btn secondary" @click="closeClaimDialog">取消</button>
+              <button 
+                class="claim-btn primary" 
+                :disabled="!claimProofFeature.trim()"
+                @click="submitClaim"
+              >
+                {{ isSubmitting ? '提交中...' : '提交申请' }}
+              </button>
+            </div>
+          </div>
+        </transition>
+      </div>
+    </transition>
+  </teleport>
 </template>
 
 <script setup lang="ts">
@@ -383,6 +445,11 @@ const featureTextLength = computed(() => item.value.feature?.length || 0)
 
 // 鼠标悬停
 const isHovering = ref(false)
+
+// ==================== 认领申请弹窗状态 ====================
+const claimDialogVisible = ref(false)
+const claimProofFeature = ref('')
+const isSubmitting = ref(false)
 
 // ==================== 计算属性 ====================
 const trackStyle = computed(() => {
@@ -667,7 +734,7 @@ const showClaimButton = computed(() => {
   if (!item.value) return false
   const user = getCurrentUserInfo(); if (!user) return false
   const isOwner = item.value.userId === user.id
-  return item.value.itemCategory === 1 && !isOwner
+  return item.value.itemCategory === 2 && !isOwner
 })
 
 const openChatDialog = () => {
@@ -682,7 +749,42 @@ const closeChatDialog = () => {
 
 // ==================== 认领功能 ====================
 const handleClaim = () => {
-  console.log('处理认领申请，物品ID:', item.value?.id)
+  if (!item.value) return
+  claimProofFeature.value = ''
+  claimDialogVisible.value = true
+}
+
+const closeClaimDialog = () => {
+  claimDialogVisible.value = false
+  claimProofFeature.value = ''
+  isSubmitting.value = false
+}
+
+const submitClaim = async () => {
+  if (!item.value || !claimProofFeature.value.trim()) return
+  
+  isSubmitting.value = true
+  
+  try {
+      const res = await axios.post('/api/item/claim', {
+        itemId: item.value.id,
+        proofFeature: claimProofFeature.value.trim()
+      })
+      
+      if (res.data.code === 200) {
+        // 显示成功提示
+        alert('认领申请提交成功，请等待管理员审核')
+        closeClaimDialog()
+        close() // 关闭详情弹窗
+      } else {
+        alert(`认领申请失败: ${res.data.msg}`)
+      }
+    } catch (error) {
+      console.error('认领申请出错:', error)
+      alert('认领申请失败，请稍后重试')
+    } finally {
+      isSubmitting.value = false
+    }
 }
 
 // ==================== 消息时间格式化 ====================
@@ -1183,6 +1285,197 @@ const formatMessageTime = (timeStr: string) => {
   opacity: 0;
 }
 
+/* ==================== 认领申请弹窗样式 ==================== */
+.claim-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+
+.claim-dialog {
+  position: relative;
+  width: 480px;
+  max-width: 90vw;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  animation: dialogSlideIn 0.3s ease-out;
+}
+
+@keyframes dialogSlideIn {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* 弹窗头部 */
+.claim-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 24px 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.claim-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.claim-close-btn {
+  background: none;
+  border: none;
+  padding: 8px;
+  border-radius: 6px;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.claim-close-btn:hover {
+  background: #f5f5f5;
+  color: #333;
+}
+
+/* 弹窗内容 */
+.claim-content {
+  padding: 24px;
+}
+
+.claim-desc {
+  margin: 0 0 20px 0;
+  color: #666;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.input-group {
+  margin-bottom: 24px;
+}
+
+.input-label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #333;
+  font-size: 14px;
+}
+
+.claim-textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.5;
+  resize: vertical;
+  transition: border-color 0.2s ease;
+  font-family: inherit;
+}
+
+.claim-textarea:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
+}
+
+.claim-textarea::placeholder {
+  color: #999;
+}
+
+.char-counter {
+  text-align: right;
+  font-size: 12px;
+  color: #999;
+  margin-top: 4px;
+}
+
+/* 提示信息 */
+.claim-tips {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 16px;
+}
+
+.tip-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: #666;
+}
+
+.tip-item:last-child {
+  margin-bottom: 0;
+}
+
+.tip-icon {
+  margin-right: 8px;
+  font-size: 14px;
+}
+
+/* 弹窗底部 */
+.claim-footer {
+  display: flex;
+  gap: 12px;
+  padding: 16px 24px 24px;
+  border-top: 1px solid #f0f0f0;
+  justify-content: flex-end;
+}
+
+.claim-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 80px;
+}
+
+.claim-btn.primary {
+  background: #007bff;
+  color: white;
+}
+
+.claim-btn.primary:hover:not(:disabled) {
+  background: #0056b3;
+}
+
+.claim-btn.primary:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.claim-btn.secondary {
+  background: #f8f9fa;
+  color: #666;
+  border: 1px solid #ddd;
+}
+
+.claim-btn.secondary:hover {
+  background: #e9ecef;
+  color: #333;
+}
+
 /* 响应式设计 */
 @media (max-width: 1024px) {
   .detail-card {
@@ -1203,6 +1496,20 @@ const formatMessageTime = (timeStr: string) => {
   
   .single-image-wrapper {
     height: 400px;
+  }
+  
+  /* 认领弹窗响应式 */
+  .claim-dialog {
+    width: 90vw;
+    max-width: 400px;
+  }
+  
+  .claim-content {
+    padding: 20px;
+  }
+  
+  .claim-footer {
+    padding: 16px 20px 20px;
   }
 }
 
@@ -1263,6 +1570,40 @@ const formatMessageTime = (timeStr: string) => {
     height: 40vh;
     width: 100% !important;
   }
+  
+  /* 认领弹窗移动端优化 */
+  .claim-dialog {
+    width: 95vw;
+    max-width: 360px;
+    margin: 20px;
+  }
+  
+  .claim-header {
+    padding: 20px 20px 16px;
+  }
+  
+  .claim-content {
+    padding: 16px 20px;
+  }
+  
+  .claim-footer {
+    flex-direction: column-reverse;
+    gap: 12px;
+    padding: 16px 20px 20px;
+  }
+  
+  .claim-btn {
+    width: 100%;
+    min-width: auto;
+  }
+  
+  .claim-tips {
+    padding: 12px;
+  }
+  
+  .tip-item {
+    font-size: 12px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -1292,6 +1633,26 @@ const formatMessageTime = (timeStr: string) => {
   
   .single-image-wrapper {
     height: 45vh;
+  }
+  
+  /* 认领弹窗超小屏幕优化 */
+  .claim-dialog {
+    width: 95vw;
+    max-width: 320px;
+    margin: 10px;
+  }
+  
+  .claim-title {
+    font-size: 16px;
+  }
+  
+  .claim-desc {
+    font-size: 13px;
+  }
+  
+  .claim-textarea {
+    font-size: 13px;
+    padding: 10px;
   }
 }
 

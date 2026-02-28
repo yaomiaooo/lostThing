@@ -269,6 +269,80 @@ def change_password(request):
             "msg": f"服务器错误: {str(e)}"
         })
 
+
+@csrf_exempt
+def reset_password(request):
+    """
+    管理员重置用户密码（临时接口）
+    URL: POST /api/user/reset-password
+    
+    请求参数：
+    {
+        "targetUserId": 123,      # 要重置密码的用户ID
+        "newPassword": "123456",  # 新密码
+        "adminPassword": "admin123"  # 管理员密码（用于验证身份）
+    }
+    """
+    if request.method != 'POST':
+        return JsonResponse({
+            "code": 1,
+            "msg": "只支持 POST 请求"
+        })
+
+    try:
+        body = json.loads(request.body.decode('utf-8'))
+        target_user_id = body.get('targetUserId')
+        new_password = body.get('newPassword')
+        admin_password = body.get('adminPassword')
+
+        # 1. 参数校验
+        if not all([target_user_id, new_password, admin_password]):
+            return JsonResponse({
+                "code": 1,
+                "msg": "参数不能为空"
+            })
+
+        # 2. 验证管理员身份（通过固定密码验证）
+        # 这里使用一个固定的管理员密码进行验证
+        ADMIN_VERIFICATION_PASSWORD = "admin123"  # 可以修改这个密码
+        
+        if admin_password != ADMIN_VERIFICATION_PASSWORD:
+            return JsonResponse({
+                "code": 1,
+                "msg": "管理员密码验证失败"
+            })
+
+        # 3. 查询目标用户
+        try:
+            target_user = User.objects.get(id=target_user_id)
+        except User.DoesNotExist:
+            return JsonResponse({
+                "code": 1,
+                "msg": "目标用户不存在"
+            })
+
+        # 4. 重置密码
+        target_user.password = make_password(new_password)
+        target_user.first_login = 1  # 设置为首次登录状态
+        target_user.update_time = timezone.now()
+        target_user.save()
+
+        return JsonResponse({
+            "code": 0,
+            "msg": f"用户 {target_user.username} 的密码已重置为: {new_password}"
+        })
+
+    except json.JSONDecodeError:
+        return JsonResponse({
+            "code": 1,
+            "msg": "请求体不是合法 JSON"
+        })
+    except Exception as e:
+        return JsonResponse({
+            "code": 1,
+            "msg": f"服务器错误: {str(e)}"
+        })
+
 @csrf_exempt
 def logout_user(request):
     """
