@@ -81,6 +81,24 @@ const routes: Array<RouteRecordRaw> = [
     }
   },
   {
+    path: '/admin/login',
+    name: 'AdminLogin',
+    component: () => import('../views/admin/AdminLoginView.vue'),
+    meta: {
+      title: '管理员登录'
+    }
+  },
+  {
+    path: '/admin/dashboard',
+    name: 'AdminDashboard',
+    component: () => import('../views/admin/AdminDashboard.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: '管理员面板'
+    }
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
     redirect: '/login'
@@ -122,6 +140,13 @@ router.beforeEach((to, from, next) => {
     const firstLogin = sessionStorage.getItem('firstLogin')
 
     if (userId && role) {
+      // 检查管理员权限
+      if (to.meta.requiresAdmin && role !== '3') {
+        // 非管理员访问管理员页面，跳转到普通用户首页
+        next('/home')
+        return
+      }
+      
       // 首次登录用户只能访问密码修改页面
       if (firstLogin === '1' && to.path !== '/force-change-password') {
         next('/force-change-password')
@@ -134,7 +159,13 @@ router.beforeEach((to, from, next) => {
 
     // 未登录,记录返回地址(本次会话有效)
     sessionStorage.setItem('returnUrl', to.fullPath)
-    next('/login')
+    
+    // 管理员页面跳转到管理员登录页，普通页面跳转到普通登录页
+    if (to.meta.requiresAdmin) {
+      next('/admin/login')
+    } else {
+      next('/login')
+    }
     return
   }
 
