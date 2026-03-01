@@ -19,7 +19,7 @@
       <main class="main-content">
         <!-- 页面标题 -->
         <section class="page-header">
-          <h1 class="page-title">📢 公告与内容管理</h1>
+          <h1 class="page-title">公告与内容管理</h1>
           <p class="page-subtitle">发布全局公告，处置违规、虚假发布信息</p>
         </section>
 
@@ -45,7 +45,7 @@
           <div class="publish-layout">
             <!-- 左侧：公告表单 -->
             <div class="publish-form-panel">
-              <h3 class="panel-title">📝 发布公告</h3>
+              <h3 class="panel-title">发布公告</h3>
               
               <div class="form-section">
                 <label class="form-label">公告类型 <span class="required">*</span></label>
