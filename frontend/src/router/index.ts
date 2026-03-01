@@ -23,7 +23,8 @@ const routes: Array<RouteRecordRaw> = [
     component: () => import('../views/home/HomeView.vue'),
     meta: {
       requiresAuth: true,
-      title: '发现'
+      title: '发现',
+      allowedRoles: [1]  // 普通用户
     }
   },
   {
@@ -32,7 +33,8 @@ const routes: Array<RouteRecordRaw> = [
     component: () => import('../views/home/PublishView.vue'),
     meta: {
       requiresAuth: true,
-      title: '发布'
+      title: '发布',
+      allowedRoles: [1]
     }
   },
   {
@@ -41,7 +43,8 @@ const routes: Array<RouteRecordRaw> = [
     component: () => import('../views/home/MessagesView.vue'),
     meta: {
       requiresAuth: true,
-      title: '消息'
+      title: '消息',
+      allowedRoles: [1]
     }
   },
   {
@@ -50,7 +53,8 @@ const routes: Array<RouteRecordRaw> = [
     component: () => import('../views/home/MyPostsView.vue'),
     meta: {
       requiresAuth: true,
-      title: '我的'
+      title: '我的',
+      allowedRoles: [1]
     }
   },
   {
@@ -59,7 +63,8 @@ const routes: Array<RouteRecordRaw> = [
     component: () => import('../views/home/SettingsView.vue'),
     meta: {
       requiresAuth: true,
-      title: '设置'
+      title: '设置',
+      allowedRoles: [1]
     }
   },
   {
@@ -80,6 +85,71 @@ const routes: Array<RouteRecordRaw> = [
       title: '物品详情'
     }
   },
+
+  // ==================== 失物招领管理员端 ====================
+
+  {
+    path: '/item-admin/notices',
+    name: 'AdminNotices',
+    component: () => import('../views/item-admin/pages/NoticeView.vue'),
+    meta: {
+      requiresAuth: true,
+      allowedRoles: [3],
+      title: '通知公告',
+      activeNav: '通知公告',
+      subtitle: '请确认公告'
+    }
+  },
+  {
+    path: '/item-admin/pending',
+    name: 'AdminPending',
+    component: () => import('../views/item-admin/pages/PendingReviewView.vue'),
+    meta: {
+      requiresAuth: true,
+      allowedRoles: [3],
+      title: '待审核',
+      activeNav: '待审核',
+      subtitle: '请审核信息'
+    }
+  },
+  {
+    path: '/item-admin/items',
+    name: 'AdminItems',
+    component: () => import('../views/item-admin/pages/ItemManageView.vue'),
+    meta: {
+      requiresAuth: true,
+      allowedRoles: [3],
+      title: '物品管理',
+      activeNav: '物品管理',
+      subtitle: '管理物品状态'
+    }
+  },
+  {
+    path: '/item-admin/statistics',
+    name: 'AdminStatistics',
+    component: () => import('../views/item-admin/pages/StatisticsView.vue'),
+    meta: {
+      requiresAuth: true,
+      allowedRoles: [3],
+      title: '数据统计',
+      activeNav: '数据统计',
+      subtitle: '查看统计数据'
+    }
+  },
+  {
+    path: '/item-admin/history',
+    name: 'AdminHistory',
+    component: () => import('../views/item-admin/pages/HistoryQueryView.vue'),
+    meta: {
+      requiresAuth: true,
+      allowedRoles: [3],
+      title: '历史查询',
+      activeNav: '历史查询',
+      subtitle: '查询历史记录'
+    }
+  },
+
+  // 404 页面
   {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
@@ -115,39 +185,55 @@ router.beforeEach((to, from, next) => {
     document.title = '校园失物招领平台'
   }
 
+  // 获取登录信息
+  const userId = sessionStorage.getItem('userId')
+  const role = sessionStorage.getItem('role')
+  const firstLogin = sessionStorage.getItem('firstLogin')
+  const userRole = role ? parseInt(role) : 0
+
   // ===== 需要登录的页面 =====
   if (to.meta.requiresAuth) {
-    const userId = sessionStorage.getItem('userId')
-    const role = sessionStorage.getItem('role')
-    const firstLogin = sessionStorage.getItem('firstLogin')
-
-    if (userId && role) {
-      // 首次登录用户只能访问密码修改页面
-      if (firstLogin === '1' && to.path !== '/force-change-password') {
-        next('/force-change-password')
-        return
-      }
-      
-      next()
+    if (!userId || !role) {
+      // 未登录，记录返回地址
+      sessionStorage.setItem('returnUrl', to.fullPath)
+      next('/login')
       return
     }
 
-    // 未登录,记录返回地址(本次会话有效)
-    sessionStorage.setItem('returnUrl', to.fullPath)
-    next('/login')
+    // 首次登录强制修改密码
+    if (firstLogin === '1' && to.path !== '/force-change-password') {
+      next('/force-change-password')
+      return
+    }
+
+    // 检查角色权限
+    if (to.meta.allowedRoles) {
+      const allowedRoles = to.meta.allowedRoles as number[]
+      if (!allowedRoles.includes(userRole)) {
+        // 无权限，根据角色跳转
+        if (userRole === 1) {
+          next('/home')  // 普通用户去首页
+        } else if (userRole === 3 || userRole === 4) {
+          next('/item-admin/notices')  // 管理员去管理端
+        } else {
+          next('/login')
+        }
+        return
+      }
+    }
+
+    next()
     return
   }
 
   // ===== 已登录却访问登录页 =====
   if (to.path === '/login') {
-    const userId = sessionStorage.getItem('userId')
-    const role = sessionStorage.getItem('role')
-
     if (userId && role) {
-      const returnUrl = sessionStorage.getItem('returnUrl')
-      if (returnUrl) {
-        sessionStorage.removeItem('returnUrl')
-        next(returnUrl)
+      // 已登录，根据角色跳转
+      if (userRole === 1) {
+        next('/home')
+      } else if (userRole === 3 || userRole === 4) {
+        next('/item-admin/notices')
       } else {
         next('/home')
       }
