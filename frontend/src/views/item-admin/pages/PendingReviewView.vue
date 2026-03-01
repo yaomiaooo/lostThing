@@ -246,7 +246,7 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button class="modal-btn approve-btn" @click="approveItem(currentItem)">通过</button>
+          <button class="modal-btn approve-btn" @click="openApproveModal(currentItem)">通过</button>
           <button class="modal-btn reject-btn" @click="openRejectFromDetail">驳回</button>
           <button class="modal-btn cancel-btn" @click="closeDetailModal">关闭</button>
         </div>
@@ -463,26 +463,28 @@ const loadPendingList = async () => {
 const loadTodayStats = async () => {
   try {
     const today = new Date().toISOString().split('T')[0]
+    // 修改 size 为较大值（例如 1000），确保获取今日所有审核记录
     const res = await axios.get('/api/item/audit/history', {
       params: {
         startDate: today,
         endDate: today,
         page: 1,
-        size: 1
+        size: 1000  // 根据实际业务量调整，或后端支持无分页获取全部
       }
     })
     
     if (res.data.code === 200) {
-      // 从审核历史计算今日统计
       const list = res.data.data.list || []
-      stats.todayApproved = list.filter((item: any) => item.status === 2).length
-      stats.todayRejected = list.filter((item: any) => item.status === 5).length
+      // 使用 newStatus 字段筛选（审核结果：2=通过，5=驳回）
+      stats.todayApproved = list.filter((item: any) => item.newStatus === 2).length
+      stats.todayRejected = list.filter((item: any) => item.newStatus === 5).length
+      
+      // 如果需要计算平均审核时长，可在此处实现（需关联物品创建时间）
+      // 暂不实现，保留默认值
     }
   } catch (error) {
     console.error('加载今日统计失败:', error)
-    stats.todayApproved = 5
-    stats.todayRejected = 2
-    stats.avgReviewTime = 8
+    // 降级显示默认值，不影响主要功能
   }
 }
 
@@ -567,8 +569,8 @@ const confirmApprove = async () => {
       pendingList.value = pendingList.value.filter(
         item => item.itemId !== approvingItem.value.itemId
       )
-      stats.pending--
-      stats.todayApproved++
+      // 重新加载统计数据确保与服务器同步
+      await loadTodayStats()
       closeApproveModal()
     }
   } catch (error) {
@@ -619,8 +621,8 @@ const confirmReject = async () => {
       pendingList.value = pendingList.value.filter(
         item => item.itemId !== rejectingItem.value.itemId
       )
-      stats.pending--
-      stats.todayRejected++
+      // 重新加载统计数据确保与服务器同步
+      await loadTodayStats()
       closeRejectModal()
     }
   } catch (error) {

@@ -1,201 +1,159 @@
 <!-- src/views/item-admin/pages/StatisticsView.vue -->
 <template>
   <div class="statistics-page">
-    <!-- 背景 -->
     <div class="background-container">
       <div class="solid-background"></div>
     </div>
 
-    <!-- 整体布局 -->
     <div class="layout-container">
-      <!-- 左侧导航 -->
       <AdminNavigation 
         subtitle="数据统计"
         active-nav="数据统计"
         @logout="handleLogout"
       />
 
-      <!-- 右侧主内容 -->
       <main class="main-content">
-        <!-- 页面标题 -->
         <section class="page-header">
           <h1 class="page-title">📊 数据统计</h1>
           <p class="page-subtitle">查看个人审核工作量与整体趋势</p>
         </section>
 
-        <!-- 时间范围选择 -->
-        <section class="date-range-section">
-          <div class="date-range-buttons">
-            <button 
-              v-for="range in dateRanges" 
-              :key="range.value"
-              class="date-btn"
-              :class="{ active: currentRange === range.value }"
-              @click="changeDateRange(range.value)"
-            >
-              {{ range.label }}
-            </button>
-          </div>
-          <div class="custom-range" v-if="currentRange === 'custom'">
-            <input type="date" v-model="customStartDate" class="date-input" />
-            <span>至</span>
-            <input type="date" v-model="customEndDate" class="date-input" />
-            <button class="apply-btn" @click="applyCustomRange">应用</button>
-          </div>
+        <!-- 时间范围选择（目前接口不支持，但保留 UI） -->
+        <section class="date-range-section" v-if="false">
+          <!-- 隐藏，因为接口暂不支持日期范围 -->
         </section>
 
-        <!-- 统计卡片 -->
-        <section class="stats-section">
-          <div class="stats-grid">
-            <div class="stat-card">
-              <div class="stat-icon">📋</div>
-              <div class="stat-value">{{ overview.totalProcessed }}</div>
-              <div class="stat-label">总处理数</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-icon">✅</div>
-              <div class="stat-value">{{ overview.approved }}</div>
-              <div class="stat-label">通过数</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-icon">❌</div>
-              <div class="stat-value">{{ overview.rejected }}</div>
-              <div class="stat-label">驳回数</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-icon">⏱️</div>
-              <div class="stat-value">{{ overview.avgTime }}分钟</div>
-              <div class="stat-label">平均处理时长</div>
-            </div>
-          </div>
-        </section>
+        <!-- 加载状态 -->
+        <div v-if="statsLoading" class="loading-container">
+          <div class="loading-spinner"></div>
+          <div class="loading-text">加载统计数据中...</div>
+        </div>
 
-        <!-- 图表区域（模拟） -->
-        <section class="chart-section">
-          <h2 class="section-title">每日审核趋势</h2>
-          <div class="chart-placeholder">
-            <!-- 这里可以集成 ECharts 等组件，暂时用模拟条状图代替 -->
-            <div class="bar-chart">
-              <div 
-                v-for="(day, index) in trendData" 
-                :key="index"
-                class="bar-item"
-                :style="{ height: day.value * 3 + 'px' }"
-              >
-                <span class="bar-label">{{ day.date }}</span>
+        <template v-else>
+          <!-- 统计卡片 -->
+          <section class="stats-section">
+            <div class="stats-grid">
+              <div class="stat-card">
+                <div class="stat-icon">📋</div>
+                <div class="stat-value">{{ stats.totalProcessed }}</div>
+                <div class="stat-label">总处理数</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon">✅</div>
+                <div class="stat-value">{{ stats.approved }}</div>
+                <div class="stat-label">通过数</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon">❌</div>
+                <div class="stat-value">{{ stats.rejected }}</div>
+                <div class="stat-label">驳回数</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-icon">📊</div>
+                <div class="stat-value">{{ stats.claimRate }}%</div>
+                <div class="stat-label">认领率</div>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
 
-        <!-- 个人审核明细 -->
-        <section class="detail-section">
-          <h2 class="section-title">个人审核明细</h2>
-          <div class="toolbar-section" style="padding: 10px 0;">
-            <div class="filter-group">
-              <select v-model="detailFilter.status" class="filter-select" @change="loadAuditHistory">
-                <option value="">全部结果</option>
-                <option value="2">通过</option>
-                <option value="5">驳回</option>
-              </select>
+          <!-- 趋势图表（使用真实数据） -->
+          <section class="chart-section">
+            <h2 class="section-title">每日发布/审核趋势</h2>
+            <div class="chart-placeholder">
+              <div class="bar-chart" v-if="trendData.length > 0">
+                <div 
+                  v-for="(item, index) in trendData" 
+                  :key="index"
+                  class="bar-item"
+                  :style="{ height: (item.count * 3) + 'px' }"
+                >
+                  <span class="bar-label">{{ formatDateShort(item.date) }}</span>
+                </div>
+              </div>
+              <div v-else class="no-trend-data">暂无趋势数据</div>
             </div>
-          </div>
-          <div class="table-container">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>时间</th>
-                  <th>物品名称</th>
-                  <th>类型</th>
-                  <th>审核结果</th>
-                  <th>驳回原因</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="record in auditList" :key="record.id" class="table-row">
-                  <td>{{ record.auditTime }}</td>
-                  <td>{{ record.itemName }}</td>
-                  <td>
-                    <span class="type-tag" :class="record.itemCategory === 1 ? 'lost-tag' : 'found-tag'">
-                      {{ record.itemCategory === 1 ? '失物' : '招领' }}
-                    </span>
-                  </td>
-                  <td>
-                    <span class="status-tag" :class="record.status === 2 ? 'status-approved' : 'status-rejected'">
-                      {{ record.status === 2 ? '通过' : '驳回' }}
-                    </span>
-                  </td>
-                  <td>{{ record.rejectReason || '-' }}</td>
-                </tr>
-                <tr v-if="auditList.length === 0">
-                  <td colspan="5" class="empty-table">暂无审核记录</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <!-- 导出按钮 -->
-          <div class="export-section">
-            <button class="export-btn" @click="exportData">
-              📥 导出统计报表
-            </button>
-          </div>
-        </section>
+          </section>
+
+          <!-- 个人审核明细 -->
+          <section class="detail-section">
+            <h2 class="section-title">个人审核明细</h2>
+            <div class="toolbar-section" style="padding: 10px 0;">
+              <div class="filter-group">
+                <select v-model="detailFilter.status" class="filter-select" @change="loadAuditHistory">
+                  <option value="">全部结果</option>
+                  <option value="2">通过</option>
+                  <option value="5">驳回</option>
+                </select>
+              </div>
+            </div>
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>时间</th>
+                    <th>物品名称</th>
+                    <th>类型</th>
+                    <th>审核结果</th>
+                    <th>驳回原因</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="record in auditList" :key="record.id" class="table-row">
+                    <td>{{ record.auditTime }}</td>
+                    <td>{{ record.itemName }}</td>
+                    <td>
+                      <span class="type-tag" :class="record.itemCategory === 1 ? 'lost-tag' : 'found-tag'">
+                        {{ record.itemCategory === 1 ? '失物' : '招领' }}
+                      </span>
+                    </td>
+                    <td>
+                      <span class="status-tag" :class="record.status === 2 ? 'status-approved' : 'status-rejected'">
+                        {{ record.status === 2 ? '通过' : '驳回' }}
+                      </span>
+                    </td>
+                    <td>{{ record.rejectReason || '-' }}</td>
+                  </tr>
+                  <tr v-if="auditList.length === 0">
+                    <td colspan="5" class="empty-table">暂无审核记录</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <!-- 导出按钮（接口暂不支持） -->
+            <div class="export-section">
+              <button class="export-btn" @click="exportData" :disabled="true" title="暂不支持导出">
+                📥 导出统计报表
+              </button>
+            </div>
+          </section>
+        </template>
       </main>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import AdminNavigation from '../components/AdminNavigation.vue'
 
 const router = useRouter()
 
-/* ================= 日期范围 ================= */
-const dateRanges = [
-  { label: '今日', value: 'today' },
-  { label: '本周', value: 'week' },
-  { label: '本月', value: 'month' },
-  { label: '自定义', value: 'custom' }
-]
-const currentRange = ref('today')
-const customStartDate = ref('')
-const customEndDate = ref('')
-
-const changeDateRange = (range: string) => {
-  currentRange.value = range
-  if (range !== 'custom') {
-    loadStatistics()
-    loadAuditHistory()
-  }
-}
-const applyCustomRange = () => {
-  if (customStartDate.value && customEndDate.value) {
-    loadStatistics()
-    loadAuditHistory()
-  }
-}
+/* ================= 数据状态 ================= */
+const statsLoading = ref(true)
+const auditLoading = ref(false)
 
 /* ================= 统计数据 ================= */
-const overview = reactive({
+const stats = reactive({
   totalProcessed: 0,
   approved: 0,
   rejected: 0,
-  avgTime: 0
+  claimRate: 0
 })
 
-// 模拟趋势数据
-const trendData = ref([
-  { date: '03-01', value: 5 },
-  { date: '03-02', value: 8 },
-  { date: '03-03', value: 3 },
-  { date: '03-04', value: 10 },
-  { date: '03-05', value: 7 },
-  { date: '03-06', value: 4 },
-  { date: '03-07', value: 6 }
-])
+// 趋势数据
+const trendData = ref<any[]>([])
 
 /* ================= 审核明细 ================= */
 const auditList = ref<any[]>([])
@@ -203,93 +161,85 @@ const detailFilter = reactive({
   status: ''
 })
 
+/* ================= 加载统计数据 ================= */
 const loadStatistics = async () => {
+  statsLoading.value = true
   try {
-    const params: any = {}
-    if (currentRange.value === 'today') {
-      params.startDate = new Date().toISOString().split('T')[0]
-      params.endDate = params.startDate
-    } else if (currentRange.value === 'week') {
-      const end = new Date()
-      const start = new Date()
-      start.setDate(end.getDate() - 7)
-      params.startDate = start.toISOString().split('T')[0]
-      params.endDate = end.toISOString().split('T')[0]
-    } else if (currentRange.value === 'month') {
-      const end = new Date()
-      const start = new Date()
-      start.setMonth(end.getMonth() - 1)
-      params.startDate = start.toISOString().split('T')[0]
-      params.endDate = end.toISOString().split('T')[0]
-    } else if (currentRange.value === 'custom') {
-      params.startDate = customStartDate.value
-      params.endDate = customEndDate.value
-    }
+    const res = await axios.get('/api/item/statistics/overview')
+    console.log('统计接口返回:', res.data)
 
-    const res = await axios.get('/api/item/statistics/overview', { params })
-    if (res.data.code === 200) {
+    if (res.data.code === 200 && res.data.data) {
       const data = res.data.data
-      overview.totalProcessed = data.totalProcessed || 0
-      overview.approved = data.approved || 0
-      overview.rejected = data.rejected || 0
-      overview.avgTime = data.avgTime || 0
+      const overview = data.overview || {}
+
+      // 计算总处理数 = 通过数 + 驳回数
+      stats.approved = overview.approved || 0
+      stats.rejected = overview.rejected || 0
+      stats.totalProcessed = stats.approved + stats.rejected
+
+      // 认领率
+      stats.claimRate = data.claimRate || 0
+
+      // 趋势数据
+      if (data.trend && Array.isArray(data.trend)) {
+        trendData.value = data.trend
+      }
     }
   } catch (error) {
     console.error('加载统计数据失败', error)
-    // 模拟数据
-    overview.totalProcessed = 156
-    overview.approved = 132
-    overview.rejected = 24
-    overview.avgTime = 8
+    // 保持初始值
+  } finally {
+    statsLoading.value = false
   }
 }
 
+/* ================= 加载审核明细 ================= */
 const loadAuditHistory = async () => {
+  auditLoading.value = true
   try {
     const params: any = {
       page: 1,
       size: 20,
       status: detailFilter.status || undefined
     }
-    if (currentRange.value === 'today') {
-      params.startDate = new Date().toISOString().split('T')[0]
-      params.endDate = params.startDate
-    } else if (currentRange.value === 'week') {
-      const end = new Date()
-      const start = new Date()
-      start.setDate(end.getDate() - 7)
-      params.startDate = start.toISOString().split('T')[0]
-      params.endDate = end.toISOString().split('T')[0]
-    } else if (currentRange.value === 'month') {
-      const end = new Date()
-      const start = new Date()
-      start.setMonth(end.getMonth() - 1)
-      params.startDate = start.toISOString().split('T')[0]
-      params.endDate = end.toISOString().split('T')[0]
-    } else if (currentRange.value === 'custom') {
-      params.startDate = customStartDate.value
-      params.endDate = customEndDate.value
-    }
-
+    // 接口暂不支持日期范围，默认全部
     const res = await axios.get('/api/item/audit/history', { params })
+    console.log('审核明细返回:', res.data)
+
     if (res.data.code === 200) {
-      auditList.value = res.data.data.list || []
+      const list = res.data.data.list || []
+      // 根据实际字段映射，假设接口返回字段与示例一致
+      auditList.value = list.map((item: any) => ({
+        id: item.id || item.auditId,
+        auditTime: item.auditTime || item.createTime,
+        itemName: item.itemName || item.name,
+        itemCategory: item.itemCategory,
+        status: item.status,
+        rejectReason: item.rejectReason
+      }))
+    } else {
+      auditList.value = []
     }
   } catch (error) {
     console.error('加载审核历史失败', error)
-    // 模拟数据
-    auditList.value = [
-      { id: 1, auditTime: '2026-03-01 10:23', itemName: '黑色钱包', itemCategory: 1, status: 2, rejectReason: '' },
-      { id: 2, auditTime: '2026-03-01 09:15', itemName: '校园卡', itemCategory: 2, status: 5, rejectReason: '照片模糊' },
-      { id: 3, auditTime: '2026-02-28 16:40', itemName: '水杯', itemCategory: 1, status: 2, rejectReason: '' }
-    ]
+    auditList.value = []
+  } finally {
+    auditLoading.value = false
   }
+}
+
+/* ================= 工具函数 ================= */
+const formatDateShort = (dateStr: string) => {
+  if (!dateStr) return ''
+  const parts = dateStr.split('-')
+  return parts.length >= 3 ? `${parts[1]}/${parts[2]}` : dateStr
 }
 
 /* ================= 导出 ================= */
 const exportData = () => {
-  // 调用导出接口
-  window.open('/api/item/statistics/export?format=csv', '_blank')
+  // 接口暂不支持，预留
+  // window.open('/api/item/statistics/export?format=csv', '_blank')
+  alert('导出功能暂未开放')
 }
 
 /* ================= 退出登录 ================= */
@@ -299,10 +249,6 @@ const handleLogout = () => {
 
 /* ================= 生命周期 ================= */
 onMounted(() => {
-  // 初始化日期
-  const today = new Date().toISOString().split('T')[0]
-  customStartDate.value = today
-  customEndDate.value = today
   loadStatistics()
   loadAuditHistory()
 })
