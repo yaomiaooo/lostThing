@@ -74,4 +74,32 @@ urlpatterns = [
     
     # 6.4.24 审核认领申请
     path('/claim/<int:claim_id>/audit', views.audit_claim, name='audit_claim'),
+
+     # ==================== 新增：分类管理接口（管理员） ====================
+    
+    # 获取分类树（管理视角，包含禁用分类）
+    path('/admin/category/tree', views.get_admin_category_tree, name='get_admin_category_tree'),
+    
+    # 新增分类
+    path('/admin/category', views.create_category, name='create_category'),
+    
+    # 修改分类
+    path('/admin/category/<int:category_id>', views.update_category, name='update_category'),
+    
+    # 删除分类
+    path('/admin/category/<int:category_id>/delete', views.delete_category, name='delete_category'),
+    
+    # ==================== 新增：地点管理接口（管理员） ====================
+    
+    # 获取地点树（管理视角，包含禁用地点）
+    path('/admin/location/tree', views.get_admin_location_tree, name='get_admin_location_tree'),
+    
+    # 新增地点
+    path('/admin/location', views.create_location, name='create_location'),
+    
+    # 修改地点
+    path('/admin/location/<int:location_id>', views.update_location, name='update_location'),
+    
+    # 删除地点
+    path('/admin/location/<int:location_id>/delete', views.delete_location, name='delete_location'),
 ]

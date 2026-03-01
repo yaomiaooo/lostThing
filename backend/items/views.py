@@ -21,6 +21,9 @@ from django.utils.dateparse import parse_datetime
 
 from datetime import datetime
 
+# 在文件顶部导入部分添加
+from django.views.decorators.http import require_http_methods
+from django.db import models
 
 # 物品状态常量
 ITEM_STATUS = {
@@ -2418,3 +2421,365 @@ def admin_item_list(request):
             }
         }
     })
+
+
+
+
+# ==================== 新增：分类管理接口（管理员） ====================
+
+def check_admin_permission(request):
+    """检查是否为管理员"""
+    user_id = request.session.get('user_id')
+    role = request.session.get('role')
+    
+    if not user_id:
+        return False, JsonResponse({"code": 401, "msg": "未登录"})
+    
+    if role not in [3, 4]:
+        return False, JsonResponse({"code": 403, "msg": "无权限操作"})
+    
+    return True, None
+
+
+@require_GET
+def get_admin_category_tree(request):
+    """
+    获取分类树（管理视角）
+    URL: GET /api/item/admin/category/tree?includeDisabled=true
+    """
+    has_perm, error_response = check_admin_permission(request)
+    if not has_perm:
+        return error_response
+    
+    # 是否包含禁用分类
+    include_disabled = request.GET.get('includeDisabled', 'false') == 'true'
+    
+    if include_disabled:
+        qs = Category.objects.all().order_by("-sort", "id")
+    else:
+        qs = Category.objects.filter(status=1).order_by("-sort", "id")
+    
+    category_list = list(qs.values("id", "name", "parent_id", "sort", "status"))
+    
+    # 构建树
+    tree = build_category_tree(category_list, parent_id=0)
+    
+    return JsonResponse({
+        "code": 200,
+        "msg": "success",
+        "data": tree
+    })
+
+
+@csrf_exempt
+@require_POST
+def create_category(request):
+    """
+    新增分类
+    URL: POST /api/item/admin/category
+    Body: {
+        "name": "电子产品",
+        "parentId": 0,  // 0表示一级分类
+        "sort": 1
+    }
+    """
+    has_perm, error_response = check_admin_permission(request)
+    if not has_perm:
+        return error_response
+    
+    try:
+        body = json.loads(request.body.decode('utf-8'))
+        name = body.get('name')
+        parent_id = body.get('parentId', 0)
+        sort = body.get('sort', 0)
+        
+        if not name:
+            return JsonResponse({"code": 400, "msg": "分类名称不能为空"})
+        
+        # 检查同级分类名是否重复
+        if Category.objects.filter(name=name, parent_id=parent_id).exists():
+            return JsonResponse({"code": 400, "msg": "该分类下已存在同名分类"})
+        
+        category = Category.objects.create(
+            name=name,
+            parent_id=parent_id,
+            sort=sort,
+            status=1
+        )
+        
+        return JsonResponse({
+            "code": 200,
+            "msg": "创建成功",
+            "data": {
+                "categoryId": category.id,
+                "name": category.name,
+                "parentId": category.parent_id,
+                "sort": category.sort
+            }
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({"code": 400, "msg": "请求数据不是合法的 JSON"})
+    except Exception as e:
+        return JsonResponse({"code": 500, "msg": f"创建失败: {str(e)}"})
+
+
+@csrf_exempt
+@require_http_methods(["PUT"])
+def update_category(request, category_id):
+    """
+    修改分类
+    URL: PUT /api/item/admin/category/{category_id}
+    Body: {
+        "name": "新名称",
+        "sort": 2,
+        "status": 1
+    }
+    """
+    has_perm, error_response = check_admin_permission(request)
+    if not has_perm:
+        return error_response
+    
+    try:
+        category = Category.objects.get(id=category_id)
+    except Category.DoesNotExist:
+        return JsonResponse({"code": 404, "msg": "分类不存在"})
+    
+    try:
+        body = json.loads(request.body.decode('utf-8'))
+        
+        # 更新字段
+        if 'name' in body:
+            # 检查同级重名
+            parent_id = category.parent_id
+            new_name = body['name']
+            if Category.objects.filter(name=new_name, parent_id=parent_id).exclude(id=category_id).exists():
+                return JsonResponse({"code": 400, "msg": "该分类下已存在同名分类"})
+            category.name = new_name
+        
+        if 'sort' in body:
+            category.sort = body['sort']
+        
+        if 'status' in body:
+            category.status = body['status']
+        
+        category.save()
+        
+        return JsonResponse({
+            "code": 200,
+            "msg": "修改成功",
+            "data": {
+                "categoryId": category.id,
+                "name": category.name,
+                "sort": category.sort,
+                "status": category.status
+            }
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({"code": 400, "msg": "请求数据不是合法的 JSON"})
+    except Exception as e:
+        return JsonResponse({"code": 500, "msg": f"修改失败: {str(e)}"})
+
+
+@csrf_exempt
+@require_http_methods(["DELETE"])
+def delete_category(request, category_id):
+    """
+    删除分类
+    URL: DELETE /api/item/admin/category/{category_id}/delete
+    """
+    has_perm, error_response = check_admin_permission(request)
+    if not has_perm:
+        return error_response
+    
+    try:
+        category = Category.objects.get(id=category_id)
+    except Category.DoesNotExist:
+        return JsonResponse({"code": 404, "msg": "分类不存在"})
+    
+    # 检查是否有子分类
+    if Category.objects.filter(parent_id=category_id).exists():
+        return JsonResponse({"code": 400, "msg": "该分类下存在子分类，无法删除"})
+    
+    # 检查是否被物品使用
+    if Item.objects.filter(item_type=category_id).exists():
+        return JsonResponse({"code": 400, "msg": "该分类已被物品使用，无法删除"})
+    
+    try:
+        category.delete()
+        return JsonResponse({
+            "code": 200,
+            "msg": "删除成功",
+            "data": {"categoryId": category_id}
+        })
+    except Exception as e:
+        return JsonResponse({"code": 500, "msg": f"删除失败: {str(e)}"})
+
+
+# ==================== 新增：地点管理接口（管理员） ====================
+
+@require_GET
+def get_admin_location_tree(request):
+    """
+    获取地点树（管理视角）
+    URL: GET /api/item/admin/location/tree?includeDisabled=true
+    """
+    has_perm, error_response = check_admin_permission(request)
+    if not has_perm:
+        return error_response
+    
+    include_disabled = request.GET.get('includeDisabled', 'false') == 'true'
+    
+    if include_disabled:
+        qs = Location.objects.all().order_by("-sort", "id")
+    else:
+        qs = Location.objects.filter(status=1).order_by("-sort", "id")
+    
+    location_list = list(qs.values("id", "name", "parent_id", "sort", "status"))
+    
+    tree = build_location_tree(location_list, parent_id=0)
+    
+    return JsonResponse({
+        "code": 200,
+        "msg": "success",
+        "data": tree
+    })
+
+
+@csrf_exempt
+@require_POST
+def create_location(request):
+    """
+    新增地点
+    URL: POST /api/item/admin/location
+    Body: {
+        "name": "图书馆",
+        "parentId": 0,
+        "sort": 1
+    }
+    """
+    has_perm, error_response = check_admin_permission(request)
+    if not has_perm:
+        return error_response
+    
+    try:
+        body = json.loads(request.body.decode('utf-8'))
+        name = body.get('name')
+        parent_id = body.get('parentId', 0)
+        sort = body.get('sort', 0)
+        
+        if not name:
+            return JsonResponse({"code": 400, "msg": "地点名称不能为空"})
+        
+        if Location.objects.filter(name=name, parent_id=parent_id).exists():
+            return JsonResponse({"code": 400, "msg": "该地点下已存在同名地点"})
+        
+        location = Location.objects.create(
+            name=name,
+            parent_id=parent_id,
+            sort=sort,
+            status=1
+        )
+        
+        return JsonResponse({
+            "code": 200,
+            "msg": "创建成功",
+            "data": {
+                "locationId": location.id,
+                "name": location.name,
+                "parentId": location.parent_id,
+                "sort": location.sort
+            }
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({"code": 400, "msg": "请求数据不是合法的 JSON"})
+    except Exception as e:
+        return JsonResponse({"code": 500, "msg": f"创建失败: {str(e)}"})
+
+
+@csrf_exempt
+@require_http_methods(["PUT"])
+def update_location(request, location_id):
+    """
+    修改地点
+    URL: PUT /api/item/admin/location/{location_id}
+    """
+    has_perm, error_response = check_admin_permission(request)
+    if not has_perm:
+        return error_response
+    
+    try:
+        location = Location.objects.get(id=location_id)
+    except Location.DoesNotExist:
+        return JsonResponse({"code": 404, "msg": "地点不存在"})
+    
+    try:
+        body = json.loads(request.body.decode('utf-8'))
+        
+        if 'name' in body:
+            parent_id = location.parent_id
+            new_name = body['name']
+            if Location.objects.filter(name=new_name, parent_id=parent_id).exclude(id=location_id).exists():
+                return JsonResponse({"code": 400, "msg": "该地点下已存在同名地点"})
+            location.name = new_name
+        
+        if 'sort' in body:
+            location.sort = body['sort']
+        
+        if 'status' in body:
+            location.status = body['status']
+        
+        location.save()
+        
+        return JsonResponse({
+            "code": 200,
+            "msg": "修改成功",
+            "data": {
+                "locationId": location.id,
+                "name": location.name,
+                "sort": location.sort,
+                "status": location.status
+            }
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({"code": 400, "msg": "请求数据不是合法的 JSON"})
+    except Exception as e:
+        return JsonResponse({"code": 500, "msg": f"修改失败: {str(e)}"})
+
+
+@csrf_exempt
+@require_http_methods(["DELETE"])
+def delete_location(request, location_id):
+    """
+    删除地点
+    URL: DELETE /api/item/admin/location/{location_id}/delete
+    """
+    has_perm, error_response = check_admin_permission(request)
+    if not has_perm:
+        return error_response
+    
+    try:
+        location = Location.objects.get(id=location_id)
+    except Location.DoesNotExist:
+        return JsonResponse({"code": 404, "msg": "地点不存在"})
+    
+    # 检查是否有子地点
+    if Location.objects.filter(parent_id=location_id).exists():
+        return JsonResponse({"code": 400, "msg": "该地点下存在子地点，无法删除"})
+    
+    # 检查是否被物品使用
+    if Item.objects.filter(location_id=location_id).exists():
+        return JsonResponse({"code": 400, "msg": "该地点已被物品使用，无法删除"})
+    
+    try:
+        location.delete()
+        return JsonResponse({
+            "code": 200,
+            "msg": "删除成功",
+            "data": {"locationId": location_id}
+        })
+    except Exception as e:
+        return JsonResponse({"code": 500, "msg": f"删除失败: {str(e)}"})

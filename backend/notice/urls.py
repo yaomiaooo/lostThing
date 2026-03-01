@@ -15,4 +15,18 @@ urlpatterns = [
     
     # 管理员：创建公告
     path('/create', views.create_notice, name='create_notice'),
+
+     # ==================== 新增：管理员公告管理接口 ====================
+    
+    # 获取公告管理列表（支持筛选）
+    path('/admin/list', views.get_admin_announcement_list, name='get_admin_announcement_list'),
+    
+    # 发布公告（全局公告）
+    path('/admin', views.publish_announcement, name='publish_announcement'),
+    
+    # 修改公告
+    path('/admin/<int:announcement_id>', views.update_announcement, name='update_announcement'),
+    
+    # 删除公告
+    path('/admin/<int:announcement_id>/delete', views.delete_announcement, name='delete_announcement'),
 ]

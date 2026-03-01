@@ -8,6 +8,9 @@ from .models import User
 
 from django.contrib.auth.hashers import check_password, make_password
 
+# 在文件顶部导入部分添加
+from django.core.paginator import Paginator
+from django.views.decorators.http import require_GET, require_POST, require_http_methods
 
 @csrf_exempt
 def login_user(request):
@@ -378,3 +381,310 @@ def logout_user(request):
             "code": 1,
             "msg": f"服务器错误: {str(e)}"
         })
+
+
+
+
+# ==================== 新增：账号与权限管理接口 ====================
+
+def check_admin_permission(request):
+    """检查是否为管理员（3=区域管理员，4=系统管理员）"""
+    user_id = request.session.get('user_id')
+    role = request.session.get('role')
+    
+    if not user_id:
+        return False, JsonResponse({"code": 401, "msg": "未登录"})
+    
+    if role not in [3, 4]:
+        return False, JsonResponse({"code": 403, "msg": "无权限操作"})
+    
+    return True, None
+
+
+@require_GET
+def get_user_list(request):
+    """
+    获取用户列表（管理员）
+    URL: GET /api/user/list?page=1&size=10&role=1&status=1&keyword=张三
+    """
+    # 权限检查
+    has_perm, error_response = check_admin_permission(request)
+    if not has_perm:
+        return error_response
+    
+    # 获取参数
+    page = int(request.GET.get('page', 1))
+    size = int(request.GET.get('size', 10))
+    role = request.GET.get('role')
+    status = request.GET.get('status')
+    keyword = request.GET.get('keyword')
+    
+    # 基础查询
+    queryset = User.objects.all().order_by('-create_time')
+    
+    # 筛选
+    if role:
+        queryset = queryset.filter(role=role)
+    if status:
+        queryset = queryset.filter(status=status)
+    if keyword:
+        queryset = queryset.filter(
+            models.Q(username__icontains=keyword) |
+            models.Q(real_name__icontains=keyword) |
+            models.Q(phone__icontains=keyword)
+        )
+    
+    # 分页
+    paginator = Paginator(queryset, size)
+    page_obj = paginator.get_page(page)
+    
+    # 组装数据
+    data_list = []
+    for user in page_obj:
+        data_list.append({
+            "userId": user.id,
+            "username": user.username,
+            "realName": user.real_name,
+            "phone": user.phone,
+            "role": user.role,
+            "roleName": {1: "学生", 2: "老师", 3: "区域管理员", 4: "系统管理员"}.get(user.role, "未知"),
+            "status": user.status,
+            "statusName": "启用" if user.status == 1 else "禁用",
+            "firstLogin": user.first_login,
+            "createTime": user.create_time.strftime('%Y-%m-%d %H:%M:%S') if user.create_time else None,
+            "lastLoginTime": user.last_login_time.strftime('%Y-%m-%d %H:%M:%S') if user.last_login_time else None
+        })
+    
+    return JsonResponse({
+        "code": 0,
+        "msg": "success",
+        "data": {
+            "list": data_list,
+            "page": page_obj.number,
+            "size": size,
+            "total": paginator.count
+        }
+    })
+
+
+@csrf_exempt
+@require_POST
+def create_admin_user(request):
+    """
+    新增管理员账号
+    URL: POST /api/user/admin
+    Body: {
+        "username": "admin001",
+        "password": "123456",
+        "realName": "管理员",
+        "phone": "13800000000",
+        "role": 3  // 3=区域管理员, 4=系统管理员
+    }
+    """
+    # 权限检查（仅系统管理员可创建）
+    user_id = request.session.get('user_id')
+    role = request.session.get('role')
+    
+    if not user_id:
+        return JsonResponse({"code": 401, "msg": "未登录"})
+    
+    if role != 4:  # 仅系统管理员
+        return JsonResponse({"code": 403, "msg": "仅系统管理员可创建管理员账号"})
+    
+    try:
+        body = json.loads(request.body.decode('utf-8'))
+        username = body.get('username')
+        password = body.get('password')
+        real_name = body.get('realName')
+        phone = body.get('phone')
+        new_role = body.get('role')
+        
+        # 参数校验
+        if not all([username, password, real_name, phone, new_role]):
+            return JsonResponse({"code": 1, "msg": "参数不能为空"})
+        
+        if new_role not in [3, 4]:
+            return JsonResponse({"code": 1, "msg": "角色只能是3(区域管理员)或4(系统管理员)"})
+        
+        # 检查用户名是否已存在
+        if User.objects.filter(username=username).exists():
+            return JsonResponse({"code": 1, "msg": "用户名已存在"})
+        
+        # 创建用户
+        user = User.objects.create(
+            username=username,
+            password=make_password(password),
+            real_name=real_name,
+            phone=phone,
+            role=new_role,
+            status=1,
+            first_login=1,
+            create_time=timezone.now(),
+            update_time=timezone.now()
+        )
+        
+        return JsonResponse({
+            "code": 0,
+            "msg": "创建成功",
+            "data": {
+                "userId": user.id,
+                "username": user.username,
+                "role": user.role
+            }
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({"code": 1, "msg": "请求数据不是合法的 JSON"})
+    except Exception as e:
+        return JsonResponse({"code": 1, "msg": f"创建失败: {str(e)}"})
+
+
+@require_GET
+def get_user_detail(request, user_id):
+    """
+    获取用户详情
+    URL: GET /api/user/{user_id}
+    """
+    has_perm, error_response = check_admin_permission(request)
+    if not has_perm:
+        return error_response
+    
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return JsonResponse({"code": 1, "msg": "用户不存在"})
+    
+    # 统计用户发布的物品数量
+    from items.models import Item
+    post_count = Item.objects.filter(user_id=user_id).count()
+    
+    data = {
+        "userId": user.id,
+        "username": user.username,
+        "realName": user.real_name,
+        "phone": user.phone,
+        "email": getattr(user, 'email', ''),
+        "role": user.role,
+        "roleName": {1: "学生", 2: "老师", 3: "区域管理员", 4: "系统管理员"}.get(user.role, "未知"),
+        "status": user.status,
+        "statusName": "启用" if user.status == 1 else "禁用",
+        "firstLogin": user.first_login,
+        "createTime": user.create_time.strftime('%Y-%m-%d %H:%M:%S') if user.create_time else None,
+        "updateTime": user.update_time.strftime('%Y-%m-%d %H:%M:%S') if user.update_time else None,
+        "lastLoginTime": user.last_login_time.strftime('%Y-%m-%d %H:%M:%S') if user.last_login_time else None,
+        "lastLoginIp": getattr(user, 'last_login_ip', ''),
+        "statistics": {
+            "postCount": post_count
+        }
+    }
+    
+    return JsonResponse({
+        "code": 0,
+        "msg": "success",
+        "data": data
+    })
+
+
+@csrf_exempt
+@require_http_methods(["PUT"])
+def update_user_status(request, user_id):
+    """
+    修改用户状态（禁用/启用）
+    URL: PUT /api/user/{user_id}/status
+    Body: {
+        "status": 0,  // 0=禁用, 1=启用
+        "reason": "违规操作"  // 可选
+    }
+    """
+    has_perm, error_response = check_admin_permission(request)
+    if not has_perm:
+        return error_response
+    
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return JsonResponse({"code": 1, "msg": "用户不存在"})
+    
+    # 不能操作自己
+    current_user_id = request.session.get('user_id')
+    if user.id == current_user_id:
+        return JsonResponse({"code": 1, "msg": "不能操作自己的账号"})
+    
+    # 不能禁用系统管理员（仅系统管理员能操作系统管理员）
+    current_role = request.session.get('role')
+    if user.role == 4 and current_role != 4:
+        return JsonResponse({"code": 403, "msg": "无权限操作系统管理员账号"})
+    
+    try:
+        body = json.loads(request.body.decode('utf-8'))
+        new_status = body.get('status')
+        reason = body.get('reason', '')
+        
+        if new_status not in [0, 1]:
+            return JsonResponse({"code": 1, "msg": "状态值非法，0=禁用, 1=启用"})
+        
+        old_status = user.status
+        user.status = new_status
+        user.update_time = timezone.now()
+        user.save()
+        
+        return JsonResponse({
+            "code": 0,
+            "msg": "状态修改成功",
+            "data": {
+                "userId": user.id,
+                "oldStatus": old_status,
+                "newStatus": new_status,
+                "reason": reason
+            }
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({"code": 1, "msg": "请求数据不是合法的 JSON"})
+    except Exception as e:
+        return JsonResponse({"code": 1, "msg": f"操作失败: {str(e)}"})
+
+
+@csrf_exempt
+@require_http_methods(["DELETE"])
+def delete_user(request, user_id):
+    """
+    删除用户
+    URL: DELETE /api/user/{user_id}
+    """
+    has_perm, error_response = check_admin_permission(request)
+    if not has_perm:
+        return error_response
+    
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return JsonResponse({"code": 1, "msg": "用户不存在"})
+    
+    # 不能删除自己
+    current_user_id = request.session.get('user_id')
+    if user.id == current_user_id:
+        return JsonResponse({"code": 1, "msg": "不能删除自己的账号"})
+    
+    # 不能删除系统管理员（仅系统管理员能删除系统管理员）
+    current_role = request.session.get('role')
+    if user.role == 4 and current_role != 4:
+        return JsonResponse({"code": 403, "msg": "无权限删除系统管理员账号"})
+    
+    # 检查用户是否有发布的物品
+    from items.models import Item
+    has_items = Item.objects.filter(user_id=user_id).exists()
+    if has_items:
+        return JsonResponse({"code": 1, "msg": "该用户有发布的物品，无法删除"})
+    
+    try:
+        user.delete()
+        return JsonResponse({
+            "code": 0,
+            "msg": "删除成功",
+            "data": {
+                "userId": user_id
+            }
+        })
+    except Exception as e:
+        return JsonResponse({"code": 1, "msg": f"删除失败: {str(e)}"})
