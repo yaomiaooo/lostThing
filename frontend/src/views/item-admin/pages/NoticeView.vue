@@ -209,8 +209,8 @@ const loadNotices = async () => {
         id: 1,
         type: 'claim',
         title: '新的认领申请',
-        content: '您审核通过的物品"黑色钱包"有新的认领申请，请及时处理。',
-        relatedItem: '黑色钱包',
+        content: '有新的认领申请需要您审核，请及时处理。',
+        relatedItem: '待审核申请',
         createTime: '2026-02-28 09:15:00',
         read: false
       }
