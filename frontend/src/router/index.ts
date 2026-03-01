@@ -1,3 +1,4 @@
+// src/router/index.ts
 import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router'
 
 /**
@@ -24,7 +25,7 @@ const routes: Array<RouteRecordRaw> = [
     meta: {
       requiresAuth: true,
       title: '发现',
-      allowedRoles: [1]  // 普通用户
+      allowedRoles: [1, 2]  // 学生、老师
     }
   },
   {
@@ -34,7 +35,7 @@ const routes: Array<RouteRecordRaw> = [
     meta: {
       requiresAuth: true,
       title: '发布',
-      allowedRoles: [1]
+      allowedRoles: [1, 2]
     }
   },
   {
@@ -44,7 +45,7 @@ const routes: Array<RouteRecordRaw> = [
     meta: {
       requiresAuth: true,
       title: '消息',
-      allowedRoles: [1]
+      allowedRoles: [1, 2]
     }
   },
   {
@@ -54,7 +55,7 @@ const routes: Array<RouteRecordRaw> = [
     meta: {
       requiresAuth: true,
       title: '我的',
-      allowedRoles: [1]
+      allowedRoles: [1, 2]
     }
   },
   {
@@ -64,7 +65,7 @@ const routes: Array<RouteRecordRaw> = [
     meta: {
       requiresAuth: true,
       title: '设置',
-      allowedRoles: [1]
+      allowedRoles: [1, 2]
     }
   },
   {
@@ -86,8 +87,7 @@ const routes: Array<RouteRecordRaw> = [
     }
   },
 
-  // ==================== 失物招领管理员端 ====================
-
+  // ==================== 失物招领管理员端 (role 3, 4) ====================
   {
     path: '/item-admin/notices',
     name: 'AdminNotices',
@@ -134,6 +134,80 @@ const routes: Array<RouteRecordRaw> = [
       title: '历史查询',
       activeNav: '历史查询',
       subtitle: '查询历史记录'
+    }
+  },
+
+  // ==================== 系统管理员端 (role 5 - 使用现有接口) ====================
+  // 数据驾驶舱 - 使用 /api/item/statistics/overview 和 /api/item/admin/list
+  {
+    path: '/system-admin/dashboard',
+    name: 'SystemDashboard',
+    component: () => import('../views/system-admin/pages/DashboardView.vue'),
+    meta: {
+      requiresAuth: true,
+      allowedRoles: [4],  // 超级管理员
+      title: '数据驾驶舱',
+      activeNav: '数据驾驶舱'
+    }
+  },
+  // 系统配置 - 使用 /api/item/admin/category/tree 和 /api/item/admin/location/tree
+  {
+    path: '/system-admin/config',
+    name: 'SystemConfig',
+    component: () => import('../views/system-admin/pages/SystemConfigView.vue'),
+    meta: {
+      requiresAuth: true,
+      allowedRoles: [4],
+      title: '系统配置',
+      activeNav: '系统配置'
+    }
+  },
+  // 账号管理 - 使用 /api/user/list 和 /api/user/admin 等现有用户接口
+  {
+    path: '/system-admin/accounts',
+    name: 'SystemAccounts',
+    component: () => import('../views/system-admin/pages/AccountManageView.vue'),
+    meta: {
+      requiresAuth: true,
+      allowedRoles: [4],
+      title: '账号管理',
+      activeNav: '账号管理'
+    }
+  },
+  // 公告管理 - 使用 /api/announcements/admin/list 和 /api/announcements/admin 等现有公告接口
+  {
+    path: '/system-admin/notices',
+    name: 'SystemNotices',
+    component: () => import('../views/system-admin/pages/NoticeManageView.vue'),
+    meta: {
+      requiresAuth: true,
+      allowedRoles: [4],
+      title: '公告管理',
+      activeNav: '公告管理'
+    }
+  },
+  // 数据管理 - 使用 /api/item/statistics/export 和现有物品管理接口
+  {
+    path: '/system-admin/data',
+    name: 'SystemData',
+    component: () => import('../views/system-admin/pages/DataManageView.vue'),
+    meta: {
+      requiresAuth: true,
+      allowedRoles: [4],
+      title: '数据管理',
+      activeNav: '数据管理'
+    }
+  },
+  // 投诉管理 - 复用 /api/item/claim/list 等现有接口模拟投诉数据
+  {
+    path: '/system-admin/complaints',
+    name: 'SystemComplaints',
+    component: () => import('../views/system-admin/pages/ComplaintManageView.vue'),
+    meta: {
+      requiresAuth: true,
+      allowedRoles: [4],
+      title: '投诉处理',
+      activeNav: '投诉处理'
     }
   },
 
@@ -199,10 +273,12 @@ router.beforeEach((to, from, next) => {
       const allowedRoles = to.meta.allowedRoles as number[]
       if (!allowedRoles.includes(userRole)) {
         // 无权限，根据角色跳转
-        if (userRole === 1) {
+        if (userRole === 1 || userRole === 2) {
           next('/home')  // 普通用户去首页
-        } else if (userRole === 3 || userRole === 4) {
-          next('/item-admin/notices')  // 管理员去管理端
+        } else if (userRole === 3) {
+          next('/item-admin/notices')  // 失物招领管理员去管理端
+        } else if (userRole === 4) {
+          next('/system-admin/dashboard')  // 系统管理员去系统管理端
         } else {
           next('/login')
         }
@@ -218,10 +294,12 @@ router.beforeEach((to, from, next) => {
   if (to.path === '/login') {
     if (userId && role) {
       // 已登录，根据角色跳转
-      if (userRole === 1) {
+      if (userRole === 1 || userRole === 2) {
         next('/home')
       } else if (userRole === 3 || userRole === 4) {
         next('/item-admin/notices')
+      } else if (userRole === 5) {
+        next('/system-admin/dashboard')
       } else {
         next('/home')
       }
