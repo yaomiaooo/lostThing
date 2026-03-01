@@ -268,8 +268,69 @@
           <h3 class="modal-title">物品详情</h3>
           <button class="modal-close" @click="closeDetailModal">×</button>
         </div>
-        <div class="modal-body" v-if="currentItem">
-          <!-- 详情内容... -->
+        <div class="modal-body">
+          <div class="detail-content" v-if="currentItem">
+            <!-- 图片展示 -->
+            <div class="detail-images" v-if="currentItemImages.length > 0">
+              <div class="image-main">
+                <img 
+                  :src="currentItemImages[currentImageIndex]" 
+                  class="main-image" 
+                  @click="previewImage(currentItemImages[currentImageIndex])"
+                />
+              </div>
+              <div class="image-thumbs" v-if="currentItemImages.length > 1">
+                <img 
+                  v-for="(img, idx) in currentItemImages" 
+                  :key="idx"
+                  :src="img" 
+                  class="thumb" 
+                  :class="{ active: idx === currentImageIndex }"
+                  @click="currentImageIndex = idx"
+                />
+              </div>
+            </div>
+            
+            <!-- 基本信息 -->
+            <div class="detail-info">
+              <div class="info-row">
+                <span class="info-label">物品名称：</span>
+                <span class="info-value">{{ currentItem.name }}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">物品类型：</span>
+                <span class="info-value">{{ currentItem.itemTypeName }}（{{ currentItem.itemCategory === 1 ? '失物' : '招领' }}）</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">发生时间：</span>
+                <span class="info-value">{{ currentItem.happenTime }}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">地点：</span>
+                <span class="info-value">{{ currentItem.locationName }} {{ currentItem.locationDetail }}</span>
+              </div>
+              <div class="info-row" v-if="currentItem.pickupLocation">
+                <span class="info-label">领取地点：</span>
+                <span class="info-value">{{ currentItem.pickupLocation }}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">特征描述：</span>
+                <span class="info-value description">{{ currentItem.feature }}</span>
+              </div>
+              <div class="info-row" v-if="currentItem.rewardAmount > 0">
+                <span class="info-label">悬赏金额：</span>
+                <span class="info-value reward">¥{{ currentItem.rewardAmount }} {{ currentItem.rewardDesc }}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">联系人：</span>
+                <span class="info-value">{{ currentItem.contactName }} {{ currentItem.contactPhone }}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">发布时间：</span>
+                <span class="info-value">{{ currentItem.createTime }}</span>
+              </div>
+            </div>
+          </div>
         </div>
         <div class="modal-footer">
           <button class="modal-btn cancel-btn" @click="closeDetailModal">关闭</button>
@@ -575,6 +636,8 @@ const showUnclaimedModal = ref(false)
 const showDeleteModal = ref(false)
 
 const currentItem = ref<any>(null)
+const currentItemImages = ref<string[]>([])
+const currentImageIndex = ref(0)
 const updatingItem = ref<any>(null)
 const archivingItem = ref<any>(null)
 const claimsItem = ref<any>(null)
@@ -734,14 +797,41 @@ const toggleSelectItem = (itemId: number) => {
 }
 
 /* ================= 查看详情 ================= */
-const viewDetail = (item: any) => {
+const viewDetail = async (item: any) => {
   currentItem.value = item
+  currentImageIndex.value = 0
+  
+  // 加载物品详情获取图片
+  try {
+    const res = await axios.get('/api/item/detail', {
+      params: { itemId: item.itemId }
+    })
+    
+    if (res.data.code === 200) {
+      const detail = res.data.data
+      currentItem.value = { ...item, ...detail.item }
+      
+      // 处理图片
+      if (detail.images && detail.images.length > 0) {
+        currentItemImages.value = detail.images.map((img: any) => img.url)
+      } else if (item.firstImageUrl) {
+        currentItemImages.value = [item.firstImageUrl]
+      } else {
+        currentItemImages.value = []
+      }
+    }
+  } catch (error) {
+    console.error('加载详情失败:', error)
+    currentItemImages.value = item.firstImageUrl ? [item.firstImageUrl] : []
+  }
+  
   showDetailModal.value = true
 }
 
 const closeDetailModal = () => {
   showDetailModal.value = false
   currentItem.value = null
+  currentItemImages.value = []
 }
 
 /* ================= 状态更新 ================= */
@@ -2131,6 +2221,97 @@ onMounted(() => {
 .no-image {
   font-size: 12px;
   color: rgba(166, 124, 82, 0.5);
+}
+
+/* 详情弹窗 */
+.detail-modal {
+  background: white;
+  border-radius: 20px;
+  width: 90%;
+  max-width: 700px;
+  max-height: 90vh;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.detail-content {
+  display: flex;
+  gap: 20px;
+}
+
+.detail-images {
+  flex: 0 0 300px;
+}
+
+.image-main {
+  width: 100%;
+  height: 300px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(166, 124, 82, 0.1);
+  margin-bottom: 12px;
+}
+
+.main-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-thumbs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.thumb {
+  width: 60px;
+  height: 60px;
+  border-radius: 8px;
+  object-fit: cover;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: all 0.3s ease;
+}
+
+.thumb.active {
+  border-color: rgba(243, 129, 129, 0.7);
+}
+
+.thumb:hover {
+  transform: scale(1.05);
+}
+
+.detail-info {
+  flex: 1;
+}
+
+.info-row {
+  margin-bottom: 15px;
+}
+
+.info-label {
+  font-family: "Comic Sans MS", cursive;
+  font-size: 14px;
+  color: rgba(166, 124, 82, 0.7);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.info-value {
+  font-family: "Comic Sans MS", cursive;
+  font-size: 14px;
+  color: #a67c52;
+  word-break: break-word;
+}
+
+.info-value.description {
+  line-height: 1.5;
+}
+
+.info-value.reward {
+  color: #f44336;
+  font-weight: 500;
 }
 
 .image-preview-overlay {

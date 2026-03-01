@@ -186,7 +186,11 @@
             <!-- 图片展示 -->
             <div class="detail-images" v-if="currentItemImages.length > 0">
               <div class="image-main">
-                <img :src="currentItemImages[currentImageIndex]" class="main-image" />
+                <img 
+                  :src="currentItemImages[currentImageIndex]" 
+                  class="main-image" 
+                  @click="previewImage(currentItemImages[currentImageIndex])"
+                />
               </div>
               <div class="image-thumbs" v-if="currentItemImages.length > 1">
                 <img 
