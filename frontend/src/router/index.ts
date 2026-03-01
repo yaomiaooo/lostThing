@@ -125,18 +125,6 @@ const routes: Array<RouteRecordRaw> = [
     }
   },
   {
-    path: '/item-admin/statistics',
-    name: 'AdminStatistics',
-    component: () => import('../views/item-admin/pages/StatisticsView.vue'),
-    meta: {
-      requiresAuth: true,
-      allowedRoles: [3],
-      title: '数据统计',
-      activeNav: '数据统计',
-      subtitle: '查看统计数据'
-    }
-  },
-  {
     path: '/item-admin/history',
     name: 'AdminHistory',
     component: () => import('../views/item-admin/pages/HistoryQueryView.vue'),

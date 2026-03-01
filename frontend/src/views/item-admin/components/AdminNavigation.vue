@@ -142,12 +142,6 @@ const navItems = ref<NavItem[]>([
     handler: () => router.push('/item-admin/items')
   },
   {
-    name: '数据统计',
-    icon: '/home/发布.svg',
-    path: '/item-admin/statistics',
-    handler: () => router.push('/item-admin/statistics')
-  },
-  {
     name: '历史查询',
     icon: '/home/设置.svg',
     path: '/item-admin/history',
