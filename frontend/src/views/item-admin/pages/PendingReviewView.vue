@@ -63,7 +63,6 @@
             </select>
           </div>
           <div class="refresh-btn" @click="refreshList">
-            <span class="refresh-icon" :class="{ rotating: refreshing }">🔄</span>
             <span>刷新</span>
           </div>
         </section>
@@ -362,8 +361,7 @@ const pagination = reactive({
 const stats = reactive({
   pending: 0,
   todayApproved: 0,
-  todayRejected: 0,
-  avgReviewTime: 0
+  todayRejected: 0
 })
 
 /* ================= 弹窗状态 ================= */

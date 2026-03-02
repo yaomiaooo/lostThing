@@ -15,7 +15,7 @@
       <main class="main-content">
         <!-- 页面标题 -->
         <section class="page-header">
-          <h1 class="page-title">📦 物品管理</h1>
+          <h1 class="page-title">物品管理</h1>
           <p class="page-subtitle">管理已发布物品状态，处理认领申请，归档长期无人认领物品</p>
         </section>
 
@@ -102,7 +102,6 @@
               </button>
             </div>
             <div class="refresh-btn" @click="refreshList">
-              <span class="refresh-icon" :class="{ rotating: refreshing }">🔄</span>
               <span>刷新</span>
             </div>
           </div>
@@ -173,6 +172,7 @@
                   </td>
                   <td class="col-info">
                     <div class="info-name">{{ item.name }}</div>
+                    <div class="info-campus">🏫 {{ getLocationCampus(item) }}</div>
                     <div class="info-location">📍 {{ item.locationName }}</div>
                     <div v-if="item.rewardAmount > 0" class="info-reward">
                       💰 ¥{{ item.rewardAmount }}
@@ -307,7 +307,7 @@
               </div>
               <div class="info-row">
                 <span class="info-label">地点：</span>
-                <span class="info-value">{{ currentItem.locationName }} {{ currentItem.locationDetail }}</span>
+                <span class="info-value">{{ getLocationCampus(currentItem) }} {{ currentItem.locationName }} {{ currentItem.locationDetail }}</span>
               </div>
               <div class="info-row" v-if="currentItem.pickupLocation">
                 <span class="info-label">领取地点：</span>
@@ -1123,6 +1123,37 @@ const maskPhone = (phone: string) => {
 const truncateText = (text: string, length: number) => {
   if (!text) return ''
   return text.length > length ? text.substring(0, length) + '...' : text
+}
+
+/* ================= 地点解析函数 ================= */
+const getLocationCampus = (item: any) => {
+  const locationId = item.locationId || 0
+  
+  // 根据locationId的前缀判断校区
+  // 1xxxx = 朝晖校区, 2xxxx = 屏峰校区, 3xxxx = 莫干山校区, 4xxxx = 西湖校区
+  const idStr = String(locationId)
+  
+  if (idStr.startsWith('1')) {
+    return '朝晖校区'
+  } else if (idStr.startsWith('2')) {
+    return '屏峰校区'
+  } else if (idStr.startsWith('3')) {
+    return '莫干山校区'
+  } else if (idStr.startsWith('4')) {
+    return '西湖校区'
+  }
+  
+  // 如果无法从locationId判断，尝试从locationName中提取
+  const locationName = item.locationName || ''
+  const campusPatterns = ['屏峰校区', '朝晖校区', '莫干山校区', '西湖校区']
+  
+  for (const campus of campusPatterns) {
+    if (locationName.includes(campus)) {
+      return campus
+    }
+  }
+  
+  return '未知校区'
 }
 
 /* ================= 生命周期 ================= */
@@ -2312,6 +2343,48 @@ onMounted(() => {
 .info-value.reward {
   color: #f44336;
   font-weight: 500;
+}
+
+/* 物品信息列样式 */
+.info-name {
+  font-weight: 600;
+  color: #a67c52;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.info-campus {
+  font-size: 12px;
+  color: rgba(166, 124, 82, 0.85);
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.info-location {
+  font-size: 12px;
+  color: rgba(166, 124, 82, 0.7);
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.info-reward {
+  font-size: 12px;
+  color: #ff9800;
+  font-weight: 600;
+}
+
+/* 长期未认领物品列表中的校区样式 */
+.item-campus {
+  font-size: 12px;
+  color: rgba(166, 124, 82, 0.85);
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .image-preview-overlay {

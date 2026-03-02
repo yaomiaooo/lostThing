@@ -195,7 +195,18 @@ def get_item_list(request):
         queryset = queryset.filter(item_type=item_type)
 
     if location_id:
-        queryset = queryset.filter(location_id=location_id)
+        # 如果location_id是单个数字（1-4），表示按校区筛选
+        # 1xxxx = 朝晖校区, 2xxxx = 屏峰校区, 3xxxx = 莫干山校区, 4xxxx = 西湖校区
+        if location_id in ['1', '2', '3', '4']:
+            # 使用字符串前缀匹配
+            from django.db.models import CharField
+            from django.db.models.functions import Cast
+            queryset = queryset.annotate(
+                location_id_str=Cast('location_id', CharField())
+            ).filter(location_id_str__startswith=location_id)
+        else:
+            # 否则按精确的location_id筛选
+            queryset = queryset.filter(location_id=location_id)
 
     # ========= 5. 分页 =========
     paginator = Paginator(queryset, size)
@@ -2304,7 +2315,17 @@ def admin_item_list(request):
     if item_category:
         queryset = queryset.filter(item_category=item_category)
     if location_id:
-        queryset = queryset.filter(location_id=location_id)
+        # 如果location_id是单个数字（1-4），表示按校区筛选
+        # 1xxxx = 朝晖校区, 2xxxx = 屏峰校区, 3xxxx = 莫干山校区, 4xxxx = 西湖校区
+        if location_id in ['1', '2', '3', '4']:
+            # 使用范围查询，性能更好
+            campus_prefix = int(location_id)
+            min_id = campus_prefix * 10000
+            max_id = (campus_prefix + 1) * 10000
+            queryset = queryset.filter(location_id__gte=min_id, location_id__lt=max_id)
+        else:
+            # 否则按精确的location_id筛选
+            queryset = queryset.filter(location_id=location_id)
     if start_date:
         queryset = queryset.filter(create_time__gte=start_date)
     if end_date:

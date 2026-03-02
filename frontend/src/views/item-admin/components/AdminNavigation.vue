@@ -43,14 +43,6 @@
           <span class="stat-label">待审核：</span>
           <span class="stat-value pending">{{ stats.pending }}</span>
         </div>
-        <div class="stat-item">
-          <span class="stat-label">今日已审：</span>
-          <span class="stat-value approved">{{ stats.todayApproved }}</span>
-        </div>
-        <div class="stat-item">
-          <span class="stat-label">长期未认领：</span>
-          <span class="stat-value warning">{{ stats.longTermUnclaimed }}</span>
-        </div>
       </div>
       <div class="stats-time">更新时间：{{ updateTime }}</div>
     </div>
@@ -115,9 +107,7 @@ const user = ref({
 /* ================= 统计数据 ================= */
 const pendingCount = ref(0)
 const stats = ref({
-  pending: 0,
-  todayApproved: 0,
-  longTermUnclaimed: 0
+  pending: 0
 })
 const updateTime = ref('')
 
@@ -200,54 +190,18 @@ const loadPendingCount = async () => {
       pendingCount.value = res.data.data.statistics?.['待审核'] || 0
       stats.value.pending = pendingCount.value
     }
-  } catch (error) {
-    console.error('加载待审核数量失败:', error)
-    pendingCount.value = 5 // 模拟数据
-    stats.value.pending = 5
-  }
-}
-
-/* ================= 加载快捷统计 ================= */
-const loadQuickStats = async () => {
-  try {
-    // 今日已审核数量（通过审核历史接口）
-    const today = new Date().toISOString().split('T')[0]
-    const historyRes = await axios.get('/api/item/audit/history', {
-      params: {
-        startDate: today,
-        endDate: today,
-        page: 1,
-        size: 1
-      }
-    })
-    
-    // 长期未认领数量
-    const unclaimedRes = await axios.get('/api/item/unclaimed/long-term', {
-      params: {
-        days: 30,
-        page: 1,
-        size: 1
-      }
-    })
-    
-    if (historyRes.data.code === 200) {
-      // 从列表中计算今日已审核数量
-      const list = historyRes.data.data.list || []
-      stats.value.todayApproved = list.filter((item: any) => item.status === 2).length
-    }
-    if (unclaimedRes.data.code === 200) {
-      stats.value.longTermUnclaimed = unclaimedRes.data.data.total || 0
-    }
     
     // 更新时间
     const now = new Date()
     updateTime.value = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
   } catch (error) {
-    console.error('加载快捷统计失败:', error)
-    // 模拟数据
-    stats.value.todayApproved = 12
-    stats.value.longTermUnclaimed = 8
-    updateTime.value = '14:30'
+    console.error('加载待审核数量失败:', error)
+    pendingCount.value = 5 // 模拟数据
+    stats.value.pending = 5
+    
+    // 更新时间
+    const now = new Date()
+    updateTime.value = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
   }
 }
 
@@ -271,9 +225,8 @@ const handleLogout = async () => {
 /* ================= 生命周期 ================= */
 onMounted(() => {
   loadUser()
-  loadPendingCount()
   if (props.showStatsCard) {
-    loadQuickStats()
+    loadPendingCount()
   }
 })
 
