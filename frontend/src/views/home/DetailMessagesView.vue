@@ -83,11 +83,11 @@
             @click.stop
           >
             <div class="menu-item" @click="deleteSelectedMessage">
-              <span class="menu-icon">🗑️</span>
+              <!-- <span class="menu-icon">🗑️</span> -->
               <span>删除此消息</span>
             </div>
             <div class="menu-item" @click="deleteAllMessages">
-              <span class="menu-icon">🧹</span>
+              <!-- <span class="menu-icon">🧹</span> -->
               <span>清空聊天记录</span>
             </div>
             <div class="menu-divider"></div>

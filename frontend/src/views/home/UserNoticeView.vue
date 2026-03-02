@@ -173,7 +173,7 @@ const loadNotices = async () => {
     const res = await axios.get('/api/announcements')
     if (res.data.code === 200) {
       // 转换后端数据结构为前端数据结构
-      notices.value = (res.data.data.announcements || []).map(notice => ({
+      notices.value = (res.data.data.announcements || []).map((notice: any) => ({
         id: notice.noticeId,
         type: 'system',
         title: notice.title,
@@ -182,7 +182,7 @@ const loadNotices = async () => {
         read: false  // 后端没有返回阅读状态，默认未读
       }))
       
-      notifications.value = (res.data.data.unreadNotifications || []).map(notif => ({
+      notifications.value = (res.data.data.unreadNotifications || []).map((notif: any) => ({
         id: notif.notificationId,
         type: notif.type,
         title: notif.title,

@@ -151,7 +151,7 @@
           @click.stop
         >
           <div class="menu-item" @click="deleteSelectedConversation">
-            <span class="menu-icon">🗑️</span>
+            <!-- <span class="menu-icon">🗑️</span> -->
             <span>删除此会话</span>
           </div>
           <div class="menu-divider"></div>

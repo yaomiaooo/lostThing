@@ -106,7 +106,7 @@ const hasCustomContent = computed(() => props.customContent)
 const navItems = ref<NavItem[]>([
   {
     name: '公告',
-    icon: '/home/消息.svg',
+    icon: '/home/公告.svg',
     handler: () => router.push('/notice')
   },
   {
