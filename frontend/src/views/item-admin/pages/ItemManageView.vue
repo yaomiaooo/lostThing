@@ -79,6 +79,9 @@
                 <option value="2">屏峰校区</option>
                 <option value="3">莫干山校区</option>
               </select>
+              <div class="refresh-btn" @click="refreshList">
+                <span>刷新</span>
+              </div>
             </div>
             <div class="search-box">
               <input 
@@ -91,8 +94,8 @@
               <button class="search-btn" @click="loadItemList">🔍</button>
             </div>
           </div>
-          <div class="action-row">
-            <div class="batch-actions" v-if="selectedItems.length > 0">
+          <div class="action-row" v-if="selectedItems.length > 0">
+            <div class="batch-actions">
               <span class="selected-count">已选 {{ selectedItems.length }} 项</span>
               <button class="batch-btn archive-btn" @click="batchArchive">
                 📁 批量归档
@@ -100,9 +103,6 @@
               <button class="batch-btn delete-btn" @click="batchDelete">
                 🗑️ 批量删除
               </button>
-            </div>
-            <div class="refresh-btn" @click="refreshList">
-              <span>刷新</span>
             </div>
           </div>
         </section>

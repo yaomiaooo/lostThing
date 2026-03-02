@@ -23,31 +23,7 @@
           <p class="page-subtitle">审核失物/招领信息的真实性、完整性和照片清晰度</p>
         </section>
 
-        <!-- 统计卡片 -->
-        <section class="stats-section">
-          <div class="stats-grid">
-            <div class="stat-card">
-              <div class="stat-icon">📥</div>
-              <div class="stat-value">{{ stats.pending }}</div>
-              <div class="stat-label">待审核</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-icon">✅</div>
-              <div class="stat-value">{{ stats.todayApproved }}</div>
-              <div class="stat-label">今日通过</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-icon">❌</div>
-              <div class="stat-value">{{ stats.todayRejected }}</div>
-              <div class="stat-label">今日驳回</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-icon">⏱️</div>
-              <div class="stat-value">{{ stats.avgReviewTime }}分钟</div>
-              <div class="stat-label">平均审核时长</div>
-            </div>
-          </div>
-        </section>
+
 
         <!-- 筛选工具栏 -->
         <section class="toolbar-section">
@@ -787,51 +763,6 @@ onMounted(() => {
 .page-subtitle {
   font-family: "Comic Sans MS", cursive;
   font-size: 16px;
-  color: rgba(166, 124, 82, 0.7);
-}
-
-/* 统计卡片 */
-.stats-section {
-  margin-bottom: 25px;
-}
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
-}
-
-.stat-card {
-  background: rgba(255, 255, 255, 0.35);
-  backdrop-filter: blur(15px);
-  border-radius: 16px;
-  padding: 20px;
-  border: 2px solid rgba(166, 124, 82, 0.2);
-  text-align: center;
-  transition: all 0.3s ease;
-}
-
-.stat-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
-}
-
-.stat-icon {
-  font-size: 32px;
-  margin-bottom: 10px;
-}
-
-.stat-value {
-  font-family: "Comic Sans MS", "Marker Felt", cursive;
-  font-size: 28px;
-  color: #a67c52;
-  font-weight: 700;
-  margin-bottom: 5px;
-}
-
-.stat-label {
-  font-family: "Comic Sans MS", cursive;
-  font-size: 14px;
   color: rgba(166, 124, 82, 0.7);
 }
 
@@ -1578,10 +1509,6 @@ onMounted(() => {
 
 /* 响应式设计 */
 @media (max-width: 1200px) {
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  
   .detail-content {
     flex-direction: column;
   }
@@ -1597,19 +1524,6 @@ onMounted(() => {
     max-width: 100vw;
     padding: 20px 15px;
     padding-bottom: 100px;
-  }
-  
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
-  }
-  
-  .stat-card {
-    padding: 15px;
-  }
-  
-  .stat-value {
-    font-size: 22px;
   }
   
   .toolbar-section {

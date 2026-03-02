@@ -19,7 +19,7 @@
       <main class="main-content">
         <!-- 页面标题 -->
         <section class="page-header">
-          <h1 class="page-title">📜 审核历史查询</h1>
+          <h1 class="page-title">审核历史查询</h1>
           <p class="page-subtitle">查看过往审核记录，支持多维度筛选</p>
         </section>
 
