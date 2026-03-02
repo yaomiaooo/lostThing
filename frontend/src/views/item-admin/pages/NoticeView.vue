@@ -20,7 +20,7 @@
       <main class="main-content">
         <!-- 页面标题 -->
         <section class="page-header">
-          <h1 class="page-title">📢 系统通知与公告</h1>
+          <h1 class="page-title">系统通知与公告</h1>
           <p class="page-subtitle">请仔细阅读以下公告，确认后进入工作台</p>
         </section>
 
@@ -52,7 +52,7 @@
 
             <!-- 系统公告列表 -->
             <div v-if="notices.length > 0" class="notice-group">
-              <h2 class="group-title">📋 系统公告</h2>
+              <h2 class="group-title">系统公告</h2>
               <div 
                 v-for="notice in notices" 
                 :key="'notice-'+notice.id"
@@ -61,7 +61,7 @@
               >
                 <div class="notice-header">
                   <span class="notice-type" :class="'type-'+notice.type">
-                    {{ getNoticeTypeText(notice.type) }}
+                    <!-- {{ getNoticeTypeText(notice.type) }} -->
                   </span>
                   <span class="notice-time">{{ formatTime(notice.createTime) }}</span>
                 </div>
@@ -70,7 +70,7 @@
                   <p class="notice-content-text">{{ notice.content }}</p>
                 </div>
                 <div class="notice-footer">
-                  <span class="notice-publisher">发布人：{{ notice.publisher }}</span>
+                  <!-- <span class="notice-publisher">发布人：{{ notice.publisher }}</span> -->
                   <button 
                     v-if="!notice.read" 
                     class="mark-read-btn"
@@ -84,7 +84,7 @@
 
             <!-- 个人通知列表 -->
             <div v-if="notifications.length > 0" class="notice-group">
-              <h2 class="group-title">✉️ 个人通知</h2>
+              <h2 class="group-title">个人通知</h2>
               <div 
                 v-for="notification in notifications" 
                 :key="'notif-'+notification.id"
@@ -581,7 +581,7 @@ onMounted(() => {
   font-family: "Comic Sans MS", cursive;
   font-size: 12px;
   font-weight: 600;
-  color: white;
+  color: rgb(255, 255, 255);
 }
 
 /* 公告类型颜色 */
