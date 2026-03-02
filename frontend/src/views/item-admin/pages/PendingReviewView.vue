@@ -19,7 +19,7 @@
       <main class="main-content">
         <!-- 页面标题 -->
         <section class="page-header">
-          <h1 class="page-title">📋 待审核信息</h1>
+          <h1 class="page-title">待审核信息</h1>
           <p class="page-subtitle">审核失物/招领信息的真实性、完整性和照片清晰度</p>
         </section>
 
