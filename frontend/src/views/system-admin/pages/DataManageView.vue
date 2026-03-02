@@ -388,7 +388,7 @@
                 <button class="preview-btn" @click="previewCleanup">
                   预览清理效果
                 </button>
-                <button class="execute-btn" @click="confirmCleanup">
+                <button class="execute-btn" @click="executeCleanup">
                   立即执行清理
                 </button>
               </div>

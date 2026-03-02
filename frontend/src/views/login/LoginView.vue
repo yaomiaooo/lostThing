@@ -323,13 +323,13 @@ const handleLogin = async () => {
       return
     }
 
-    // 根据角色跳转
-    if (user.role === 1) {
+    // 根据角色跳转到默认页面
+    if (user.role === 1 || user.role === 2) {
       router.push('/home')
-    } else if (user.role === 2) {
-      router.push('/admin/dashboard')
     } else if (user.role === 3) {
-      router.push('/system/dashboard')
+      router.push('/item-admin/notices')
+    } else if (user.role === 4) {
+      router.push('/system-admin/dashboard')
     } else {
       router.push('/home')
     }
