@@ -576,6 +576,51 @@
       <img :src="previewImageUrl" class="preview-large" />
       <button class="preview-close" @click="closeImagePreview">×</button>
     </div>
+
+    <!-- 认领申请驳回弹窗 -->
+    <div v-if="showClaimRejectModal" class="modal-overlay" @click.self="closeClaimRejectModal">
+      <div class="reject-modal">
+        <div class="modal-header">
+          <h3 class="modal-title">驳回认领申请</h3>
+          <button class="modal-close" @click="closeClaimRejectModal">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="reject-content">
+            <p class="reject-item-name">「{{ rejectingClaim?.claimUserName }}」的认领申请</p>
+            <div class="form-group">
+              <label class="form-label">驳回原因 <span class="required">*</span></label>
+              <textarea 
+                v-model="rejectReason" 
+                class="form-textarea"
+                placeholder="请详细说明驳回原因，如：信息不完整、照片不清晰、疑似虚假信息等..."
+                rows="4"
+              ></textarea>
+              <div class="reason-options">
+                <button 
+                  v-for="reason in commonRejectReasons" 
+                  :key="reason"
+                  class="reason-tag"
+                  @click="selectReason(reason)"
+                >
+                  {{ reason }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="modal-btn cancel-btn" @click="closeClaimRejectModal">取消</button>
+          <button 
+            class="modal-btn reject-btn" 
+            :disabled="submitting || !rejectReason.trim()"
+            @click="confirmRejectClaim"
+          >
+            <span v-if="submitting" class="loading-spinner-small"></span>
+            <span v-else>确认驳回</span>
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -634,6 +679,7 @@ const showArchiveModal = ref(false)
 const showClaimsModal = ref(false)
 const showUnclaimedModal = ref(false)
 const showDeleteModal = ref(false)
+const showClaimRejectModal = ref(false)
 
 const currentItem = ref<any>(null)
 const currentItemImages = ref<string[]>([])
@@ -642,6 +688,9 @@ const updatingItem = ref<any>(null)
 const archivingItem = ref<any>(null)
 const claimsItem = ref<any>(null)
 const deletingItem = ref<any>(null)
+const rejectingClaim = ref<any>(null)
+const rejectReason = ref('')
+const submitting = ref(false)
 
 /* ================= 状态更新 ================= */
 const newStatus = ref<number | null>(null)
@@ -662,6 +711,16 @@ const archiveTypes = ['移交保卫处', '捐赠处理', '报废处理', '其他
 /* ================= 认领申请 ================= */
 const claimsList = ref<any[]>([])
 const unclaimedList = ref<any[]>([])
+
+/* ================= 常用驳回原因 ================= */
+const commonRejectReasons = [
+  '信息不完整，缺少关键描述',
+  '照片不清晰，无法辨认物品',
+  '联系方式无效',
+  '疑似虚假信息',
+  '物品描述与实际不符',
+  '重复认领'
+]
 
 /* ================= 图片预览 ================= */
 const previewImageUrl = ref('')
@@ -958,17 +1017,67 @@ const closeClaimsModal = () => {
 }
 
 const auditClaim = async (claimId: number, status: number) => {
+  if (status === 2) {
+    // 驳回，先打开驳回弹窗
+    const claim = claimsList.value.find(c => c.claimId === claimId)
+    if (claim) {
+      openClaimRejectModal(claim)
+    }
+  } else {
+    // 通过，直接提交
+    try {
+      const res = await axios.post(`/api/item/claim/${claimId}/audit`, { status })
+      
+      if (res.data.code === 200) {
+        // 刷新认领列表和物品列表
+        await viewClaims(claimsItem.value)
+        await loadItemList()
+      }
+    } catch (error) {
+      console.error('审核认领申请失败:', error)
+      alert('操作失败，请重试')
+    }
+  }
+}
+
+/* ================= 认领申请驳回 ================= */
+const openClaimRejectModal = (claim: any) => {
+  rejectingClaim.value = claim
+  rejectReason.value = ''
+  showClaimRejectModal.value = true
+}
+
+const closeClaimRejectModal = () => {
+  showClaimRejectModal.value = false
+  rejectingClaim.value = null
+  rejectReason.value = ''
+}
+
+const selectReason = (reason: string) => {
+  rejectReason.value = reason
+}
+
+const confirmRejectClaim = async () => {
+  if (!rejectingClaim.value || !rejectReason.value.trim()) return
+  
+  submitting.value = true
   try {
-    const res = await axios.post(`/api/item/claim/${claimId}/audit`, { status })
+    const res = await axios.post(`/api/item/claim/${rejectingClaim.value.claimId}/audit`, {
+      status: 2, // 驳回
+      rejectReason: rejectReason.value.trim()
+    })
     
     if (res.data.code === 200) {
       // 刷新认领列表和物品列表
       await viewClaims(claimsItem.value)
       await loadItemList()
+      closeClaimRejectModal()
     }
   } catch (error) {
-    console.error('审核认领申请失败:', error)
+    console.error('驳回认领申请失败:', error)
     alert('操作失败，请重试')
+  } finally {
+    submitting.value = false
   }
 }
 
@@ -2174,6 +2283,54 @@ onMounted(() => {
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
 }
 
+/* 认领驳回弹窗 */
+.claim-reject-modal {
+  background: white;
+  border-radius: 20px;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.reject-claim-info {
+  background: rgba(166, 124, 82, 0.1);
+  padding: 15px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+
+.reject-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.reason-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.reason-btn {
+  padding: 8px 16px;
+  border: 1.6px solid rgba(166, 124, 82, 0.4);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.4);
+  font-family: "Comic Sans MS", cursive;
+  font-size: 13px;
+  color: #a67c52;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.reason-btn:hover,
+.reason-btn.active {
+  border-color: #f44336;
+  background: linear-gradient(to right, #f44336, #ef5350);
+  color: white;
+}
+
 .confirm-content {
   text-align: center;
   padding: 20px;
@@ -2427,6 +2584,97 @@ onMounted(() => {
 
 .preview-close:hover {
   background: rgba(255, 255, 255, 0.3);
+}
+
+/* 驳回弹窗 */
+.reject-modal {
+  background: white;
+  border-radius: 20px;
+  width: 90%;
+  max-width: 450px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.reject-content {
+  padding: 10px;
+}
+
+.reject-item-name {
+  font-family: "Comic Sans MS", cursive;
+  font-size: 16px;
+  color: #a67c52;
+  font-weight: 600;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-label {
+  font-family: "Comic Sans MS", cursive;
+  font-size: 14px;
+  color: #a67c52;
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.required {
+  color: #ff4d4f;
+}
+
+.reason-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.reason-tag {
+  padding: 6px 12px;
+  border: 1px solid rgba(166, 124, 82, 0.3);
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.5);
+  font-family: "Comic Sans MS", cursive;
+  font-size: 12px;
+  color: rgba(166, 124, 82, 0.8);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.reason-tag:hover {
+  border-color: #f38181;
+  color: #f38181;
+  background: rgba(243, 129, 129, 0.1);
+}
+
+.reject-btn {
+  background: linear-gradient(to right, #f44336, #ef5350);
+  color: white;
+}
+
+.reject-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 加载动画小尺寸 */
+.loading-spinner-small {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  display: inline-block;
+  margin-right: 5px;
+  vertical-align: middle;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 /* 响应式设计 */
