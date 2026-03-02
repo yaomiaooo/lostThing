@@ -78,6 +78,7 @@
               'active': activeConversationId === conversation.conversationId 
             }"
             @click="openConversation(conversation)"
+            @contextmenu.prevent="handleConversationRightClick($event, conversation)"
           >
             <div class="conversation-avatar">
               <div class="avatar-placeholder">
@@ -138,6 +139,27 @@
             <div class="no-more-text">没有更多会话了</div>
           </div>
         </div>
+        
+        <!-- 会话右击菜单 -->
+        <div 
+          v-if="conversationContextMenu.visible" 
+          class="context-menu"
+          :style="{ 
+            left: conversationContextMenu.x + 'px', 
+            top: conversationContextMenu.y + 'px' 
+          }"
+          @click.stop
+        >
+          <div class="menu-item" @click="deleteSelectedConversation">
+            <span class="menu-icon">🗑️</span>
+            <span>删除此会话</span>
+          </div>
+          <div class="menu-divider"></div>
+          <div class="menu-item" @click="closeConversationContextMenu">
+            <span class="menu-icon">✕</span>
+            <span>取消</span>
+          </div>
+        </div>
       </main>
     </div>
 
@@ -168,6 +190,7 @@ import {
 } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
+import { ElMessage } from 'element-plus'
 import DetailMessagesView from './DetailMessagesView.vue'
 import Navigation from './navigation.vue'
 import {
@@ -191,6 +214,14 @@ const currentPage = ref(1)
 const pageSize = 20
 const activeConversationId = ref<number | null>(null)
 const isMessagesPageActive = ref(false)
+
+// ==================== 会话右击菜单状态 ====================
+const conversationContextMenu = reactive({
+  visible: false,
+  x: 0,
+  y: 0,
+  selectedConversation: null as any
+})
 
 // ==================== 聊天对话框状态 ====================
 const chatDialogVisible = ref(false)
@@ -258,6 +289,78 @@ const stats = computed(() => {
 
   return { total, unread, active }
 })
+
+// ==================== 会话右击菜单处理 ====================
+const handleConversationRightClick = (event: MouseEvent, conversation: any) => {
+  console.log('右击会话:', conversation)
+  
+  conversationContextMenu.visible = true
+  conversationContextMenu.x = event.clientX
+  conversationContextMenu.y = event.clientY
+  conversationContextMenu.selectedConversation = conversation
+  
+  console.log('显示会话右击菜单，位置:', conversationContextMenu.x, conversationContextMenu.y)
+}
+
+const closeConversationContextMenu = () => {
+  conversationContextMenu.visible = false
+  conversationContextMenu.selectedConversation = null
+}
+
+const deleteSelectedConversation = async () => {
+  if (!conversationContextMenu.selectedConversation) {
+    closeConversationContextMenu()
+    return
+  }
+  
+  try {
+    const confirmed = window.confirm('确定要删除这个会话吗？此操作将删除所有相关消息且不可撤销。')
+    if (!confirmed) {
+      closeConversationContextMenu()
+      return
+    }
+    
+    const conversationId = conversationContextMenu.selectedConversation.conversationId
+    if (!conversationId) {
+      ElMessage.error('无法确定会话ID')
+      closeConversationContextMenu()
+      return
+    }
+    
+    // 先从前端移除会话
+    const index = conversations.value.findIndex(c => c.conversationId === conversationId)
+    if (index !== -1) {
+      conversations.value.splice(index, 1)
+    }
+    
+    // 如果删除的是当前打开的会话，关闭聊天对话框
+    if (chatDialogVisible.value && currentConversationId.value === conversationId) {
+      chatDialogVisible.value = false
+      currentConversationId.value = undefined
+    }
+    
+    // 调用删除接口
+    try {
+      const res = await axios.post('/api/chat/conversation/delete', {
+        conversationId: conversationId
+      })
+      
+      if (res.data.code === 0) {
+        ElMessage.success('会话删除成功')
+      } else {
+        ElMessage.warning(res.data.msg || '删除请求已提交')
+      }
+    } catch (apiError) {
+      console.error('API调用失败:', apiError)
+      ElMessage.warning('删除请求已提交')
+    }
+  } catch (error) {
+    console.error('删除会话失败:', error)
+    ElMessage.error('删除失败')
+  } finally {
+    closeConversationContextMenu()
+  }
+}
 
 // ==================== 导航函数 ====================
 const goHome = () => router.push('/home')
@@ -603,6 +706,7 @@ onMounted(async () => {
 
   window.addEventListener('unread-count-changed', handleUnreadCountChanged as EventListener)
   window.addEventListener('storage', handleStorageChange as EventListener)
+  window.addEventListener('click', closeConversationContextMenu)
 })
 
 const handleUnreadCountChanged = (event: CustomEvent) => {
@@ -642,11 +746,60 @@ onUnmounted(() => {
   isMessagesPageActive.value = false
   window.removeEventListener('unread-count-changed', handleUnreadCountChanged as EventListener)
   window.removeEventListener('storage', handleStorageChange as EventListener)
+  window.removeEventListener('click', closeConversationContextMenu)
 })
 </script>
 
 <style scoped>
 /* 样式部分保持不变，添加导航栏红点样式 */
+/* 会话右击菜单样式 */
+.context-menu {
+  position: fixed;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  min-width: 160px;
+  padding: 8px 0;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #334155;
+  transition: background-color 0.2s;
+}
+
+.menu-item:hover {
+  background-color: #f1f5f9;
+}
+
+.menu-icon {
+  margin-right: 8px;
+  font-size: 16px;
+}
+
+.menu-divider {
+  height: 1px;
+  background-color: #e2e8f0;
+  margin: 8px 0;
+}
+
+/* 会话项添加悬停效果 */
+.conversation-item {
+  position: relative;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.conversation-item:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
 .nav-badge {
   position: absolute;
   top: 8px;

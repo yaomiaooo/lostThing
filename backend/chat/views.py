@@ -516,8 +516,96 @@ def get_my_conversations(request):
     return JsonResponse({
         "code": 0,
         "msg": "success",
-        "data": result
-    })
+        "data": result})
+
+
+
+@csrf_exempt
+def delete_conversation(request):
+    """
+    删除会话（包括所有相关消息）
+    
+    POST /api/chat/conversation/delete
+    {
+        "conversationId": 1
+    }
+    """
+    
+    # 1. 仅支持 POST
+    if request.method != 'POST':
+        return JsonResponse({
+            "code": 1,
+            "msg": "只支持 POST 请求",
+            "data": None
+        })
+    
+    # 2. 登录校验
+    user_id = request.session.get('user_id')
+    if not user_id:
+        return JsonResponse({
+            "code": 401,
+            "msg": "未登录",
+            "data": None
+        })
+    
+    try:
+        body = json.loads(request.body.decode('utf-8'))
+        conversation_id = body.get('conversationId')
+        
+        if not conversation_id:
+            return JsonResponse({
+                "code": 1,
+                "msg": "缺少 conversationId 参数",
+                "data": None
+            })
+        
+        # 3. 验证会话存在且用户有权访问
+        try:
+            conversation = Conversation.objects.get(id=conversation_id)
+        except Conversation.DoesNotExist:
+            return JsonResponse({
+                "code": 1,
+                "msg": "会话不存在",
+                "data": None
+            })
+        
+        # 检查权限：必须是会话参与者
+        if user_id not in [conversation.owner_id, conversation.finder_id]:
+            return JsonResponse({
+                "code": 403,
+                "msg": "无权删除该会话",
+                "data": None
+            })
+        
+        # 4. 执行删除操作（使用事务确保数据一致性）
+        with transaction.atomic():
+            # 先删除所有相关消息
+            messages_deleted = Message.objects.filter(conversation=conversation).delete()[0]
+            
+            # 再删除会话
+            conversation.delete()
+        
+        return JsonResponse({
+            "code": 0,
+            "msg": "会话删除成功",
+            "data": {
+                "conversationId": conversation_id,
+                "messagesDeleted": messages_deleted
+            }
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({
+            "code": 1,
+            "msg": "请求体不是合法 JSON",
+            "data": None
+        })
+    except Exception as e:
+        return JsonResponse({
+            "code": 1,
+            "msg": f"删除失败: {str(e)}",
+            "data": None
+        })
 
 
 @csrf_exempt

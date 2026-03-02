@@ -16,4 +16,6 @@ urlpatterns = [
     path('/conversation/messages/delete', views.delete_messages, name='delete_messages'),
     # 6.5.7 获取用户未读消息计数
     path('/unread-count', views.get_unread_count, name='get_unread_count'),
+    # 6.5.8 删除会话
+    path('/conversation/delete', views.delete_conversation, name='delete_conversation'),
 ]
