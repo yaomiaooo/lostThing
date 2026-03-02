@@ -42,7 +42,7 @@
               <div class="stat-value">{{ overview.claimed }}</div>
               <div class="stat-label">已认领</div>
             </div>
-            <div class="stat-card danger" @click="quickFilter('archived')">
+            <div class="stat-card danger" @click="quickFilter('7')">
               <div class="stat-icon">📁</div>
               <div class="stat-value">{{ overview.archived }}</div>
               <div class="stat-label">已归档</div>
