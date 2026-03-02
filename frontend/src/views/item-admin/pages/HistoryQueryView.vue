@@ -278,51 +278,70 @@ const changeDateRange = (range: string) => {
   currentRange.value = range
   if (range === 'custom') return
 
-  const today = new Date()
-  const todayStr = today.toISOString().split('T')[0]
-  const tomorrow = new Date(today)
-  tomorrow.setDate(today.getDate() + 1)
-  const tomorrowStr = tomorrow.toISOString().split('T')[0]
+  const now = new Date()
+  // 创建新的日期对象，避免修改原对象
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  
+  const formatDateTime = (date: Date, isEnd: boolean = false) => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    // 结束时间需要包含整天，设为 23:59:59
+    const time = isEnd ? '23:59:59' : '00:00:00'
+    return `${year}-${month}-${day} ${time}`
+  }
 
   if (range === 'today') {
-    // 查询今天到明天凌晨，确保包含今天的所有记录
-    filterParams.startDate = todayStr
-    filterParams.endDate = tomorrowStr
+    // 今日：00:00:00 到 23:59:59
+    filterParams.startDate = formatDateTime(today, false)
+    filterParams.endDate = formatDateTime(today, true)
   } else if (range === 'week') {
+    // 本周（最近7天）：6天前 00:00:00 到 今天 23:59:59
     const start = new Date(today)
-    start.setDate(today.getDate() - 7)
-    filterParams.startDate = start.toISOString().split('T')[0]
-    filterParams.endDate = tomorrowStr
+    start.setDate(today.getDate() - 6)
+    filterParams.startDate = formatDateTime(start, false)
+    filterParams.endDate = formatDateTime(today, true)
   } else if (range === 'month') {
+    // 本月（最近30天）：29天前 00:00:00 到 今天 23:59:59
     const start = new Date(today)
-    start.setMonth(today.getMonth() - 1)
-    filterParams.startDate = start.toISOString().split('T')[0]
-    filterParams.endDate = tomorrowStr
+    start.setDate(today.getDate() - 29)
+    filterParams.startDate = formatDateTime(start, false)
+    filterParams.endDate = formatDateTime(today, true)
   }
   loadHistory(1)
 }
 
+// 自定义日期范围也需要修复
 const applyCustomRange = () => {
   if (customStartDate.value && customEndDate.value) {
-    filterParams.startDate = customStartDate.value
-    filterParams.endDate = customEndDate.value
+    // 开始日期 00:00:00，结束日期 23:59:59
+    filterParams.startDate = `${customStartDate.value} 00:00:00`
+    filterParams.endDate = `${customEndDate.value} 23:59:59`
     loadHistory(1)
   }
 }
 
+// 重置时也要用完整时间格式
 const resetFilters = () => {
   filterParams.status = ''
   filterParams.itemCategory = ''
   filterParams.keyword = ''
   currentRange.value = 'today'
-  const today = new Date().toISOString().split('T')[0]
-  const tomorrow = new Date()
-  tomorrow.setDate(tomorrow.getDate() + 1)
-  const tomorrowStr = tomorrow.toISOString().split('T')[0]
   
-  // 查询今天到明天凌晨，确保包含今天的所有记录
-  filterParams.startDate = today
-  filterParams.endDate = tomorrowStr
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const formatDate = (date: Date) => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+  
+  const todayStr = formatDate(today)
+  customStartDate.value = todayStr
+  customEndDate.value = todayStr
+  filterParams.startDate = `${todayStr} 00:00:00`
+  filterParams.endDate = `${todayStr} 23:59:59`
   loadHistory(1)
 }
 
@@ -481,17 +500,20 @@ const handleLogout = () => {
 
 /* ================= 生命周期 ================= */
 onMounted(() => {
-  // 初始化日期为今日（包含完整时间段）
-  const today = new Date()
-  const todayStr = today.toISOString().split('T')[0]
-  const tomorrow = new Date(today)
-  tomorrow.setDate(today.getDate() + 1)
-  const tomorrowStr = tomorrow.toISOString().split('T')[0]
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const formatDate = (date: Date) => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
   
+  const todayStr = formatDate(today)
   customStartDate.value = todayStr
-  customEndDate.value = tomorrowStr
-  filterParams.startDate = todayStr
-  filterParams.endDate = tomorrowStr
+  customEndDate.value = todayStr
+  filterParams.startDate = `${todayStr} 00:00:00`
+  filterParams.endDate = `${todayStr} 23:59:59`
   loadHistory()
 })
 </script>
