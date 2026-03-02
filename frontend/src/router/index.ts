@@ -19,6 +19,16 @@ const routes: Array<RouteRecordRaw> = [
     }
   },
   {
+    path: '/notice',
+    name: 'UserNotice',
+    component: () => import('../views/home/UserNoticeView.vue'),
+    meta: {
+      requiresAuth: true,
+      title: '公告',
+      allowedRoles: [1, 2]  // 学生、老师
+    }
+  },
+  {
     path: '/home',
     name: 'Home',
     component: () => import('../views/home/HomeView.vue'),
@@ -268,6 +278,13 @@ router.beforeEach((to, from, next) => {
       return
     }
 
+    // 普通用户登录后先检查是否已阅读公告
+    const hasReadNotices = sessionStorage.getItem('hasReadNotices')
+    if ((userRole === 1 || userRole === 2) && to.path !== '/notice' && !hasReadNotices) {
+      next('/notice')
+      return
+    }
+
     // 检查角色权限
     if (to.meta.allowedRoles) {
       const allowedRoles = to.meta.allowedRoles as number[]
@@ -295,7 +312,8 @@ router.beforeEach((to, from, next) => {
     if (userId && role) {
       // 已登录，根据角色跳转
       if (userRole === 1 || userRole === 2) {
-        next('/home')
+        const hasReadNotices = sessionStorage.getItem('hasReadNotices')
+        next(hasReadNotices ? '/home' : '/notice')
       } else if (userRole === 3 || userRole === 4) {
         next('/item-admin/notices')
       } else if (userRole === 5) {

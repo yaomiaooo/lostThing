@@ -105,6 +105,11 @@ const hasCustomContent = computed(() => props.customContent)
 // 导航项配置
 const navItems = ref<NavItem[]>([
   {
+    name: '公告',
+    icon: '/home/消息.svg',
+    handler: () => router.push('/notice')
+  },
+  {
     name: '发现',
     icon: '/home/发现.svg',
     handler: () => router.push('/home')
