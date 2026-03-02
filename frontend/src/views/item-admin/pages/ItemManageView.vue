@@ -202,6 +202,13 @@
                   <td class="col-actions">
                     <div class="action-btns">
                       <button class="action-btn view-btn" @click="viewDetail(item)">查看</button>
+                      <!-- 新增编辑按钮：所有状态都可以编辑 -->
+                      <button 
+                        class="action-btn edit-btn"
+                        @click="openEditModal(item)"
+                      >
+                        编辑
+                      </button>
                       <button 
                         v-if="item.currentStatus === 2 || item.currentStatus === 3"
                         class="action-btn status-btn"
@@ -334,6 +341,333 @@
         </div>
         <div class="modal-footer">
           <button class="modal-btn cancel-btn" @click="closeDetailModal">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 新增：编辑物品弹窗 ==================== -->
+    <div v-if="showEditModal" class="modal-overlay" @click.self="closeEditModal">
+      <div class="edit-modal">
+        <div class="modal-header">
+          <h3 class="modal-title">编辑物品信息</h3>
+          <button class="modal-close" @click="closeEditModal">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="edit-content" v-if="editingItem">
+            <!-- 左侧：图片管理 -->
+            <div class="edit-left-column">
+              <div class="edit-section">
+                <div class="section-header">
+                  <h4 class="section-title">物品图片</h4>
+                  <span class="section-subtitle">（最多5张，拖拽排序）</span>
+                </div>
+                
+                <!-- 图片上传区域 -->
+                <div 
+                  class="upload-area"
+                  :class="{ 'drag-over': dragOver }"
+                  @click="triggerFileInput"
+                  @dragover.prevent="handleDragOver"
+                  @dragleave.prevent="handleDragLeave"
+                  @drop.prevent="handleDrop"
+                >
+                  <div class="upload-icon">📷</div>
+                  <p class="upload-text">点击或拖拽上传图片</p>
+                  <p class="upload-hint">支持 JPG/PNG，单张不超过5MB</p>
+                </div>
+                <input
+                  ref="fileInput"
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  class="file-input"
+                  @change="handleFileSelect"
+                />
+
+                <!-- 图片预览区 -->
+                <div v-if="editImages.length > 0" class="edit-image-grid">
+                  <div 
+                    v-for="(image, index) in editImages"
+                    :key="index"
+                    class="edit-grid-item"
+                    draggable="true"
+                    @dragstart="handleDragStart(index)"
+                    @dragover.prevent
+                    @drop="handleDropSort(index)"
+                  >
+                    <img :src="image.previewUrl" class="edit-grid-image" />
+                    <div class="edit-grid-overlay">
+                      <button 
+                        type="button"
+                        class="edit-grid-delete-btn"
+                        @click.stop="removeEditImage(index)"
+                      >
+                        ×
+                      </button>
+                      <div class="edit-grid-sort">↕</div>
+                    </div>
+                    <div class="edit-grid-index">{{ index + 1 }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 右侧：表单信息 -->
+            <div class="edit-right-column">
+              <!-- 基本信息 -->
+              <div class="edit-section">
+                <div class="section-header">
+                  <h4 class="section-title">基本信息</h4>
+                </div>
+                
+                <!-- 物品名称 -->
+                <div class="edit-form-row">
+                  <label class="edit-label">物品名称 <span class="required">*</span></label>
+                  <input 
+                    v-model="editForm.name" 
+                    type="text" 
+                    class="edit-input"
+                    placeholder="请输入物品名称"
+                    maxlength="50"
+                  />
+                </div>
+
+                <!-- 发布类型 -->
+                <div class="edit-form-row">
+                  <label class="edit-label">发布类型</label>
+                  <div class="edit-type-display">
+                    <span class="type-badge" :class="editForm.itemCategory === 1 ? 'lost-badge' : 'found-badge'">
+                      {{ editForm.itemCategory === 1 ? '失物寻找' : '招领启事' }}
+                    </span>
+                    <span class="type-hint">（类型不可修改）</span>
+                  </div>
+                </div>
+
+                <!-- 物品分类 -->
+                <div class="edit-form-row">
+                  <label class="edit-label">物品分类 <span class="required">*</span></label>
+                  <div class="edit-cascader">
+                    <div class="cascader-level">
+                      <label class="cascader-label">一级分类</label>
+                      <select 
+                        v-model="editSelectedFirstCategory"
+                        class="edit-select"
+                        @change="onEditFirstCategoryChange"
+                      >
+                        <option 
+                          v-for="cat in firstCategories" 
+                          :key="cat.id"
+                          :value="cat.id"
+                        >
+                          {{ cat.name }}
+                        </option>
+                      </select>
+                    </div>
+                    <div class="cascader-level">
+                      <label class="cascader-label">二级分类</label>
+                      <select 
+                        v-model="editSelectedSecondCategory"
+                        class="edit-select"
+                        @change="onEditSecondCategoryChange"
+                      >
+                        <option 
+                          v-for="cat in secondCategories" 
+                          :key="cat.id"
+                          :value="cat.id"
+                        >
+                          {{ cat.name }}
+                        </option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 地点信息 -->
+              <div class="edit-section">
+                <div class="section-header">
+                  <h4 class="section-title">地点信息</h4>
+                </div>
+                
+                <div class="edit-form-row">
+                  <label class="edit-label">所在校区/地点 <span class="required">*</span></label>
+                  <div class="edit-cascader location-cascader">
+                    <div class="cascader-level">
+                      <label class="cascader-label">校区</label>
+                      <select 
+                        v-model="editSelectedCampus"
+                        class="edit-select"
+                        @change="onEditCampusChange"
+                      >
+                        <option 
+                          v-for="campus in campuses" 
+                          :key="campus.id"
+                          :value="campus.id"
+                        >
+                          {{ campus.name }}
+                        </option>
+                      </select>
+                    </div>
+                    <div class="cascader-level">
+                      <label class="cascader-label">区域</label>
+                      <select 
+                        v-model="editSelectedArea"
+                        class="edit-select"
+                        @change="onEditAreaChange"
+                      >
+                        <option 
+                          v-for="area in areas" 
+                          :key="area.id"
+                          :value="area.id"
+                        >
+                          {{ area.name }}
+                        </option>
+                      </select>
+                    </div>
+                    <div class="cascader-level">
+                      <label class="cascader-label">具体地点</label>
+                      <select 
+                        v-model="editSelectedLocation"
+                        class="edit-select"
+                        @change="onEditLocationChange"
+                      >
+                        <option 
+                          v-for="location in locations" 
+                          :key="location.id"
+                          :value="location.id"
+                        >
+                          {{ location.name }}
+                        </option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="edit-form-row">
+                  <label class="edit-label">位置补充</label>
+                  <input 
+                    v-model="editForm.locationDetail" 
+                    type="text" 
+                    class="edit-input"
+                    placeholder="如：三楼自习区、操场跑道内侧"
+                    maxlength="255"
+                  />
+                </div>
+
+                <!-- 领取地点（仅招领） -->
+                <div class="edit-form-row" v-if="editForm.itemCategory === 2">
+                  <label class="edit-label">领取地点</label>
+                  <input 
+                    v-model="editForm.pickupLocation" 
+                    type="text" 
+                    class="edit-input"
+                    placeholder="如：保卫处值班室"
+                    maxlength="255"
+                  />
+                </div>
+              </div>
+
+              <!-- 时间与悬赏 -->
+              <div class="edit-section">
+                <div class="section-header">
+                  <h4 class="section-title">时间与悬赏</h4>
+                </div>
+                
+                <div class="edit-form-row">
+                  <label class="edit-label">{{ editForm.itemCategory === 1 ? '丢失时间' : '发现时间' }} <span class="required">*</span></label>
+                  <input 
+                    v-model="editForm.happenTime" 
+                    type="datetime-local" 
+                    class="edit-input datetime-input"
+                  />
+                </div>
+
+                <!-- 悬赏金额（仅失物） -->
+                <template v-if="editForm.itemCategory === 1">
+                  <div class="edit-form-row">
+                    <label class="edit-label">悬赏金额（元）</label>
+                    <div class="currency-input">
+                      <span class="currency-symbol">¥</span>
+                      <input 
+                        v-model="editForm.rewardAmount" 
+                        type="number" 
+                        class="edit-input reward-input"
+                        placeholder="0.00"
+                        min="0"
+                        max="999999.99"
+                        step="0.01"
+                      />
+                    </div>
+                  </div>
+                  <div class="edit-form-row">
+                    <label class="edit-label">悬赏说明</label>
+                    <input 
+                      v-model="editForm.rewardDesc" 
+                      type="text" 
+                      class="edit-input"
+                      placeholder="如：找到必有重谢"
+                      maxlength="200"
+                    />
+                  </div>
+                </template>
+              </div>
+
+              <!-- 特征描述 -->
+              <div class="edit-section">
+                <div class="section-header">
+                  <h4 class="section-title">特征描述</h4>
+                </div>
+                <div class="edit-form-row">
+                  <textarea 
+                    v-model="editForm.feature" 
+                    class="edit-textarea"
+                    placeholder="请详细描述物品特征，如：颜色、大小、品牌、磨损情况等"
+                    rows="4"
+                    maxlength="1000"
+                  ></textarea>
+                  <div class="char-counter">{{ editForm.feature.length }}/1000</div>
+                </div>
+              </div>
+
+              <!-- 联系方式 -->
+              <div class="edit-section">
+                <div class="section-header">
+                  <h4 class="section-title">联系方式</h4>
+                </div>
+                <div class="edit-form-row">
+                  <label class="edit-label">联系人 <span class="required">*</span></label>
+                  <input 
+                    v-model="editForm.contactName" 
+                    type="text" 
+                    class="edit-input"
+                    placeholder="联系人姓名"
+                    maxlength="20"
+                  />
+                </div>
+                <div class="edit-form-row">
+                  <label class="edit-label">联系电话 <span class="required">*</span></label>
+                  <input 
+                    v-model="editForm.contactPhone" 
+                    type="tel" 
+                    class="edit-input"
+                    placeholder="11位手机号"
+                    maxlength="11"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="modal-btn cancel-btn" @click="closeEditModal">取消</button>
+          <button 
+            class="modal-btn confirm-btn" 
+            :disabled="editSubmitting"
+            @click="confirmEdit"
+          >
+            <span v-if="editSubmitting" class="loading-spinner-small"></span>
+            <span v-else>保存修改</span>
+          </button>
         </div>
       </div>
     </div>
@@ -625,7 +959,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import AdminNavigation from '../components/AdminNavigation.vue'
@@ -680,6 +1014,8 @@ const showClaimsModal = ref(false)
 const showUnclaimedModal = ref(false)
 const showDeleteModal = ref(false)
 const showClaimRejectModal = ref(false)
+// 新增编辑弹窗状态
+const showEditModal = ref(false)
 
 const currentItem = ref<any>(null)
 const currentItemImages = ref<string[]>([])
@@ -724,6 +1060,592 @@ const commonRejectReasons = [
 
 /* ================= 图片预览 ================= */
 const previewImageUrl = ref('')
+
+/* ================= 编辑功能相关状态 ================= */
+const editingItem = ref<any>(null)
+const editSubmitting = ref(false)
+const editForm = reactive({
+  itemCategory: 1,
+  itemType: 0,
+  name: '',
+  locationId: 0,
+  locationDetail: '',
+  pickupLocation: '',
+  happenTime: '',
+  feature: '',
+  rewardAmount: 0,
+  rewardDesc: '',
+  contactName: '',
+  contactPhone: ''
+})
+
+// 编辑弹窗中的级联选择器状态
+const editSelectedFirstCategory = ref<number>(0)
+const editSelectedSecondCategory = ref<number>(0)
+const editSelectedCampus = ref<number>(0)
+const editSelectedArea = ref<number>(0)
+const editSelectedLocation = ref<number>(0)
+
+// 分类和地点树数据
+const categoryTree = ref<any[]>([])
+const locationTree = ref<any[]>([])
+
+// 计算属性：级联选择器选项
+const firstCategories = computed(() => categoryTree.value)
+const secondCategories = computed(() => {
+  if (!editSelectedFirstCategory.value) return []
+  const selectedFirst = categoryTree.value.find(cat => cat.id === editSelectedFirstCategory.value)
+  return selectedFirst?.children || []
+})
+
+const campuses = computed(() => locationTree.value)
+const areas = computed(() => {
+  if (!editSelectedCampus.value) return []
+  const selectedCampusNode = locationTree.value.find(loc => loc.id === editSelectedCampus.value)
+  return selectedCampusNode?.children || []
+})
+const locations = computed(() => {
+  if (!editSelectedArea.value) return []
+  for (const campus of locationTree.value) {
+    if (campus.children) {
+      const selectedAreaNode = campus.children.find((area: any) => area.id === editSelectedArea.value)
+      if (selectedAreaNode) {
+        return selectedAreaNode.children || []
+      }
+    }
+  }
+  return []
+})
+
+// 编辑弹窗中的图片管理
+const fileInput = ref<HTMLInputElement>()
+const editImages = ref<Array<{ 
+  file?: File;
+  previewUrl: string;
+  isOriginal?: boolean;
+  originalId?: number;
+}>>([])
+const dragOver = ref(false)
+const draggedImageIndex = ref<number | null>(null)
+
+/* ================= 加载分类和地点树 ================= */
+const loadCategoryTree = async () => {
+  try {
+    const res = await axios.get('/api/item/category/tree')
+    if (res.data.code === 200 && Array.isArray(res.data.data)) {
+      categoryTree.value = res.data.data
+    } else {
+      // 使用默认数据
+      categoryTree.value = [
+        {
+          id: 1,
+          name: '证件',
+          children: [
+            { id: 101, name: '校园卡' },
+            { id: 102, name: '身份证' },
+            { id: 103, name: '学生证' },
+            { id: 104, name: '银行卡' }
+          ]
+        },
+        {
+          id: 2,
+          name: '电子设备',
+          children: [
+            { id: 201, name: '手机' },
+            { id: 202, name: '耳机' },
+            { id: 203, name: '平板电脑' },
+            { id: 204, name: '充电宝' },
+            { id: 205, name: '电脑' }
+          ]
+        },
+        {
+          id: 3,
+          name: '日用品',
+          children: [
+            { id: 301, name: '水杯' },
+            { id: 302, name: '雨伞' },
+            { id: 303, name: '衣物' },
+            { id: 304, name: '钥匙' }
+          ]
+        },
+        {
+          id: 4,
+          name: '学习用品',
+          children: [
+            { id: 401, name: '书本' },
+            { id: 402, name: '笔记本' },
+            { id: 403, name: '文具' }
+          ]
+        },
+        {
+          id: 5,
+          name: '其他',
+          children: [
+            { id: 501, name: '其他物品' }
+          ]
+        }
+      ]
+    }
+  } catch (error) {
+    console.error('加载分类树失败:', error)
+    categoryTree.value = []
+  }
+}
+
+const loadLocationTree = async () => {
+  try {
+    const res = await axios.get('/api/item/location/tree')
+    if (res.data.code === 200 && Array.isArray(res.data.data)) {
+      locationTree.value = res.data.data
+    } else {
+      // 使用默认数据
+      locationTree.value = [
+        {
+          id: 1,
+          name: '朝晖校区',
+          children: [
+            {
+              id: 101,
+              name: '教学楼',
+              children: [
+                { id: 10101, name: '文荟楼' },
+                { id: 10102, name: '文萃楼' },
+                { id: 10103, name: '文荟楼' }
+              ]
+            },
+            {
+              id: 102,
+              name: '图书馆',
+              children: [
+                { id: 10201, name: '朝晖图书馆' }
+              ]
+            }
+          ]
+        },
+        {
+          id: 2,
+          name: '屏峰校区',
+          children: [
+            {
+              id: 201,
+              name: '教学楼',
+              children: [
+                { id: 20101, name: '健行楼 A 楼' },
+                { id: 20102, name: '健行楼 B 楼' },
+                { id: 20103, name: '广知楼' }
+              ]
+            },
+            {
+              id: 202,
+              name: '图书馆',
+              children: [
+                { id: 20201, name: '屏峰图书馆' }
+              ]
+            }
+          ]
+        },
+        {
+          id: 3,
+          name: '莫干山校区',
+          children: [
+            {
+              id: 301,
+              name: '教学楼',
+              children: [
+                { id: 30101, name: '教学楼 A' },
+                { id: 30102, name: '教学楼 B' }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  } catch (error) {
+    console.error('加载地点树失败:', error)
+    locationTree.value = []
+  }
+}
+
+/* ================= 编辑弹窗级联选择器事件 ================= */
+const onEditFirstCategoryChange = () => {
+  editSelectedSecondCategory.value = 0
+  editForm.itemType = 0
+}
+
+const onEditSecondCategoryChange = () => {
+  if (editSelectedSecondCategory.value) {
+    editForm.itemType = editSelectedSecondCategory.value
+  }
+}
+
+const onEditCampusChange = () => {
+  editSelectedArea.value = 0
+  editSelectedLocation.value = 0
+  editForm.locationId = 0
+}
+
+const onEditAreaChange = () => {
+  editSelectedLocation.value = 0
+  editForm.locationId = 0
+}
+
+const onEditLocationChange = () => {
+  if (editSelectedLocation.value) {
+    editForm.locationId = editSelectedLocation.value
+  }
+}
+
+/* ================= 编辑弹窗图片管理 ================= */
+const triggerFileInput = () => {
+  fileInput.value?.click()
+}
+
+const handleDragOver = (event: DragEvent) => {
+  event.preventDefault()
+  dragOver.value = true
+}
+
+const handleDragLeave = (event: DragEvent) => {
+  event.preventDefault()
+  dragOver.value = false
+}
+
+const handleDrop = (event: DragEvent) => {
+  event.preventDefault()
+  dragOver.value = false
+  
+  const files = event.dataTransfer?.files
+  if (files) {
+    handleEditFiles(Array.from(files))
+  }
+}
+
+const handleFileSelect = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  const files = target.files
+  if (!files) return
+  
+  handleEditFiles(Array.from(files))
+  target.value = ''
+}
+
+const handleEditFiles = (fileList: File[]) => {
+  const remainingSlots = 5 - editImages.value.length
+  if (remainingSlots <= 0) {
+    alert('最多只能上传5张图片')
+    return
+  }
+  
+  const validFiles = fileList.slice(0, remainingSlots)
+  
+  validFiles.forEach(file => {
+    if (!file.type.startsWith('image/')) {
+      alert('只能上传图片文件')
+      return
+    }
+    
+    if (file.size > 5 * 1024 * 1024) {
+      alert('图片大小不能超过5MB')
+      return
+    }
+    
+    const previewUrl = URL.createObjectURL(file)
+    editImages.value.push({ 
+      file: file, 
+      previewUrl: previewUrl,
+      isOriginal: false
+    })
+  })
+}
+
+const removeEditImage = (index: number) => {
+  // 释放新图片的URL
+  if (!editImages.value[index].isOriginal) {
+    URL.revokeObjectURL(editImages.value[index].previewUrl)
+  }
+  
+  editImages.value.splice(index, 1)
+}
+
+const handleDragStart = (index: number) => {
+  draggedImageIndex.value = index
+}
+
+const handleDropSort = (dropIndex: number) => {
+  if (draggedImageIndex.value === null || draggedImageIndex.value === dropIndex) return
+  
+  const temp = editImages.value[draggedImageIndex.value]
+  editImages.value.splice(draggedImageIndex.value, 1)
+  editImages.value.splice(dropIndex, 0, temp)
+  
+  draggedImageIndex.value = null
+}
+
+/* ================= 编辑功能核心方法 ================= */
+const openEditModal = async (item: any) => {
+  // 确保树数据已加载
+  if (categoryTree.value.length === 0) await loadCategoryTree()
+  if (locationTree.value.length === 0) await loadLocationTree()
+  
+  editingItem.value = item
+  
+  // 填充表单数据
+  editForm.itemCategory = item.itemCategory
+  editForm.itemType = item.itemType
+  editForm.name = item.name
+  editForm.locationId = item.locationId
+  editForm.locationDetail = item.locationDetail || ''
+  editForm.pickupLocation = item.pickupLocation || ''
+  
+  // 格式化时间
+  if (item.happenTime) {
+    let timeStr = item.happenTime
+    if (timeStr.includes(' ')) {
+      timeStr = timeStr.replace(' ', 'T')
+    }
+    // 确保格式为 YYYY-MM-DDTHH:mm
+    if (timeStr.includes(':')) {
+      const parts = timeStr.split(':')
+      if (parts.length >= 2) {
+        timeStr = `${parts[0]}:${parts[1]}`
+      }
+    }
+    editForm.happenTime = timeStr.substring(0, 16)
+  } else {
+    // 默认当前时间
+    const now = new Date()
+    editForm.happenTime = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}T${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+  }
+  
+  editForm.feature = item.feature || ''
+  editForm.rewardAmount = item.rewardAmount || 0
+  editForm.rewardDesc = item.rewardDesc || ''
+  editForm.contactName = item.contactName || ''
+  editForm.contactPhone = item.contactPhone || ''
+  
+  // 设置分类选择器
+  setupEditCategorySelectors(item.itemType)
+  
+  // 设置地点选择器
+  setupEditLocationSelectors(item.locationId)
+  
+  // 加载图片
+  await loadEditImages(item.itemId)
+  
+  showEditModal.value = true
+}
+
+const setupEditCategorySelectors = (itemType: number) => {
+  // 查找对应的分类
+  for (const firstCat of categoryTree.value) {
+    if (firstCat.children) {
+      for (const secondCat of firstCat.children) {
+        if (secondCat.id === itemType) {
+          editSelectedFirstCategory.value = firstCat.id
+          editSelectedSecondCategory.value = secondCat.id
+          return
+        }
+      }
+    }
+  }
+}
+
+const setupEditLocationSelectors = (locationId: number) => {
+  // 查找对应的地点层级
+  for (const campus of locationTree.value) {
+    if (campus.children) {
+      for (const area of campus.children) {
+        if (area.children) {
+          for (const location of area.children) {
+            if (location.id === locationId) {
+              editSelectedCampus.value = campus.id
+              editSelectedArea.value = area.id
+              editSelectedLocation.value = location.id
+              return
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+const loadEditImages = async (itemId: number) => {
+  try {
+    const res = await axios.get('/api/item/detail', {
+      params: { itemId: itemId }
+    })
+    
+    if (res.data.code === 200 && res.data.data.images) {
+      editImages.value = []
+      
+      for (const image of res.data.data.images) {
+        editImages.value.push({
+          previewUrl: image.url,
+          isOriginal: true,
+          originalId: image.id
+        })
+      }
+    } else {
+      editImages.value = []
+    }
+  } catch (error) {
+    console.error('加载图片失败:', error)
+    editImages.value = []
+  }
+}
+
+const closeEditModal = () => {
+  showEditModal.value = false
+  editingItem.value = null
+  
+  // 清理图片URL，避免内存泄漏
+  editImages.value.forEach(image => {
+    if (!image.isOriginal && image.previewUrl) {
+      URL.revokeObjectURL(image.previewUrl)
+    }
+  })
+  editImages.value = []
+  
+  // 重置表单状态
+  editSubmitting.value = false
+}
+
+const confirmEdit = async () => {
+  if (!editingItem.value) return
+  
+  // 表单验证...
+  if (!editForm.name.trim()) {
+    alert('请输入物品名称')
+    return
+  }
+  if (!editForm.itemType) {
+    alert('请选择物品分类')
+    return
+  }
+  if (!editForm.locationId) {
+    alert('请选择地点')
+    return
+  }
+  if (!editForm.happenTime) {
+    alert('请选择时间')
+    return
+  }
+  if (!editForm.feature.trim()) {
+    alert('请输入特征描述')
+    return
+  }
+  if (!editForm.contactName.trim()) {
+    alert('请输入联系人姓名')
+    return
+  }
+  if (!editForm.contactPhone.trim() || !/^1[3-9]\d{9}$/.test(editForm.contactPhone.trim())) {
+    alert('请输入有效的手机号码')
+    return
+  }
+  
+  editSubmitting.value = true
+  
+  try {
+    // 1. 更新物品信息
+    const submitData = {
+      name: editForm.name,
+      itemType: editForm.itemType,
+      locationId: editForm.locationId,
+      locationDetail: editForm.locationDetail,
+      pickupLocation: editForm.pickupLocation,
+      happenTime: editForm.happenTime.replace('T', ' ') + ':00',
+      feature: editForm.feature,
+      rewardAmount: editForm.itemCategory === 1 ? (editForm.rewardAmount || 0) : 0,
+      rewardDesc: editForm.itemCategory === 1 ? (editForm.rewardDesc || '') : '',
+      contactName: editForm.contactName,
+      contactPhone: editForm.contactPhone
+    }
+    
+    const updateRes = await axios.put(`/api/item/${editingItem.value.itemId}`, submitData)
+    
+    if (updateRes.data.code !== 200) {
+      throw new Error(updateRes.data.msg || '更新失败')
+    }
+    
+    // 2. 更新图片（使用 try-catch 单独处理，不影响主流程）
+    try {
+      await updateEditImages(editingItem.value.itemId)
+    } catch (imageError: any) {
+      console.error('图片更新失败（非阻断）:', imageError)
+      // 图片更新失败只警告，不阻断成功提示
+      // 可选：alert('物品信息已保存，但图片更新失败，请稍后重试')
+    }
+    
+    // 3. 刷新列表
+    await loadItemList()
+    
+    // 4. 关闭弹窗并提示成功
+    closeEditModal()
+    alert('修改成功！')
+    
+  } catch (error: any) {
+    console.error('更新失败:', error)
+    alert(`更新失败: ${error.message || '网络错误'}`)
+  } finally {
+    editSubmitting.value = false
+  }
+}
+
+const updateEditImages = async (itemId: number) => {
+  // 如果没有图片，直接返回成功，不调用接口
+  if (editImages.value.length === 0) {
+    console.log('没有图片需要更新，跳过图片更新')
+    return
+  }
+  
+  try {
+    const formData = new FormData()
+    
+    // 将所有图片添加到formData中
+    for (let i = 0; i < editImages.value.length; i++) {
+      const image = editImages.value[i]
+      
+      if (image.file) {
+        // 新上传的图片，直接添加
+        formData.append('images', image.file)
+      } else if (image.isOriginal && image.previewUrl) {
+        // 原始图片，需要从URL获取并转换为File对象
+        try {
+          const response = await fetch(image.previewUrl)
+          if (response.ok) {
+            const blob = await response.blob()
+            const file = new File([blob], `image_${image.originalId || i}.jpg`, { type: blob.type })
+            formData.append('images', file)
+          } else {
+            console.warn(`无法获取原始图片: ${image.previewUrl}`, response.status)
+          }
+        } catch (error) {
+          console.error(`获取原始图片失败 ${i}:`, error)
+          // 继续处理其他图片，不中断
+        }
+      }
+    }
+    
+    // 检查是否有实际要上传的文件
+    const filesToUpload = formData.getAll('images')
+    if (filesToUpload.length === 0) {
+      console.log('没有有效的图片文件需要上传')
+      return
+    }
+    
+    // 调用图片更新接口
+    await axios.post(`/api/item/${itemId}/images/update`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+  } catch (error) {
+    console.error('图片更新失败:', error)
+    // 抛出错误让上层处理，但不阻断主流程
+    throw new Error('图片更新失败，但物品信息已保存')
+  }
+}
 
 /* ================= 加载物品列表 ================= */
 const loadItemList = async () => {
@@ -1269,6 +2191,9 @@ const getLocationCampus = (item: any) => {
 onMounted(() => {
   loadItemList()
   loadUnclaimedStats()
+  // 预加载分类和地点树
+  loadCategoryTree()
+  loadLocationTree()
 })
 </script>
 
@@ -1753,6 +2678,12 @@ onMounted(() => {
   border: 1px solid rgba(166, 124, 82, 0.3);
 }
 
+/* 新增编辑按钮样式 */
+.edit-btn {
+  background: linear-gradient(to right, #4caf50, #8bc34a);
+  color: white;
+}
+
 .status-btn {
   background: linear-gradient(to right, #2196f3, #21cbf3);
   color: white;
@@ -1817,7 +2748,7 @@ onMounted(() => {
   color: rgba(166, 124, 82, 0.8);
 }
 
-/* 模态框样式（复用之前的，略作调整） */
+/* 模态框样式 */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -1892,6 +2823,340 @@ onMounted(() => {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
+}
+
+/* ==================== 新增：编辑弹窗样式 ==================== */
+.edit-modal {
+  background: white;
+  border-radius: 20px;
+  width: 90%;
+  max-width: 900px;
+  max-height: 90vh;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.edit-content {
+  display: flex;
+  gap: 25px;
+}
+
+.edit-left-column {
+  flex: 0 0 300px;
+}
+
+.edit-right-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.edit-section {
+  background: rgba(166, 124, 82, 0.05);
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid rgba(166, 124, 82, 0.1);
+}
+
+.edit-section .section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(166, 124, 82, 0.1);
+}
+
+.edit-section .section-title {
+  font-family: "Comic Sans MS", cursive;
+  font-size: 16px;
+  color: #a67c52;
+  font-weight: 600;
+  margin: 0;
+}
+
+.edit-section .section-subtitle {
+  font-size: 12px;
+  color: rgba(166, 124, 82, 0.6);
+}
+
+/* 编辑表单样式 */
+.edit-form-row {
+  margin-bottom: 15px;
+}
+
+.edit-form-row:last-child {
+  margin-bottom: 0;
+}
+
+.edit-label {
+  display: block;
+  font-family: "Comic Sans MS", cursive;
+  font-size: 14px;
+  color: #a67c52;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+.edit-label .required {
+  color: #ff4d4f;
+}
+
+.edit-input,
+.edit-select,
+.edit-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1.6px solid rgba(166, 124, 82, 0.4);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.6);
+  font-family: "Comic Sans MS", cursive;
+  font-size: 14px;
+  color: #a67c52;
+  outline: none;
+  box-sizing: border-box;
+  transition: all 0.3s ease;
+}
+
+.edit-input:focus,
+.edit-select:focus,
+.edit-textarea:focus {
+  border-color: rgba(243, 129, 129, 0.7);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 0 3px rgba(243, 129, 129, 0.1);
+}
+
+.edit-input::placeholder,
+.edit-textarea::placeholder {
+  color: rgba(166, 124, 82, 0.5);
+}
+
+.edit-textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+.datetime-input {
+  font-size: 14px;
+}
+
+.currency-input {
+  position: relative;
+}
+
+.currency-symbol {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 14px;
+  color: #a67c52;
+  font-weight: 500;
+}
+
+.reward-input {
+  padding-left: 28px;
+}
+
+.char-counter {
+  text-align: right;
+  font-size: 12px;
+  color: rgba(166, 124, 82, 0.6);
+  margin-top: 5px;
+}
+
+/* 类型显示 */
+.edit-type-display {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.type-badge {
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  color: white;
+}
+
+.lost-badge {
+  background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%);
+}
+
+.found-badge {
+  background: linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%);
+}
+
+.type-hint {
+  font-size: 12px;
+  color: rgba(166, 124, 82, 0.6);
+}
+
+/* 级联选择器 */
+.edit-cascader {
+  display: flex;
+  gap: 10px;
+}
+
+.edit-cascader.location-cascader {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.cascader-level {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.cascader-label {
+  font-size: 12px;
+  color: rgba(166, 124, 82, 0.7);
+}
+
+/* 图片上传区域 */
+.upload-area {
+  border: 2px dashed rgba(166, 124, 82, 0.4);
+  border-radius: 12px;
+  padding: 30px 20px;
+  background: rgba(255, 255, 255, 0.3);
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-bottom: 15px;
+}
+
+.upload-area:hover {
+  border-color: rgba(243, 129, 129, 0.6);
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.upload-area.drag-over {
+  border-color: #f38181;
+  background: rgba(243, 129, 129, 0.1);
+}
+
+.upload-icon {
+  font-size: 36px;
+  margin-bottom: 10px;
+}
+
+.upload-text {
+  font-family: "Comic Sans MS", cursive;
+  font-size: 15px;
+  color: #a67c52;
+  margin-bottom: 5px;
+  font-weight: 500;
+}
+
+.upload-hint {
+  font-family: "Comic Sans MS", cursive;
+  font-size: 12px;
+  color: rgba(166, 124, 82, 0.6);
+  margin: 0;
+}
+
+.file-input {
+  display: none;
+}
+
+/* 编辑图片网格 */
+.edit-image-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.edit-grid-item {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  cursor: move;
+}
+
+.edit-grid-item:hover .edit-grid-overlay {
+  opacity: 1;
+}
+
+.edit-grid-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.edit-grid-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.edit-grid-delete-btn {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: #ff4d4f;
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.edit-grid-delete-btn:hover {
+  background: #ff7875;
+  transform: scale(1.1);
+}
+
+.edit-grid-sort {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.3);
+  color: white;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: move;
+}
+
+.edit-grid-index {
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(243, 129, 129, 0.8);
+  color: white;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
 }
 
 /* 状态更新弹窗特有样式 */
@@ -2682,6 +3947,20 @@ onMounted(() => {
   .stats-grid {
     grid-template-columns: repeat(3, 1fr);
   }
+  
+  /* 编辑弹窗响应式 */
+  .edit-content {
+    flex-direction: column;
+  }
+  
+  .edit-left-column {
+    flex: 1;
+    width: 100%;
+  }
+  
+  .edit-image-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
 }
 
 @media (max-width: 768px) {
@@ -2739,6 +4018,24 @@ onMounted(() => {
   .action-btn {
     padding: 8px;
     font-size: 11px;
+  }
+  
+  /* 编辑弹窗移动端适配 */
+  .edit-modal {
+    width: 95%;
+    max-height: 95vh;
+  }
+  
+  .edit-section {
+    padding: 15px;
+  }
+  
+  .edit-cascader.location-cascader {
+    grid-template-columns: 1fr;
+  }
+  
+  .edit-image-grid {
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 </style>

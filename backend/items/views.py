@@ -53,6 +53,7 @@ def add_item(request):
 
     # 2. 获取当前登录用户
     user_id = request.session.get('user_id')
+    role = request.session.get('role')
     if not user_id:
         return JsonResponse({
             'code': 401,
@@ -862,6 +863,7 @@ def update_item(request, item_id):
     
     # 2. 获取当前登录用户
     user_id = request.session.get('user_id')
+    role = request.session.get('role')
     if not user_id:
         return JsonResponse({
             'code': 401,
@@ -877,15 +879,15 @@ def update_item(request, item_id):
             'msg': '物品不存在'
         })
     
-    # 4. 权限校验：只有发布者可以修改自己的物品
-    if item.user_id != user_id:
+    # 4. 权限校验：只有发布者、失物招领管理员(3)和系统管理员(4)可以修改物品
+    if item.user_id != user_id and role not in [3, 4]:
         return JsonResponse({
             'code': 403,
             'msg': '无权限修改此物品'
         })
     
-    # 5. 状态校验：只有待审核(1)或已驳回(5)状态的物品可以修改
-    if item.current_status not in [1, 5]:
+    # 5. 状态校验：普通用户只能修改待审核(1)或已驳回(5)状态的物品，管理员可以修改任何状态
+    if role not in [3, 4] and item.current_status not in [1, 5]:
         return JsonResponse({
             'code': 400,
             'msg': f'当前状态为{get_status_text(item.current_status)}，不可修改'
@@ -987,8 +989,9 @@ def update_item(request, item_id):
             'msg': '未修改任何信息'
         })
     
-    # 10. 如果是已驳回状态，修改后自动变回待审核状态
-    if item.current_status == 5:
+    # 10. 如果是已驳回状态且当前用户不是管理员，修改后自动变回待审核状态
+    old_status = item.current_status  # 保存修改前的状态
+    if role not in [3, 4] and item.current_status == 5:
         item.current_status = 1  # 变回待审核
         item.reject_reason = None  # 清除驳回原因
         updated_fields.append('current_status')
@@ -1007,21 +1010,33 @@ def update_item(request, item_id):
             'error': str(e)
         })
     
-    # 13. 记录状态历史（如果是已驳回变回待审核）
-    if item.current_status == 1 and 5 in [field for field in updated_fields if field == 'current_status']:
-        try:
+    # 13. 记录状态历史
+    try:
+        # 如果是已驳回变回待审核（普通用户操作）
+        if role not in [3, 4] and old_status == 5 and item.current_status == 1:
             ItemStatusHistory.objects.create(
                 item_id=item.id,
-                old_status=5,  # 已驳回
-                new_status=1,  # 待审核
+                old_status=old_status,
+                new_status=item.current_status,
                 operator_id=user_id,
                 operator_type=1,  # 1=用户
                 operate_reason='用户修改信息后重新提交',
                 operate_time=timezone.now()
             )
-        except Exception as e:
-            # 状态历史记录失败不影响主流程
-            print(f"记录状态历史失败: {e}")
+        # 如果是管理员修改物品
+        elif role in [3, 4]:
+            ItemStatusHistory.objects.create(
+                item_id=item.id,
+                old_status=old_status,
+                new_status=item.current_status,
+                operator_id=user_id,
+                operator_type=2,  # 2=管理员
+                operate_reason='管理员修改物品信息',
+                operate_time=timezone.now()
+            )
+    except Exception as e:
+        # 状态历史记录失败不影响主流程
+        print(f"记录状态历史失败: {e}")
     
     # 14. 返回结果
     return JsonResponse({
