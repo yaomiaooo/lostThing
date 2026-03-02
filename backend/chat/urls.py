@@ -12,4 +12,8 @@ urlpatterns = [
     path('/conversation/list', views.get_my_conversations, name='get_my_conversations'),
     # 6.5.5 判断会话是否还能发送消息
     path('/conversation/can-send', views.can_send_message, name='can_send_message'),
+    # 6.5.6 删除消息（支持批量删除）
+    path('/conversation/messages/delete', views.delete_messages, name='delete_messages'),
+    # 6.5.7 获取用户未读消息计数
+    path('/unread-count', views.get_unread_count, name='get_unread_count'),
 ]

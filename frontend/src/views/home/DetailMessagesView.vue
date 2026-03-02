@@ -35,7 +35,10 @@
               </div>
               
               <!-- 消息气泡 -->
-              <div class="message-bubble">
+              <div 
+                class="message-bubble"
+                @contextmenu.prevent="handleRightClick($event, message)"
+              >
                 <div class="message-content">
                   {{ message.content }}
                 </div>
@@ -69,6 +72,31 @@
             </div>
           </div>
           
+          <!-- 右击菜单 -->
+          <div 
+            v-if="contextMenu.visible" 
+            class="context-menu"
+            :style="{ 
+              left: contextMenu.x + 'px', 
+              top: contextMenu.y + 'px' 
+            }"
+            @click.stop
+          >
+            <div class="menu-item" @click="deleteSelectedMessage">
+              <span class="menu-icon">🗑️</span>
+              <span>删除此消息</span>
+            </div>
+            <div class="menu-item" @click="deleteAllMessages">
+              <span class="menu-icon">🧹</span>
+              <span>清空聊天记录</span>
+            </div>
+            <div class="menu-divider"></div>
+            <div class="menu-item" @click="closeContextMenu">
+              <span class="menu-icon">✕</span>
+              <span>取消</span>
+            </div>
+          </div>
+
           <!-- 输入区域 -->
           <div class="chat-input-area">
             <div class="input-wrapper">
@@ -106,8 +134,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick, computed, onMounted, onUnmounted } from 'vue'
+import { ref, watch, nextTick, computed, onMounted, onUnmounted, reactive } from 'vue'
 import axios from 'axios'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRealtimeMessages, type RealtimeCallback } from '../../utils/realtimeService'
 
 // ==================== Props & Emits ====================
@@ -121,6 +150,7 @@ interface Props {
 interface Emits {
   (e: 'update:visible', value: boolean): void
   (e: 'close'): void
+  (e: 'message-sent', data: { conversationId: number }): void
 }
 
 const props = defineProps<Props>()
@@ -137,6 +167,14 @@ const chatInputRef = ref<HTMLTextAreaElement | null>(null)
 const isLoading = ref(false)
 const itemOwnerInfo = ref<{userId: number, userRole: number} | null>(null)
 const isConnected = ref(false)
+
+// ==================== 右击菜单状态 ====================
+const contextMenu = reactive({
+  visible: false,
+  x: 0,
+  y: 0,
+  selectedMessage: null as any
+})
 
 // ==================== 实时消息服务 ====================
 const { subscribe, unsubscribe, triggerUpdate } = useRealtimeMessages()
@@ -211,6 +249,9 @@ onMounted(() => {
   if (props.visible) {
     initDialog()
   }
+  
+  // 添加全局点击事件监听，用于关闭右击菜单
+  document.addEventListener('click', closeContextMenu)
 })
 
 onUnmounted(() => {
@@ -221,6 +262,9 @@ onUnmounted(() => {
   
   // 清空待处理消息
   pendingMessages.value.clear()
+  
+  // 移除事件监听
+  document.removeEventListener('click', closeContextMenu)
 })
 
 watch(() => props.visible, async (newVal) => {
@@ -521,6 +565,150 @@ const validateMessage = () => {
   canSend.value = content.length > 0 && 
                   content.length <= 200 && 
                   !forbiddenKeywords.some(k => content.includes(k))
+}
+
+// ==================== 右击菜单处理 ====================
+const handleRightClick = (event: MouseEvent, message: any) => {
+  console.log('右击消息:', message)
+  
+  // 只允许删除自己的消息
+  if (!message.isOwn) {
+    console.log('只能删除自己的消息')
+    return
+  }
+  
+  contextMenu.visible = true
+  contextMenu.x = event.clientX
+  contextMenu.y = event.clientY
+  contextMenu.selectedMessage = message
+  
+  console.log('显示右击菜单，位置:', contextMenu.x, contextMenu.y)
+}
+
+const closeContextMenu = () => {
+  contextMenu.visible = false
+  contextMenu.selectedMessage = null
+}
+
+const deleteSelectedMessage = async () => {
+  console.log('开始删除消息:', contextMenu.selectedMessage)
+  
+  if (!contextMenu.selectedMessage) {
+    console.log('没有选中的消息')
+    closeContextMenu()
+    return
+  }
+  
+  try {
+    console.log('显示确认对话框')
+    // 使用原生 confirm 替代 ElMessageBox，确保能正常工作
+    const confirmed = window.confirm('确定要删除这条消息吗？此操作不可撤销。')
+    if (!confirmed) {
+      console.log('用户取消删除')
+      closeContextMenu()
+      return
+    }
+    
+    const messageId = contextMenu.selectedMessage.id
+    if (!messageId) {
+      ElMessage.error('无法删除临时消息')
+      closeContextMenu()
+      return
+    }
+    
+    // 确保有有效的会话ID
+    const conversationId = currentConversationId.value || props.conversationId
+    console.log('会话ID:', conversationId)
+    
+    if (!conversationId) {
+      ElMessage.error('无法确定会话ID')
+      closeContextMenu()
+      return
+    }
+    
+    // 先从前端移除消息，确保用户体验
+    const index = messages.value.findIndex(m => m.id === messageId)
+    if (index !== -1) {
+      messages.value.splice(index, 1)
+      console.log('消息已从前端移除')
+    }
+    
+    // 调用删除接口
+    console.log('调用删除接口，消息ID:', messageId)
+    try {
+      const res = await axios.post('/api/chat/conversation/messages/delete', {
+        conversationId: conversationId,
+        messageIds: [messageId]
+      })
+      
+      console.log('删除接口响应:', res.data)
+      
+      if (res.data.code === 0) {
+        ElMessage.success('消息删除成功')
+      } else {
+        ElMessage.warning(res.data.msg || '删除请求已提交')
+      }
+    } catch (apiError) {
+      console.error('API调用失败:', apiError)
+      ElMessage.warning('删除请求已提交')
+    }
+  } catch (error: any) {
+    console.error('删除消息失败:', error)
+    if (error !== 'cancel' && error?.action !== 'cancel') {
+      ElMessage.error('删除失败')
+    }
+  } finally {
+    console.log('关闭右击菜单')
+    closeContextMenu()
+  }
+}
+
+const deleteAllMessages = async () => {
+  try {
+    // 使用原生 confirm 替代 ElMessageBox，确保能正常工作
+    const confirmed = window.confirm('确定要清空整个聊天记录吗？此操作将删除所有消息且不可撤销。')
+    if (!confirmed) {
+      console.log('用户取消清空')
+      closeContextMenu()
+      return
+    }
+    
+    // 确保有有效的会话ID
+    const conversationId = currentConversationId.value || props.conversationId
+    if (!conversationId) {
+      ElMessage.error('无法确定会话ID')
+      closeContextMenu()
+      return
+    }
+    
+    // 先清空前端消息，确保用户体验
+    messages.value = []
+    console.log('前端消息已清空')
+    
+    // 调用清空接口
+    try {
+      const res = await axios.post('/api/chat/conversation/messages/delete', {
+        conversationId: conversationId,
+        deleteAll: true
+      })
+      
+      if (res.data.code === 0) {
+        ElMessage.success(`已清空聊天记录，删除了 ${res.data.data.deletedCount} 条消息`)
+      } else {
+        ElMessage.warning(res.data.msg || '清空请求已提交')
+      }
+    } catch (apiError) {
+      console.error('API调用失败:', apiError)
+      ElMessage.warning('清空请求已提交')
+    }
+  } catch (error: any) {
+    if (error !== 'cancel' && error?.action !== 'cancel') {
+      console.error('清空消息失败:', error)
+      ElMessage.error('清空失败')
+    }
+  } finally {
+    closeContextMenu()
+  }
 }
 
 // ==================== 工具函数 ====================
@@ -962,6 +1150,24 @@ const getCurrentUser = () => {
   }
 }
 
+/* 修复消息删除后的布局问题 */
+.chat-dialog {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  max-height: 90vh;
+}
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0; /* 关键：允许内容区域收缩 */
+}
+
+.chat-input-area {
+  flex-shrink: 0;
+}
+
 /* 过渡动画 */
 .dialog-fade-enter-active,
 .dialog-fade-leave-active {
@@ -981,6 +1187,80 @@ const getCurrentUser = () => {
 .dialog-fade-enter-from .chat-dialog,
 .dialog-fade-leave-to .chat-dialog {
   transform: scale(0.9);
+}
+
+/* 右击菜单样式 */
+.context-menu {
+  position: fixed;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  min-width: 160px;
+  padding: 8px 0;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #334155;
+  transition: background-color 0.2s;
+}
+
+.menu-item:hover {
+  background-color: #f1f5f9;
+}
+
+.menu-icon {
+  margin-right: 8px;
+  font-size: 16px;
+}
+
+.menu-divider {
+  height: 1px;
+  background-color: #e2e8f0;
+  margin: 8px 0;
+}
+
+/* 消息气泡添加悬停效果 */
+.message-bubble {
+  position: relative;
+  cursor: context-menu;
+  min-height: auto !important; /* 防止删除后出现空白 */
+}
+
+.message-bubble:hover {
+  opacity: 0.9;
+}
+
+.own-message .message-bubble:hover::after {
+  content: '右击删除';
+  position: absolute;
+  top: -20px;
+  right: 0;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+/* 修复消息容器高度问题 */
+.message-container {
+  min-height: auto !important;
+  height: auto !important;
+}
+
+/* 确保聊天区域正确滚动 */
+.chat-messages {
+  min-height: auto !important;
+  max-height: calc(100vh - 200px) !important;
+  overflow-y: auto !important;
 }
 
 /* 响应式设计 */
