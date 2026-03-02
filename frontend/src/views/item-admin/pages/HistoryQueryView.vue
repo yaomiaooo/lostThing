@@ -141,8 +141,88 @@
       </main>
     </div>
 
-    <!-- 物品详情弹窗（可选，可复用其他页面的详情弹窗，此处简化直接跳转） -->
-    <!-- 为简化，我们跳转到待审核页面的详情（但管理员不一定有权限查看物品详情，可考虑打开新页面或弹窗，这里先预留） -->
+    <!-- 物品详情弹窗 -->
+    <div v-if="showDetailModal" class="modal-overlay" @click.self="closeDetailModal">
+      <div class="detail-modal">
+        <div class="modal-header">
+          <h3 class="modal-title">物品详情</h3>
+          <button class="modal-close" @click="closeDetailModal">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="detail-content" v-if="currentItem">
+            <!-- 图片展示 -->
+            <div class="detail-images" v-if="currentItemImages.length > 0">
+              <div class="image-main">
+                <img 
+                  :src="currentItemImages[currentImageIndex]" 
+                  class="main-image" 
+                  @click="previewImage(currentItemImages[currentImageIndex])"
+                />
+              </div>
+              <div class="image-thumbs" v-if="currentItemImages.length > 1">
+                <img 
+                  v-for="(img, idx) in currentItemImages" 
+                  :key="idx"
+                  :src="img" 
+                  class="thumb" 
+                  :class="{ active: idx === currentImageIndex }"
+                  @click="currentImageIndex = idx"
+                />
+              </div>
+            </div>
+            
+            <!-- 基本信息 -->
+            <div class="detail-info">
+              <div class="info-row">
+                <span class="info-label">物品名称：</span>
+                <span class="info-value">{{ currentItem.name }}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">物品类型：</span>
+                <span class="info-value">{{ currentItem.itemTypeName }}（{{ currentItem.itemCategory === 1 ? '失物' : '招领' }}）</span>
+              </div>
+              <div class="info-row" v-if="currentItem.happenTime">
+                <span class="info-label">发生时间：</span>
+                <span class="info-value">{{ currentItem.happenTime }}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">地点：</span>
+                <span class="info-value">{{ getLocationCampus(currentItem) }} {{ currentItem.locationName }} {{ currentItem.locationDetail }}</span>
+              </div>
+              <div class="info-row" v-if="currentItem.pickupLocation">
+                <span class="info-label">领取地点：</span>
+                <span class="info-value">{{ currentItem.pickupLocation }}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">特征描述：</span>
+                <span class="info-value description">{{ currentItem.feature }}</span>
+              </div>
+              <div class="info-row" v-if="currentItem.rewardAmount > 0">
+                <span class="info-label">悬赏金额：</span>
+                <span class="info-value reward">¥{{ currentItem.rewardAmount }} {{ currentItem.rewardDesc }}</span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">联系人：</span>
+                <span class="info-value">{{ currentItem.contactName }} {{ currentItem.contactPhone }}</span>
+              </div>
+              <div class="info-row" v-if="currentItem.createTime">
+                <span class="info-label">发布时间：</span>
+                <span class="info-value">{{ currentItem.createTime }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="modal-btn cancel-btn" @click="closeDetailModal">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 图片预览 -->
+    <div v-if="previewImageUrl" class="image-preview-overlay" @click.self="closeImagePreview">
+      <img :src="previewImageUrl" class="preview-large" />
+      <button class="preview-close" @click="closeImagePreview">×</button>
+    </div>
   </div>
 </template>
 
@@ -157,6 +237,13 @@ const router = useRouter()
 /* ================= 数据状态 ================= */
 const loading = ref(false)
 const historyList = ref<any[]>([])
+
+/* ================= 弹窗状态 ================= */
+const showDetailModal = ref(false)
+const currentItem = ref<any>(null)
+const currentItemImages = ref<string[]>([])
+const currentImageIndex = ref(0)
+const previewImageUrl = ref('')
 
 /* ================= 日期范围 ================= */
 const dateRanges = [
@@ -309,13 +396,82 @@ const changePage = (page: number) => {
 }
 
 /* ================= 查看物品详情 ================= */
-const viewItemDetail = (itemId: number) => {
-  // 跳转到物品详情页（需要确认路由是否存在），或打开弹窗
-  // 由于暂未实现物品详情页面，可先跳转到待审核页面的详情弹窗？或者新开页面
-  // 这里简单使用 window.open 或 router.push，但需要后端支持
-  // 根据实际路由调整，例如跳转到 /item-admin/items?itemId=xxx
-  alert(`查看物品详情功能待完善，物品ID: ${itemId}`)
-  // 实际可调用 router.push(`/item-admin/items?itemId=${itemId}`)
+const viewItemDetail = async (itemId: number) => {
+  currentItem.value = { itemId }
+  currentImageIndex.value = 0
+  
+  // 加载物品详情获取图片
+  try {
+    const res = await axios.get('/api/item/detail', {
+      params: { itemId }
+    })
+    
+    if (res.data.code === 200) {
+      const detail = res.data.data
+      currentItem.value = detail.item
+      
+      // 处理图片
+      if (detail.images && detail.images.length > 0) {
+        currentItemImages.value = detail.images.map((img: any) => img.url)
+      } else if (currentItem.value.firstImageUrl) {
+        currentItemImages.value = [currentItem.value.firstImageUrl]
+      } else {
+        currentItemImages.value = []
+      }
+    }
+  } catch (error) {
+    console.error('加载详情失败:', error)
+    currentItemImages.value = []
+  }
+  
+  showDetailModal.value = true
+}
+
+const closeDetailModal = () => {
+  showDetailModal.value = false
+  currentItem.value = null
+  currentItemImages.value = []
+}
+
+/* ================= 图片预览 ================= */
+const previewImage = (url: string | null) => {
+  if (!url) return
+  previewImageUrl.value = url
+}
+
+const closeImagePreview = () => {
+  previewImageUrl.value = ''
+}
+
+/* ================= 地点解析函数 ================= */
+const getLocationCampus = (item: any) => {
+  const locationId = item.locationId || 0
+  
+  // 根据locationId的前缀判断校区
+  // 1xxxx = 朝晖校区, 2xxxx = 屏峰校区, 3xxxx = 莫干山校区, 4xxxx = 西湖校区
+  const idStr = String(locationId)
+  
+  if (idStr.startsWith('1')) {
+    return '朝晖校区'
+  } else if (idStr.startsWith('2')) {
+    return '屏峰校区'
+  } else if (idStr.startsWith('3')) {
+    return '莫干山校区'
+  } else if (idStr.startsWith('4')) {
+    return '西湖校区'
+  }
+  
+  // 如果无法从locationId判断，尝试从locationName中提取
+  const locationName = item.locationName || ''
+  const campusPatterns = ['屏峰校区', '朝晖校区', '莫干山校区', '西湖校区']
+  
+  for (const campus of campusPatterns) {
+    if (locationName.includes(campus)) {
+      return campus
+    }
+  }
+  
+  return '未知校区'
 }
 
 /* ================= 退出登录 ================= */
@@ -659,6 +815,227 @@ onMounted(() => {
 .page-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .page-info { font-size: 14px; color: rgba(166, 124, 82, 0.8); }
 
+/* 模态框样式 */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(5px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid rgba(166, 124, 82, 0.1);
+}
+
+.modal-title {
+  font-family: "Comic Sans MS", cursive;
+  font-size: 20px;
+  color: #a67c52;
+  margin: 0;
+  font-weight: 600;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: rgba(166, 124, 82, 0.6);
+  cursor: pointer;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.modal-close:hover {
+  background: rgba(166, 124, 82, 0.1);
+  color: #a67c52;
+}
+
+.modal-body {
+  padding: 20px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.modal-footer {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding: 20px;
+  border-top: 1px solid rgba(166, 124, 82, 0.1);
+}
+
+.modal-btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 10px;
+  font-family: "Comic Sans MS", cursive;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.cancel-btn {
+  background: rgba(166, 124, 82, 0.1);
+  color: #a67c52;
+  border: 1px solid rgba(166, 124, 82, 0.3);
+}
+
+.cancel-btn:hover {
+  background: rgba(166, 124, 82, 0.2);
+}
+
+/* 详情弹窗 */
+.detail-modal {
+  background: white;
+  border-radius: 20px;
+  width: 90%;
+  max-width: 700px;
+  max-height: 90vh;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.detail-content {
+  display: flex;
+  gap: 20px;
+}
+
+.detail-images {
+  flex: 0 0 300px;
+}
+
+.image-main {
+  width: 100%;
+  height: 300px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(166, 124, 82, 0.1);
+  margin-bottom: 12px;
+}
+
+.main-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-thumbs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.thumb {
+  width: 60px;
+  height: 60px;
+  border-radius: 8px;
+  object-fit: cover;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: all 0.3s ease;
+}
+
+.thumb.active {
+  border-color: rgba(243, 129, 129, 0.7);
+}
+
+.thumb:hover {
+  transform: scale(1.05);
+}
+
+.detail-info {
+  flex: 1;
+}
+
+.info-row {
+  margin-bottom: 15px;
+}
+
+.info-label {
+  font-family: "Comic Sans MS", cursive;
+  font-size: 14px;
+  color: rgba(166, 124, 82, 0.7);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.info-value {
+  font-family: "Comic Sans MS", cursive;
+  font-size: 14px;
+  color: #a67c52;
+  word-break: break-word;
+}
+
+.info-value.description {
+  line-height: 1.5;
+}
+
+.info-value.reward {
+  color: #f44336;
+  font-weight: 500;
+}
+
+/* 图片预览覆盖层 */
+.image-preview-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.preview-large {
+  max-width: 90%;
+  max-height: 90%;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.preview-close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.preview-close:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
 /* 响应式 */
 @media (max-width: 768px) {
   .main-content {
@@ -672,5 +1049,13 @@ onMounted(() => {
     align-items: stretch;
   }
   .filter-input { width: auto; }
+  
+  .detail-content {
+    flex-direction: column;
+  }
+  
+  .detail-images {
+    flex: 1;
+  }
 }
 </style>
