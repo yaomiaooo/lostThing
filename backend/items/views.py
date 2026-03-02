@@ -443,6 +443,26 @@ def audit_item(request):
             operate_time=timezone.now()
         )
 
+        # 9. 发送通知给发布者
+        if status == 2:
+            # 审核通过通知
+            Notification.objects.create(
+                user_id=item.user_id,
+                title="物品审核已通过",
+                content=f"您发布的物品【{item.name}】已通过审核，现在可以正常展示了。",
+                type=1,  # 物品相关
+                related_id=item.id
+            )
+        elif status == 5:
+            # 审核驳回通知
+            Notification.objects.create(
+                user_id=item.user_id,
+                title="物品审核已驳回",
+                content=f"您发布的物品【{item.name}】未通过审核。驳回原因：{reject_reason}",
+                type=1,  # 物品相关
+                related_id=item.id
+            )
+
         return JsonResponse({
             "code": 200,
             "msg": "审核成功"
@@ -2239,11 +2259,20 @@ def audit_claim(request, claim_id):
             operate_time=timezone.now()
         )
         
-        # 发送通知给认领人（可选）
+        # 发送通知给认领人（通过时）
         Notification.objects.create(
             user_id=claim.claim_user_id,
             title="认领申请已通过",
             content=f"您对物品【{item.name}】的认领申请已通过审核，请联系管理员领取。",
+            type=2,  # 认领相关
+            related_id=item.id
+        )
+    elif status == 2:
+        # 发送通知给认领人（驳回时）
+        Notification.objects.create(
+            user_id=claim.claim_user_id,
+            title="认领申请已驳回",
+            content=f"您对物品【{item.name}】的认领申请未通过审核。驳回原因：{reject_reason}",
             type=2,  # 认领相关
             related_id=item.id
         )
