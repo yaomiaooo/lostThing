@@ -121,7 +121,8 @@
                     </div>
                   </td>
                   <td class="col-location">
-                    <div class="location-campus">{{ item.locationName }}</div>
+                    <div class="location-campus">{{ getLocationCampus(item) }}</div>
+                    <div class="location-building">{{ getLocationBuilding(item) }}</div>
                     <div v-if="item.locationDetail" class="location-detail">{{ item.locationDetail }}</div>
                   </td>
                   <td class="col-time">
@@ -667,6 +668,48 @@ const maskPhone = (phone: string) => {
   return phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')
 }
 
+/* ================= 地点解析函数 ================= */
+const getLocationCampus = (item: any) => {
+  const locationId = item.locationId || 0
+  
+  // 根据locationId的前缀判断校区
+  // 1xxxx = 朝晖校区, 2xxxx = 屏峰校区, 3xxxx = 莫干山校区, 4xxxx = 西湖校区
+  const idStr = String(locationId)
+  
+  if (idStr.startsWith('1')) {
+    return '朝晖校区'
+  } else if (idStr.startsWith('2')) {
+    return '屏峰校区'
+  } else if (idStr.startsWith('3')) {
+    return '莫干山校区'
+  } else if (idStr.startsWith('4')) {
+    return '西湖校区'
+  }
+  
+  // 如果无法从locationId判断，尝试从locationName中提取
+  const locationName = item.locationName || ''
+  const campusPatterns = ['屏峰校区', '朝晖校区', '莫干山校区', '西湖校区']
+  
+  for (const campus of campusPatterns) {
+    if (locationName.includes(campus)) {
+      return campus
+    }
+  }
+  
+  return '未知校区'
+}
+
+const getLocationBuilding = (item: any) => {
+  const locationName = item.locationName || ''
+  
+  // locationName本身就是建筑名称，直接返回
+  if (locationName && locationName.length > 0) {
+    return locationName
+  }
+  
+  return '未知地点'
+}
+
 /* ================= 路由跳转 ================= */
 const handleLogout = () => {
   router.push('/login')
@@ -1055,14 +1098,29 @@ onMounted(() => {
 
 /* 地点 */
 .location-campus {
-  font-weight: 500;
+  font-weight: 600;
   color: #a67c52;
+  font-size: 14px;
+  margin-bottom: 2px;
+}
+
+.location-building {
+  font-weight: 500;
+  color: rgba(166, 124, 82, 0.85);
+  font-size: 13px;
+  margin-bottom: 2px;
 }
 
 .location-detail {
   font-size: 12px;
-  color: rgba(166, 124, 82, 0.7);
-  margin-top: 4px;
+  color: rgba(166, 124, 82, 0.6);
+  line-height: 1.4;
+}
+
+/* 地点列宽度调整 */
+.col-location { 
+  min-width: 160px;
+  width: 180px;
 }
 
 /* 时间 */
