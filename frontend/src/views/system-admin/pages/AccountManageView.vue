@@ -480,7 +480,7 @@
                 v-model="userForm.roleNo" 
                 type="text" 
                 class="form-input"
-                :placeholder="userForm.role === 'student' ? '请输入学号' : '请输入工号'"
+                
               />
               <span v-if="userFormErrors.roleNo" class="error-text">{{ userFormErrors.roleNo }}</span>
             </div>
@@ -488,7 +488,7 @@
           <div class="form-row">
             <div class="form-group">
               <label class="form-label">手机号 <span class="required">*</span></label>
-              <input v-model="userForm.phone" type="tel" class="form-input" maxlength="11" />
+              <input v-model="userForm.phone" type="tel" class="form-input" maxlength="11" autocomplete="off" />
               <span v-if="userFormErrors.phone" class="error-text">{{ userFormErrors.phone }}</span>
             </div>
           </div>
@@ -499,6 +499,7 @@
                 v-model="userForm.password" 
                 :type="showPassword ? 'text' : 'password'" 
                 class="form-input"
+                autocomplete="new-password"
               />
               <button class="toggle-pwd" @click="showPassword = !showPassword">
                 {{ showPassword ? '🙈' : '👁️' }}
