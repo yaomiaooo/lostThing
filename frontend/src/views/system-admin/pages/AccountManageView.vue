@@ -159,11 +159,11 @@
                   <td class="col-time">{{ formatDate(user.createTime) }}</td>
                   <td class="col-actions">
                     <div class="action-group">
-                      <button class="icon-action" @click="viewUserDetail(user)" title="查看">查看</button>
-                      <button class="icon-action" @click="openUserModal(user)" title="编辑">编辑</button>
+                      <button class="table-action-btn view-btn" @click="viewUserDetail(user)" title="查看">查看</button>
+                      <button class="table-action-btn edit-btn" @click="openUserModal(user)" title="编辑">编辑</button>
                       <button 
-                        class="icon-action" 
-                        :class="{ danger: user.status === 1 }"
+                        class="table-action-btn" 
+                        :class="user.status === 1 ? 'disable-btn' : 'enable-btn'"
                         @click="toggleUserStatus(user)"
                         :title="user.status === 1 ? '禁用' : '启用'"
                       >
@@ -615,7 +615,6 @@
         </div>
         <div class="modal-body">
           <div class="user-detail-header">
-            <img :src="detailUser.avatar || '/default-avatar.png'" class="detail-avatar" />
             <div class="detail-info">
               <h4 class="detail-name">{{ detailUser.realName }}</h4>
               <p class="detail-role">{{ detailUser.role === 1 ? '学生' : detailUser.role === 2 ? '教师' : detailUser.roleName }}</p>
@@ -641,27 +640,9 @@
               </div>
             </div>
           </div>
-          <div class="detail-section">
-            <h5>活动统计</h5>
-            <div class="detail-stats">
-              <div class="stat-box">
-                <span class="stat-num">{{ detailUser.publishCount || 0 }}</span>
-                <span class="stat-label">发布物品</span>
-              </div>
-              <div class="stat-box">
-                <span class="stat-num">{{ detailUser.claimCount || 0 }}</span>
-                <span class="stat-label">认领申请</span>
-              </div>
-              <div class="stat-box">
-                <span class="stat-num">{{ detailUser.foundCount || 0 }}</span>
-                <span class="stat-label">成功找回</span>
-              </div>
-            </div>
-          </div>
         </div>
         <div class="modal-footer">
           <button class="modal-btn cancel-btn" @click="closeUserDetailModal">关闭</button>
-          <button class="modal-btn confirm-btn" @click="viewUserItems">查看发布物品</button>
         </div>
       </div>
     </div>
@@ -1644,7 +1625,8 @@ onMounted(() => {
   border-radius: 10px;
   background: linear-gradient(to right, #f38181, #f77d5f);
   color: white;
-  font-size: 16px;
+  font-family: "Comic Sans MS", cursive;
+  font-size: 14px;
   cursor: pointer;
   transition: all 0.3s ease;
 }
@@ -1791,29 +1773,66 @@ onMounted(() => {
 .action-group {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
-.icon-action {
-  width: 32px;
-  height: 32px;
-  border: none;
+.table-action-btn {
+  padding: 6px 12px;
+  border: 1.6px solid rgba(166, 124, 82, 0.3);
   border-radius: 8px;
-  background: rgba(166, 124, 82, 0.1);
+  background: rgba(255, 255, 255, 0.5);
   cursor: pointer;
-  font-size: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  font-family: "Comic Sans MS", cursive;
+  font-size: 13px;
+  color: #a67c52;
+  font-weight: 500;
   transition: all 0.3s ease;
+  white-space: nowrap;
 }
 
-.icon-action:hover {
-  background: rgba(166, 124, 82, 0.2);
-  transform: scale(1.1);
+.table-action-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.icon-action.danger:hover {
+.table-action-btn.view-btn {
+  border-color: rgba(33, 150, 243, 0.3);
+  background: rgba(33, 150, 243, 0.08);
+  color: #2196f3;
+}
+
+.table-action-btn.view-btn:hover {
+  background: rgba(33, 150, 243, 0.15);
+}
+
+.table-action-btn.edit-btn {
+  border-color: rgba(255, 152, 0, 0.3);
+  background: rgba(255, 152, 0, 0.08);
+  color: #ff9800;
+}
+
+.table-action-btn.edit-btn:hover {
+  background: rgba(255, 152, 0, 0.15);
+}
+
+.table-action-btn.disable-btn {
+  border-color: rgba(244, 67, 54, 0.3);
+  background: rgba(244, 67, 54, 0.08);
+  color: #f44336;
+}
+
+.table-action-btn.disable-btn:hover {
   background: rgba(244, 67, 54, 0.15);
+}
+
+.table-action-btn.enable-btn {
+  border-color: rgba(76, 175, 80, 0.3);
+  background: rgba(76, 175, 80, 0.08);
+  color: #4caf50;
+}
+
+.table-action-btn.enable-btn:hover {
+  background: rgba(76, 175, 80, 0.15);
 }
 
 /* 分页 */
