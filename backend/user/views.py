@@ -82,7 +82,15 @@ def login_user(request):
                 "data": None
             })
 
-        # 5. 校验密码（哈希）
+        # 5. 检查用户状态
+        if user.status == 0:
+            return JsonResponse({
+                "code": 1,
+                "msg": "账号已被禁用，请联系管理员",
+                "data": None
+            })
+
+        # 6. 校验密码（哈希）
         if not check_password(password, user.password):
             return JsonResponse({
                 "code": 1,
