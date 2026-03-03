@@ -81,6 +81,8 @@
                 <option value="">全部角色</option>
                 <option value="1">学生</option>
                 <option value="2">教师</option>
+                <option value="3">失物招领管理员</option>
+                <option value="4">系统管理员</option>
               </select>
               <select v-model="userFilter.status" class="filter-select" @change="loadUsers">
                 <option value="">全部状态</option>
@@ -455,6 +457,7 @@
               <select v-model="userForm.role" class="form-select">
                 <option value="student">学生</option>
                 <option value="teacher">教师</option>
+                <option value="admin">管理员</option>
               </select>
             </div>
             <div class="form-group">
@@ -475,7 +478,7 @@
               <span v-if="userFormErrors.realName" class="error-text">{{ userFormErrors.realName }}</span>
             </div>
             <div class="form-group">
-              <label class="form-label">{{ userForm.role === 'student' ? '学号' : '工号' }} <span class="required">*</span></label>
+              <label class="form-label">{{ userForm.role === 'student' ? '学号' : userForm.role === 'teacher' ? '工号' : '账号' }} <span class="required">*</span></label>
               <input 
                 v-model="userForm.roleNo" 
                 type="text" 
@@ -628,7 +631,7 @@
             <h5>基本信息</h5>
             <div class="detail-grid">
               <div class="detail-item">
-                <span class="item-label">{{ detailUser.role === 1 ? '学号' : '工号' }}</span>
+                <span class="item-label">{{ detailUser.role === 1 ? '学号' : detailUser.role === 2 ? '工号' : '账号' }}</span>
                 <span class="item-value">{{ detailUser.username || '-' }}</span>
               </div>
               <div class="detail-item">
@@ -951,7 +954,7 @@ const openUserModal = (user?: any) => {
   
   if (user) {
     Object.assign(userForm, {
-      role: user.role === 1 ? 'student' : user.role === 2 ? 'teacher' : 'student',
+      role: user.role === 1 ? 'student' : user.role === 2 ? 'teacher' : user.role === 3 ? 'admin' : 'student',
       realName: user.realName,
       roleNo: user.username || '',
       phone: user.phone,
@@ -986,7 +989,7 @@ const validateUserFormFields = () => {
   }
   
   if (!userForm.roleNo.trim()) {
-    userFormErrors.roleNo = userForm.role === 'student' ? '学号不能为空' : '工号不能为空'
+    userFormErrors.roleNo = userForm.role === 'student' ? '学号不能为空' : userForm.role === 'teacher' ? '工号不能为空' : '账号不能为空'
     isValid = false
   }
   
@@ -1017,32 +1020,60 @@ const saveUser = async () => {
   
   submitting.value = true
   try {
-    const url = editingUser.value ? `/api/user/${editingUser.value.userId}` : '/api/user/create'
-    const method = editingUser.value ? 'put' : 'post'
-    
-    const payload: any = {
-      username: userForm.roleNo,
-      realName: userForm.realName,
-      phone: userForm.phone,
-      role: userForm.role === 'student' ? 1 : 2,
-      status: userForm.status
-    }
-    
-    if (userForm.password) {
-      payload.password = userForm.password
-    }
-    
-    const res = await axios[method](url, payload)
-    
-    if (res.data.code === 0) {
-      alert(editingUser.value ? '更新成功！' : '创建成功！')
-      await loadUsers()
-      closeUserModal()
+    if (userForm.role === 'admin') {
+      // 管理员角色，调用管理员接口
+      const adminPayload: any = {
+        username: userForm.roleNo,
+        realName: userForm.realName,
+        phone: userForm.phone,
+        permissions: ['review', 'manage', 'user', 'notice', 'data', 'config'], // 默认给全部权限
+        status: userForm.status,
+        role: 3 // 3=失物招领管理员
+      }
+      
+      if (userForm.password) {
+        adminPayload.password = userForm.password
+      }
+      
+      const res = await axios.post('/api/user/admin', adminPayload)
+      
+      if (res.data.code === 0) {
+        alert('创建管理员成功！')
+        await loadAdmins()
+        await loadUsers()
+        closeUserModal()
+      } else {
+        alert(res.data.msg || '创建管理员失败，请重试')
+      }
     } else {
-      alert(res.data.msg || '操作失败，请重试')
+      // 学生/教师角色，调用用户接口
+      const url = editingUser.value ? `/api/user/${editingUser.value.userId}` : '/api/user/create'
+      const method = editingUser.value ? 'put' : 'post'
+      
+      const payload: any = {
+        username: userForm.roleNo,
+        realName: userForm.realName,
+        phone: userForm.phone,
+        role: userForm.role === 'student' ? 1 : 2,
+        status: userForm.status
+      }
+      
+      if (userForm.password) {
+        payload.password = userForm.password
+      }
+      
+      const res = await axios[method](url, payload)
+      
+      if (res.data.code === 0) {
+        alert(editingUser.value ? '更新成功！' : '创建成功！')
+        await loadUsers()
+        closeUserModal()
+      } else {
+        alert(res.data.msg || '操作失败，请重试')
+      }
     }
   } catch (error: any) {
-    console.error('保存用户失败:', error)
+    console.error('保存失败:', error)
     const errorMsg = error.response?.data?.msg || '操作失败，请重试'
     alert(errorMsg)
   } finally {
@@ -1184,9 +1215,28 @@ const batchDeleteUsers = async () => {
 /* ================= 管理员管理方法 ================= */
 const loadAdmins = async () => {
   try {
-    const res = await axios.get('/api/admin/admins')
-    if (res.data.code === 200) {
-      adminList.value = res.data.data || []
+    const res = await axios.get('/api/user/list', {
+      params: {
+        size: 1000 // 获取足够多的用户来筛选管理员
+      }
+    })
+    if (res.data.code === 0) {
+      // 过滤出管理员用户(role 3或4)
+      const allUsers = res.data.data.list || []
+      adminList.value = allUsers
+        .filter((user: any) => user.role === 3 || user.role === 4)
+        .map((user: any) => ({
+          adminId: user.userId,
+          realName: user.realName,
+          username: user.username,
+          phone: user.phone,
+          email: '',
+          status: user.status,
+          permissions: ['review', 'manage', 'user', 'notice', 'data', 'config'], // 默认全部权限
+          reviewCount: 0,
+          lastLoginTime: user.lastLoginTime || '',
+          avatar: null
+        }))
     }
   } catch (error) {
     console.error('加载管理员失败:', error)
@@ -1198,7 +1248,22 @@ const loadAdmins = async () => {
   }
 }
 
-const openAdminModal = (admin?: any) => {
+const openAdminModal = async (admin?: any) => {
+  if (admin) {
+    // 编辑管理员：先确保用户列表已加载，然后找到该用户并调用用户编辑功能
+    if (userList.value.length === 0) {
+      await loadUsers()
+    }
+    
+    // 找到对应的用户对象
+    const user = userList.value.find((u: any) => u.userId === admin.adminId)
+    if (user) {
+      openUserModal(user)
+      return
+    }
+  }
+  
+  // 新增管理员或找不到用户时，使用原来的管理员弹窗
   editingAdmin.value = admin || null
   if (admin) {
     Object.assign(adminForm, {
@@ -1233,18 +1298,57 @@ const closeAdminModal = () => {
 const saveAdmin = async () => {
   submitting.value = true
   try {
-    const url = editingAdmin.value ? `/api/admin/admins/${editingAdmin.value.adminId}` : '/api/admin/admins'
-    const method = editingAdmin.value ? 'put' : 'post'
-    
-    const res = await axios[method](url, adminForm)
-    
-    if (res.data.code === 200) {
-      await loadAdmins()
-      closeAdminModal()
+    if (editingAdmin.value) {
+      // 更新管理员，使用用户更新接口
+      const payload: any = {
+        username: adminForm.username,
+        realName: adminForm.realName,
+        phone: adminForm.phone,
+        status: adminForm.status
+      }
+      
+      console.log('更新管理员，发送数据:', payload)
+      console.log('adminForm 数据:', adminForm)
+      
+      const res = await axios.put(`/api/user/${editingAdmin.value.adminId}`, payload)
+      
+      console.log('更新管理员响应:', res.data)
+      
+      if (res.data.code === 0) {
+        alert('更新成功！')
+        await loadAdmins()
+        closeAdminModal()
+      } else {
+        alert(res.data.msg || '操作失败，请重试')
+      }
+    } else {
+      // 新增管理员，使用专门的管理员创建接口
+      const payload: any = {
+        username: adminForm.username,
+        realName: adminForm.realName,
+        phone: adminForm.phone,
+        role: 3 // 默认创建区域管理员
+      }
+      
+      if (adminForm.password) {
+        payload.password = adminForm.password
+      }
+      
+      const res = await axios.post('/api/user/admin', payload)
+      
+      if (res.data.code === 0) {
+        alert('创建管理员成功！')
+        await loadAdmins()
+        await loadUsers()
+        closeAdminModal()
+      } else {
+        alert(res.data.msg || '创建管理员失败，请重试')
+      }
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('保存管理员失败:', error)
-    alert('操作失败，请重试')
+    const errorMsg = error.response?.data?.msg || '操作失败，请重试'
+    alert(errorMsg)
   } finally {
     submitting.value = false
   }
@@ -1252,16 +1356,19 @@ const saveAdmin = async () => {
 
 const toggleAdminStatus = async (admin: any) => {
   try {
-    const res = await axios.post(`/api/admin/admins/${admin.adminId}/status`, {
+    const res = await axios.put(`/api/user/${admin.adminId}/status`, {
       status: admin.status === 1 ? 0 : 1
     })
     
-    if (res.data.code === 200) {
+    if (res.data.code === 0) {
       admin.status = admin.status === 1 ? 0 : 1
+    } else {
+      alert(res.data.msg || '操作失败')
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('切换状态失败:', error)
-    alert('操作失败')
+    const errorMsg = error.response?.data?.msg || '操作失败'
+    alert(errorMsg)
   }
 }
 
