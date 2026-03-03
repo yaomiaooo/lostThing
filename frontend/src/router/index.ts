@@ -261,6 +261,7 @@ router.beforeEach((to, from, next) => {
   const userId = sessionStorage.getItem('userId')
   const role = sessionStorage.getItem('role')
   const firstLogin = sessionStorage.getItem('firstLogin')
+  const hasReadNotices = sessionStorage.getItem('hasReadNotices')
   const userRole = role ? parseInt(role) : 0
 
   // ===== 需要登录的页面 =====
@@ -272,16 +273,27 @@ router.beforeEach((to, from, next) => {
       return
     }
 
-    // 首次登录强制修改密码
-    if (firstLogin === '1' && to.path !== '/force-change-password') {
-      next('/force-change-password')
+    // 首次登录强制修改密码 - 优先级最高
+    if (firstLogin === '1') {
+      if (to.path === '/force-change-password') {
+        // 已经在修改密码页面，直接放行
+        next()
+      } else {
+        // 跳转到修改密码页面
+        next('/force-change-password')
+      }
       return
     }
 
-    // 普通用户登录后先检查是否已阅读公告
-    const hasReadNotices = sessionStorage.getItem('hasReadNotices')
-    if ((userRole === 1 || userRole === 2) && to.path !== '/notice' && !hasReadNotices) {
-      next('/notice')
+    // 普通用户检查是否已阅读公告
+    if ((userRole === 1 || userRole === 2) && !hasReadNotices) {
+      if (to.path === '/notice') {
+        // 已经在公告页面，直接放行
+        next()
+      } else {
+        // 跳转到公告页面
+        next('/notice')
+      }
       return
     }
 
@@ -312,11 +324,19 @@ router.beforeEach((to, from, next) => {
     if (userId && role) {
       // 已登录，根据角色跳转
       if (userRole === 1 || userRole === 2) {
-        const hasReadNotices = sessionStorage.getItem('hasReadNotices')
-        next(hasReadNotices ? '/home' : '/notice')
-      } else if (userRole === 3 || userRole === 4) {
+        if (firstLogin === '1') {
+          // 首次登录，跳转到修改密码
+          next('/force-change-password')
+        } else if (hasReadNotices) {
+          // 已阅读公告，去首页
+          next('/home')
+        } else {
+          // 未阅读公告，去公告页
+          next('/notice')
+        }
+      } else if (userRole === 3) {
         next('/item-admin/notices')
-      } else if (userRole === 5) {
+      } else if (userRole === 4) {
         next('/system-admin/dashboard')
       } else {
         next('/home')
