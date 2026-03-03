@@ -103,7 +103,7 @@
                 导出
               </button>
               <button class="action-btn primary" @click="openUserModal()">
-                ➕ 新增用户
+                新增用户
               </button>
             </div>
           </div>
@@ -964,11 +964,11 @@ const openUserModal = (user?: any) => {
       realName: '',
       roleNo: '',
       phone: '',
-      password: '',
+      password: '123456',
       status: 1
     })
   }
-  showPassword.value = false
+  showPassword.value = !editingUser.value
   showUserModal.value = true
 }
 
@@ -1618,6 +1618,26 @@ onMounted(() => {
   font-size: 14px;
   color: #a67c52;
   outline: none;
+}
+
+.search-input::placeholder {
+  color: #a67c52;
+  opacity: 0.7;
+}
+
+.search-input::-webkit-input-placeholder {
+  color: #a67c52;
+  opacity: 0.7;
+}
+
+.search-input::-moz-placeholder {
+  color: #a67c52;
+  opacity: 0.7;
+}
+
+.search-input:-ms-input-placeholder {
+  color: #a67c52;
+  opacity: 0.7;
 }
 
 .search-btn {
