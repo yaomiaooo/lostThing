@@ -150,7 +150,6 @@
                   </td>
                   <td class="col-contact">
                     <div class="contact-phone">{{ maskPhone(user.phone) }}</div>
-                    <div class="contact-email" v-if="user.email">{{ user.email }}</div>
                   </td>
                   <td class="col-status">
                     <span class="status-badge" :class="{ active: user.status === 1 }">
@@ -358,6 +357,7 @@
                         class="user-search-input"
                         placeholder="搜索用户..."
                         @focus="showUserDropdown = true"
+                        @input="searchUsers"
                       />
                     </div>
                     <div v-if="showUserDropdown && userSearchResults.length" class="user-dropdown">
@@ -472,6 +472,7 @@
             <div class="form-group">
               <label class="form-label">姓名 <span class="required">*</span></label>
               <input v-model="userForm.realName" type="text" class="form-input" />
+              <span v-if="userFormErrors.realName" class="error-text">{{ userFormErrors.realName }}</span>
             </div>
             <div class="form-group">
               <label class="form-label">{{ userForm.role === 'student' ? '学号' : '工号' }} <span class="required">*</span></label>
@@ -481,16 +482,14 @@
                 class="form-input"
                 :placeholder="userForm.role === 'student' ? '请输入学号' : '请输入工号'"
               />
+              <span v-if="userFormErrors.roleNo" class="error-text">{{ userFormErrors.roleNo }}</span>
             </div>
           </div>
           <div class="form-row">
             <div class="form-group">
               <label class="form-label">手机号 <span class="required">*</span></label>
               <input v-model="userForm.phone" type="tel" class="form-input" maxlength="11" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">邮箱</label>
-              <input v-model="userForm.email" type="email" class="form-input" />
+              <span v-if="userFormErrors.phone" class="error-text">{{ userFormErrors.phone }}</span>
             </div>
           </div>
           <div class="form-group" v-if="!editingUser">
@@ -506,6 +505,7 @@
               </button>
             </div>
             <button class="gen-pwd" @click="generatePassword">🎲 生成随机密码</button>
+            <span v-if="userFormErrors.password" class="error-text">{{ userFormErrors.password }}</span>
           </div>
         </div>
         <div class="modal-footer">
@@ -636,10 +636,6 @@
                 <span class="item-value">{{ detailUser.phone }}</span>
               </div>
               <div class="detail-item">
-                <span class="item-label">邮箱</span>
-                <span class="item-value">{{ detailUser.email || '-' }}</span>
-              </div>
-              <div class="detail-item">
                 <span class="item-label">注册时间</span>
                 <span class="item-value">{{ detailUser.createTime }}</span>
               </div>
@@ -666,6 +662,57 @@
         <div class="modal-footer">
           <button class="modal-btn cancel-btn" @click="closeUserDetailModal">关闭</button>
           <button class="modal-btn confirm-btn" @click="viewUserItems">查看发布物品</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 导出格式选择弹窗 -->
+    <div v-if="showExportModal" class="modal-overlay" @click.self="showExportModal = false">
+      <div class="edit-modal">
+        <div class="modal-header">
+          <h3 class="modal-title">导出用户数据</h3>
+          <button class="modal-close" @click="showExportModal = false">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">导出格式</label>
+            <div class="radio-group">
+              <label class="radio-item">
+                <input 
+                  type="radio" 
+                  v-model="exportFormat" 
+                  value="csv"
+                />
+                <span class="custom-radio"></span>
+                <span>CSV格式 (.csv)</span>
+              </label>
+              <label class="radio-item">
+                <input 
+                  type="radio" 
+                  v-model="exportFormat" 
+                  value="xlsx"
+                />
+                <span class="custom-radio"></span>
+                <span>Excel格式 (.xlsx)</span>
+              </label>
+            </div>
+          </div>
+          <div style="font-size: 12px; color: #999; margin-top: 8px;">
+            <p>• 将导出当前筛选条件下的所有用户数据</p>
+            <p>• 包含用户基本信息、状态等完整字段</p>
+            <p>• Excel功能开发中，暂时提供CSV格式</p>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="modal-btn cancel-btn" @click="showExportModal = false">取消</button>
+          <button 
+            class="modal-btn confirm-btn" 
+            :disabled="exporting"
+            @click="doExport"
+          >
+            <span v-if="exporting" class="loading-spinner-small"></span>
+            <span v-else>确定导出</span>
+          </button>
         </div>
       </div>
     </div>
@@ -782,7 +829,6 @@ const userForm = reactive({
   realName: '',
   roleNo: '',
   phone: '',
-  email: '',
   password: '',
   status: 1
 })
@@ -886,32 +932,7 @@ const toggleSelectUser = (userId: number) => {
   }
 }
 
-const openUserModal = (user?: any) => {
-  editingUser.value = user || null
-  if (user) {
-    Object.assign(userForm, {
-      role: user.role === 1 ? 'student' : user.role === 2 ? 'teacher' : 'student',
-      realName: user.realName,
-      roleNo: user.username || '',
-      phone: user.phone,
-      email: user.email || '',
-      password: '',
-      status: user.status
-    })
-  } else {
-    Object.assign(userForm, {
-      role: 'student',
-      realName: '',
-      roleNo: '',
-      phone: '',
-      email: '',
-      password: '',
-      status: 1
-    })
-  }
-  showPassword.value = false
-  showUserModal.value = true
-}
+
 
 const closeUserModal = () => {
   showUserModal.value = false
@@ -928,30 +949,120 @@ const generatePassword = () => {
   showPassword.value = true
 }
 
+/* ================= 表单验证错误信息 ================= */
+const userFormErrors = reactive({
+  realName: '',
+  roleNo: '',
+  phone: '',
+  password: ''
+})
+
+/* ================= 手机号正则 ================= */
+const phoneRegex = /^1[3-9]\d{9}$/
+
+const openUserModal = (user?: any) => {
+  editingUser.value = user || null
+  // 清空错误信息
+  Object.keys(userFormErrors).forEach(key => {
+    userFormErrors[key as keyof typeof userFormErrors] = ''
+  })
+  
+  if (user) {
+    Object.assign(userForm, {
+      role: user.role === 1 ? 'student' : user.role === 2 ? 'teacher' : 'student',
+      realName: user.realName,
+      roleNo: user.username || '',
+      phone: user.phone,
+      password: '',
+      status: user.status
+    })
+  } else {
+    Object.assign(userForm, {
+      role: 'student',
+      realName: '',
+      roleNo: '',
+      phone: '',
+      password: '',
+      status: 1
+    })
+  }
+  showPassword.value = false
+  showUserModal.value = true
+}
+
+const validateUserFormFields = () => {
+  let isValid = true
+  
+  // 清空之前的错误
+  Object.keys(userFormErrors).forEach(key => {
+    userFormErrors[key as keyof typeof userFormErrors] = ''
+  })
+  
+  if (!userForm.realName.trim()) {
+    userFormErrors.realName = '姓名不能为空'
+    isValid = false
+  }
+  
+  if (!userForm.roleNo.trim()) {
+    userFormErrors.roleNo = userForm.role === 'student' ? '学号不能为空' : '工号不能为空'
+    isValid = false
+  }
+  
+  if (!userForm.phone.trim()) {
+    userFormErrors.phone = '手机号不能为空'
+    isValid = false
+  } else if (!phoneRegex.test(userForm.phone)) {
+    userFormErrors.phone = '手机号格式不正确'
+    isValid = false
+  }
+  
+  if (!editingUser.value && !userForm.password.trim()) {
+    userFormErrors.password = '初始密码不能为空'
+    isValid = false
+  } else if (!editingUser.value && userForm.password.length < 6) {
+    userFormErrors.password = '密码长度至少6位'
+    isValid = false
+  }
+  
+  return isValid
+}
+
 const saveUser = async () => {
+  // 前端表单验证
+  if (!validateUserFormFields()) {
+    return
+  }
+  
   submitting.value = true
   try {
-    const url = editingUser.value ? `/api/user/${editingUser.value.userId}` : '/api/user/admin'
+    const url = editingUser.value ? `/api/user/${editingUser.value.userId}` : '/api/user/create'
     const method = editingUser.value ? 'put' : 'post'
     
-    const payload = {
+    const payload: any = {
       username: userForm.roleNo,
       realName: userForm.realName,
       phone: userForm.phone,
-      email: userForm.email,
       role: userForm.role === 'student' ? 1 : 2,
-      password: userForm.password
+      status: userForm.status
+    }
+    
+    if (userForm.password) {
+      payload.password = userForm.password
     }
     
     const res = await axios[method](url, payload)
     
-    if (res.data.code === 200) {
+    if (res.data.code === 0) {
+      alert(editingUser.value ? '更新成功！' : '创建成功！')
       await loadUsers()
       closeUserModal()
+    } else {
+      alert(res.data.msg || '操作失败，请重试')
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('保存用户失败:', error)
-    alert('操作失败，请重试')
+    const errorMsg = error.response?.data?.msg || '操作失败，请重试'
+    alert(errorMsg)
   } finally {
     submitting.value = false
   }
@@ -988,36 +1099,90 @@ const viewUserItems = () => {
   closeUserDetailModal()
 }
 
+/* ================= 导出功能 ================= */
+const showExportModal = ref(false)
+const exportFormat = ref('csv')
+const exporting = ref(false)
+
 const exportUsers = () => {
-  // 导出用户数据
-  window.open('/api/user/export', '_blank')
+  showExportModal.value = true
+}
+
+const doExport = async () => {
+  exporting.value = true
+  try {
+    const params = new URLSearchParams({
+      format: exportFormat.value,
+      role: userFilter.role || '',
+      status: userFilter.status || '',
+      keyword: userFilter.keyword || ''
+    })
+    
+    const response = await axios.get(`/api/user/export?${params.toString()}`, {
+      responseType: 'blob'
+    })
+    
+    // 创建下载链接
+    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const link = document.createElement('a')
+    link.href = url
+    
+    // 生成文件名
+    const filename = `用户数据_${new Date().toISOString().slice(0, 10)}.${exportFormat.value}`
+    
+    link.setAttribute('download', filename)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+    
+    alert('导出成功！')
+    showExportModal.value = false
+  } catch (error: any) {
+    console.error('导出失败:', error)
+    alert('导出失败，请重试')
+  } finally {
+    exporting.value = false
+  }
 }
 
 const batchEnableUsers = async () => {
   if (!confirm(`确定要启用选中的 ${selectedUsers.value.length} 个用户吗？`)) return
   try {
-    await axios.put('/api/user/batch-status', {
+    const res = await axios.post('/api/user/batch-status', {
       userIds: selectedUsers.value,
       status: 1
     })
-    selectedUsers.value = []
-    await loadUsers()
-  } catch (error) {
-    alert('批量操作失败')
+    if (res.data.code === 0) {
+      selectedUsers.value = []
+      await loadUsers()
+    } else {
+      alert(res.data.msg || '批量操作失败')
+    }
+  } catch (error: any) {
+    console.error('批量启用失败:', error)
+    const errorMsg = error.response?.data?.msg || '批量操作失败'
+    alert(errorMsg)
   }
 }
 
 const batchDisableUsers = async () => {
   if (!confirm(`确定要禁用选中的 ${selectedUsers.value.length} 个用户吗？`)) return
   try {
-    await axios.put('/api/user/batch-status', {
+    const res = await axios.post('/api/user/batch-status', {
       userIds: selectedUsers.value,
       status: 0
     })
-    selectedUsers.value = []
-    await loadUsers()
-  } catch (error) {
-    alert('批量操作失败')
+    if (res.data.code === 0) {
+      selectedUsers.value = []
+      await loadUsers()
+    } else {
+      alert(res.data.msg || '批量操作失败')
+    }
+  } catch (error: any) {
+    console.error('批量禁用失败:', error)
+    const errorMsg = error.response?.data?.msg || '批量操作失败'
+    alert(errorMsg)
   }
 }
 
@@ -2773,6 +2938,68 @@ input:checked + .slider:before {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* 错误提示文本 */
+.error-text {
+  display: block;
+  margin-top: 5px;
+  font-family: "Comic Sans MS", cursive;
+  font-size: 12px;
+  color: #f44336;
+}
+
+/* 单选按钮组 */
+.radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.radio-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-family: "Comic Sans MS", cursive;
+  font-size: 14px;
+  color: #a67c52;
+}
+
+.radio-item input {
+  display: none;
+}
+
+.radio-item .custom-radio {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(166, 124, 82, 0.4);
+  border-radius: 50%;
+  position: relative;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.radio-item input:checked + .custom-radio {
+  border-color: #f38181;
+  background: linear-gradient(to right, #f38181, #f77d5f);
+}
+
+.radio-item .custom-radio::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: white;
+  transition: transform 0.3s ease;
+}
+
+.radio-item input:checked + .custom-radio::after {
+  transform: translate(-50%, -50%) scale(1);
 }
 
 /* 响应式 */

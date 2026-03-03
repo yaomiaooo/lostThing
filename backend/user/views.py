@@ -1,10 +1,13 @@
 from django.shortcuts import render
 
 import json
-from django.http import JsonResponse
+import io
+import csv
+from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
 from .models import User
+from django.db import models
 
 from django.contrib.auth.hashers import check_password, make_password
 
@@ -563,7 +566,6 @@ def get_user_detail(request, user_id):
         "username": user.username,
         "realName": user.real_name,
         "phone": user.phone,
-        "email": getattr(user, 'email', ''),
         "role": user.role,
         "roleName": {1: "学生", 2: "老师", 3: "区域管理员", 4: "系统管理员"}.get(user.role, "未知"),
         "status": user.status,
@@ -686,5 +688,309 @@ def delete_user(request, user_id):
                 "userId": user_id
             }
         })
+    except Exception as e:
+        return JsonResponse({"code": 1, "msg": f"删除失败: {str(e)}"})
+
+
+@csrf_exempt
+@require_POST
+def create_regular_user(request):
+    """
+    新增普通用户（学生/教师）
+    URL: POST /api/user/create
+    Body: {
+        "username": "2023001",
+        "password": "123456",
+        "realName": "张三",
+        "phone": "13800138000",
+        "role": 1  // 1=学生, 2=教师
+    }
+    """
+    # 权限检查
+    has_perm, error_response = check_admin_permission(request)
+    if not has_perm:
+        return error_response
+    
+    try:
+        body = json.loads(request.body.decode('utf-8'))
+        username = body.get('username')
+        password = body.get('password')
+        real_name = body.get('realName')
+        phone = body.get('phone')
+        new_role = body.get('role')
+        
+        # 参数校验
+        if not all([username, password, real_name, phone, new_role]):
+            return JsonResponse({"code": 1, "msg": "必填参数不能为空"})
+        
+        if new_role not in [1, 2]:
+            return JsonResponse({"code": 1, "msg": "角色只能是1(学生)或2(教师)"})
+        
+        # 验证手机号格式
+        if len(phone) != 11 or not phone.isdigit():
+            return JsonResponse({"code": 1, "msg": "手机号格式不正确"})
+        
+        # 检查用户名是否已存在
+        if User.objects.filter(username=username).exists():
+            return JsonResponse({"code": 1, "msg": "用户名已存在"})
+        
+        # 检查手机号是否已存在
+        if User.objects.filter(phone=phone).exists():
+            return JsonResponse({"code": 1, "msg": "手机号已存在"})
+        
+        # 创建用户
+        user = User.objects.create(
+            username=username,
+            password=make_password(password),
+            real_name=real_name,
+            phone=phone,
+            role=new_role,
+            status=1,
+            first_login=1,
+            create_time=timezone.now(),
+            update_time=timezone.now()
+        )
+        
+        return JsonResponse({
+            "code": 0,
+            "msg": "创建成功",
+            "data": {
+                "userId": user.id,
+                "username": user.username,
+                "realName": user.real_name,
+                "role": user.role
+            }
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({"code": 1, "msg": "请求数据不是合法的 JSON"})
+    except Exception as e:
+        return JsonResponse({"code": 1, "msg": f"创建失败: {str(e)}"})
+
+
+@csrf_exempt
+@require_http_methods(["PUT"])
+def update_regular_user(request, user_id):
+    """
+    更新普通用户信息
+    URL: PUT /api/user/{user_id}
+    """
+    # 权限检查
+    has_perm, error_response = check_admin_permission(request)
+    if not has_perm:
+        return error_response
+    
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return JsonResponse({"code": 1, "msg": "用户不存在"})
+    
+    try:
+        body = json.loads(request.body.decode('utf-8'))
+        real_name = body.get('realName')
+        phone = body.get('phone')
+        new_role = body.get('role')
+        password = body.get('password')
+        status = body.get('status')
+        
+        # 更新字段
+        if real_name is not None:
+            user.real_name = real_name
+        if phone is not None:
+            # 检查手机号是否已被其他用户使用
+            if User.objects.filter(phone=phone).exclude(id=user_id).exists():
+                return JsonResponse({"code": 1, "msg": "手机号已被其他用户使用"})
+            user.phone = phone
+        if new_role is not None and new_role in [1, 2]:
+            user.role = new_role
+        if password is not None and password:
+            user.password = make_password(password)
+            user.first_login = 1
+        if status is not None and status in [0, 1]:
+            user.status = status
+        
+        user.update_time = timezone.now()
+        user.save()
+        
+        return JsonResponse({
+            "code": 0,
+            "msg": "更新成功",
+            "data": {
+                "userId": user.id,
+                "username": user.username
+            }
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({"code": 1, "msg": "请求数据不是合法的 JSON"})
+    except Exception as e:
+        return JsonResponse({"code": 1, "msg": f"更新失败: {str(e)}"})
+
+
+@require_GET
+def export_users(request):
+    """
+    导出用户数据
+    URL: GET /api/user/export?format=xlsx&role=1&status=1&keyword=张三
+    format: xlsx 或 csv
+    """
+    # 权限检查
+    has_perm, error_response = check_admin_permission(request)
+    if not has_perm:
+        return error_response
+    
+    # 获取参数
+    export_format = request.GET.get('format', 'csv')
+    role = request.GET.get('role')
+    status = request.GET.get('status')
+    keyword = request.GET.get('keyword')
+    
+    # 基础查询
+    queryset = User.objects.all().order_by('-create_time')
+    
+    # 筛选
+    if role:
+        queryset = queryset.filter(role=role)
+    if status:
+        queryset = queryset.filter(status=status)
+    if keyword:
+        queryset = queryset.filter(
+            models.Q(username__icontains=keyword) |
+            models.Q(real_name__icontains=keyword) |
+            models.Q(phone__icontains=keyword)
+        )
+    
+    # 准备数据
+    users_data = []
+    for user in queryset:
+        users_data.append({
+            "用户ID": user.id,
+            "用户名": user.username,
+            "真实姓名": user.real_name,
+            "手机号": user.phone,
+            "角色": {1: "学生", 2: "老师", 3: "区域管理员", 4: "系统管理员"}.get(user.role, "未知"),
+            "状态": "启用" if user.status == 1 else "禁用",
+            "是否首次登录": "是" if user.first_login == 1 else "否",
+            "创建时间": user.create_time.strftime('%Y-%m-%d %H:%M:%S') if user.create_time else '',
+            "最后登录时间": user.last_login_time.strftime('%Y-%m-%d %H:%M:%S') if user.last_login_time else ''
+        })
+    
+    if export_format == 'csv':
+        # 导出 CSV
+        response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
+        filename = f"用户数据_{timezone.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        if users_data:
+            writer = csv.DictWriter(response, fieldnames=users_data[0].keys())
+            writer.writeheader()
+            for row in users_data:
+                writer.writerow(row)
+        
+        return response
+    
+    else:
+        # 导出 Excel (xlsx) - 先使用 CSV 作为默认
+        response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
+        filename = f"用户数据_{timezone.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        if users_data:
+            writer = csv.DictWriter(response, fieldnames=users_data[0].keys())
+            writer.writeheader()
+            for row in users_data:
+                writer.writerow(row)
+        
+        return response
+
+
+@csrf_exempt
+@require_POST
+def batch_update_users_status(request):
+    """
+    批量更新用户状态
+    URL: POST /api/user/batch-status
+    Body: {
+        "userIds": [1, 2, 3],
+        "status": 0  // 0=禁用, 1=启用
+    }
+    """
+    has_perm, error_response = check_admin_permission(request)
+    if not has_perm:
+        return error_response
+    
+    try:
+        body = json.loads(request.body.decode('utf-8'))
+        user_ids = body.get('userIds', [])
+        new_status = body.get('status')
+        
+        if not user_ids or new_status not in [0, 1]:
+            return JsonResponse({"code": 1, "msg": "参数错误"})
+        
+        current_user_id = request.session.get('user_id')
+        # 不能批量操作自己
+        user_ids = [uid for uid in user_ids if uid != current_user_id]
+        
+        updated_count = User.objects.filter(id__in=user_ids).update(
+            status=new_status,
+            update_time=timezone.now()
+        )
+        
+        return JsonResponse({
+            "code": 0,
+            "msg": f"成功更新 {updated_count} 个用户",
+            "data": {"updatedCount": updated_count}
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({"code": 1, "msg": "请求数据不是合法的 JSON"})
+    except Exception as e:
+        return JsonResponse({"code": 1, "msg": f"操作失败: {str(e)}"})
+
+
+@csrf_exempt
+@require_http_methods(["DELETE"])
+def batch_delete_users(request):
+    """
+    批量删除用户
+    URL: DELETE /api/user/batch-delete
+    Body: {
+        "userIds": [1, 2, 3]
+    }
+    """
+    has_perm, error_response = check_admin_permission(request)
+    if not has_perm:
+        return error_response
+    
+    try:
+        body = json.loads(request.body.decode('utf-8'))
+        user_ids = body.get('userIds', [])
+        
+        if not user_ids:
+            return JsonResponse({"code": 1, "msg": "请选择要删除的用户"})
+        
+        current_user_id = request.session.get('user_id')
+        # 不能删除自己
+        user_ids = [uid for uid in user_ids if uid != current_user_id]
+        
+        # 检查用户是否有发布的物品
+        try:
+            from items.models import Item
+            users_with_items = Item.objects.filter(user_id__in=user_ids).values_list('user_id', flat=True).distinct()
+            if users_with_items:
+                return JsonResponse({"code": 1, "msg": f"用户 {list(users_with_items)} 有发布的物品，无法删除"})
+        except ImportError:
+            pass
+        
+        deleted_count, _ = User.objects.filter(id__in=user_ids).delete()
+        
+        return JsonResponse({
+            "code": 0,
+            "msg": f"成功删除 {deleted_count} 个用户",
+            "data": {"deletedCount": deleted_count}
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({"code": 1, "msg": "请求数据不是合法的 JSON"})
     except Exception as e:
         return JsonResponse({"code": 1, "msg": f"删除失败: {str(e)}"})

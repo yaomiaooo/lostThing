@@ -16,15 +16,30 @@ urlpatterns = [
      # 获取用户列表（支持分页、筛选、搜索）
     path('/list', views.get_user_list, name='get_user_list'),
     
+    # 新增普通用户（学生/教师）
+    path('/create', views.create_regular_user, name='create_regular_user'),  # POST /api/user/create
+    
+    # 更新普通用户信息
+    path('/<int:user_id>', views.update_regular_user, name='update_regular_user'),  # PUT /api/user/{user_id}
+    
     # 新增管理员账号
-    path('/admin', views.create_admin_user, name='create_admin_user'),
+    path('/admin', views.create_admin_user, name='create_admin_user'),  # POST /api/user/admin
     
     # 获取用户详情
-    path('/<int:user_id>', views.get_user_detail, name='get_user_detail'),
+    path('/<int:user_id>/detail', views.get_user_detail, name='get_user_detail'),  # GET /api/user/{user_id}/detail
     
     # 修改用户状态（禁用/启用）
-    path('/<int:user_id>/status', views.update_user_status, name='update_user_status'),
+    path('/<int:user_id>/status', views.update_user_status, name='update_user_status'),  # PUT /api/user/{user_id}/status
     
     # 删除用户
-    path('/<int:user_id>/delete', views.delete_user, name='delete_user'),
+    path('/<int:user_id>/delete', views.delete_user, name='delete_user'),  # DELETE /api/user/{user_id}/delete
+    
+    # 导出用户数据
+    path('/export', views.export_users, name='export_users'),  # GET /api/user/export
+    
+    # 批量更新用户状态
+    path('/batch-status', views.batch_update_users_status, name='batch_update_users_status'),  # POST /api/user/batch-status
+    
+    # 批量删除用户
+    path('/batch-delete', views.batch_delete_users, name='batch_delete_users'),  # DELETE /api/user/batch-delete
 ]
