@@ -64,7 +64,7 @@
               @keyup.enter="loadHistory(1)"
             />
             <button class="search-btn" @click="loadHistory(1)">
-              🔍 查询
+              🔍︎ 查询
             </button>
             <button class="reset-btn" @click="resetFilters">
               ↻ 重置

@@ -91,7 +91,7 @@
                 placeholder="搜索物品名称、地点..."
                 @keyup.enter="loadItemList"
               />
-              <button class="search-btn" @click="loadItemList">🔍</button>
+              <button class="search-btn" @click="loadItemList">🔍︎</button>
             </div>
           </div>
           <div class="action-row" v-if="selectedItems.length > 0">
