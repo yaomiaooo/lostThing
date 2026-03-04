@@ -61,15 +61,15 @@
             <div class="stat-mini">
               <span class="stat-icon"></span>
               <div class="stat-info">
-                <span class="stat-value">{{ userStats.total }}</span>
-                <span class="stat-label">总用户</span>
+                <span class="stat-value">{{ userStats.lostFoundAdmin }}</span>
+                <span class="stat-label">失物招领管理员</span>
               </div>
             </div>
             <div class="stat-mini highlight">
               <span class="stat-icon"></span>
               <div class="stat-info">
-                <span class="stat-value">{{ userStats.active }}</span>
-                <span class="stat-label">活跃</span>
+                <span class="stat-value">{{ userStats.total }}</span>
+                <span class="stat-label">总用户</span>
               </div>
             </div>
           </div>
@@ -574,7 +574,7 @@ const userStats = reactive({
   student: 0,
   teacher: 0,
   total: 0,
-  active: 0
+  lostFoundAdmin: 0
 })
 
 const userFilter = reactive({
@@ -665,7 +665,7 @@ const loadUserStatistics = async () => {
       userStats.total = res.data.data.total
       userStats.student = res.data.data.student
       userStats.teacher = res.data.data.teacher
-      userStats.active = res.data.data.active
+      userStats.lostFoundAdmin = res.data.data.lostFoundAdmin
     }
   } catch (error) {
     console.error('加载统计数据失败:', error)
@@ -713,7 +713,7 @@ const loadUsers = async () => {
     userStats.student = 2
     userStats.teacher = 1
     userStats.total = 3
-    userStats.active = 2
+    userStats.lostFoundAdmin = 0
   }
 }
 

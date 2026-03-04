@@ -497,7 +497,7 @@ def get_user_statistics(request):
     student = all_users.filter(role=1).count()
     teacher = all_users.filter(role=2).count()
     admin = all_users.filter(role__in=[3, 4]).count()
-    active = all_users.filter(status=1).count()
+    lostFoundAdmin = all_users.filter(role=3).count()
     
     return JsonResponse({
         "code": 0,
@@ -507,7 +507,7 @@ def get_user_statistics(request):
             "student": student,
             "teacher": teacher,
             "admin": admin,
-            "active": active
+            "lostFoundAdmin": lostFoundAdmin
         }
     })
 
