@@ -1788,6 +1788,9 @@ def get_statistics(request):
     start_date = request.GET.get('startDate')
     end_date = request.GET.get('endDate')
     
+    # 获取今日日期
+    today = timezone.now().date()
+    
     # 3. 基础查询集
     queryset = Item.objects.all()
     
@@ -1807,6 +1810,7 @@ def get_statistics(request):
     canceled = queryset.filter(current_status=6).count()
     archived = queryset.filter(current_status=7).count()
     invalid = queryset.filter(current_status=8).count()
+    new_today = queryset.filter(create_time__date=today).count()
     
     # 6. 按类型统计
     lost_items = queryset.filter(item_category=1).count()  # 失物
@@ -1843,7 +1847,8 @@ def get_statistics(request):
                 "rejected": rejected,
                 "canceled": canceled,
                 "archived": archived,
-                "invalid": invalid
+                "invalid": invalid,
+                "newToday": new_today
             },
             "byCategory": {
                 "lostItems": lost_items,

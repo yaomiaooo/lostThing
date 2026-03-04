@@ -17,7 +17,7 @@
       >
         <template #custom-content>
           <div class="notice-content">
-            <div class="notice-title">📊 系统状态</div>
+            <div class="notice-title">系统状态</div>
             <div class="notice-desc">
               今日新增物品: {{ todayNewItems }}<br>
               待处理审核: {{ pendingAudit }}<br>
@@ -32,45 +32,51 @@
       <main class="main-content">
         <!-- 页面标题 -->
         <section class="page-header">
-          <h1 class="page-title">📈 数据驾驶舱</h1>
+          <h1 class="page-title">数据驾驶舱</h1>
           <p class="page-subtitle">全校失物招领数据实时监控与统计分析</p>
         </section>
 
+          <!-- 加载提示 -->
+        <div v-if="loading" class="loading-overlay">
+          <div class="loading-spinner"></div>
+          <p>加载数据中...</p>
+        </div>
+
         <!-- 核心指标卡片 -->
-        <section class="stats-section">
+        <section v-else class="stats-section">
           <div class="stats-grid">
             <div class="stat-card primary" @click="quickNavigate('/system-admin/accounts')">
-              <div class="stat-icon">👥</div>
+              <div class="stat-icon"></div>
               <div class="stat-value">{{ overview.totalUsers || 0 }}</div>
               <div class="stat-label">总用户数</div>
               <div class="stat-trend">↑ {{ overview.newUsersToday || 0 }} 今日新增</div>
             </div>
             <div class="stat-card success" @click="quickNavigate('/item-admin/items')">
-              <div class="stat-icon">📦</div>
+              <div class="stat-icon"></div>
               <div class="stat-value">{{ overview.totalItems || 0 }}</div>
               <div class="stat-label">物品总数</div>
               <div class="stat-trend">↑ {{ todayNewItems }} 今日发布</div>
             </div>
             <div class="stat-card warning" @click="quickNavigate('/item-admin/pending')">
-              <div class="stat-icon">⏳</div>
+              <div class="stat-icon"></div>
               <div class="stat-value">{{ pendingAudit }}</div>
               <div class="stat-label">待审核</div>
               <div class="stat-trend">需尽快处理</div>
             </div>
             <div class="stat-card info" @click="quickNavigate('/system-admin/complaints')">
-              <div class="stat-icon">🚨</div>
+              <div class="stat-icon"></div>
               <div class="stat-value">{{ pendingComplaints }}</div>
               <div class="stat-label">待处理投诉</div>
               <div class="stat-trend">点击查看详情</div>
             </div>
             <div class="stat-card secondary" @click="quickNavigate('/item-admin/history')">
-              <div class="stat-icon">✅</div>
+              <div class="stat-icon"></div>
               <div class="stat-value">{{ overview.resolvedItems || 0 }}</div>
               <div class="stat-label">已解决</div>
               <div class="stat-trend">本月 {{ overview.monthlyResolved || 0 }}</div>
             </div>
             <div class="stat-card danger" @click="quickNavigate('/system-admin/data')">
-              <div class="stat-icon">📁</div>
+              <div class="stat-icon"></div>
               <div class="stat-value">{{ overview.archivedItems || 0 }}</div>
               <div class="stat-label">已归档</div>
               <div class="stat-trend">长期未认领</div>
@@ -79,12 +85,12 @@
         </section>
 
         <!-- 图表区域 -->
-        <section class="charts-section">
+         <section v-if="!loading" class="charts-section">
           <div class="chart-grid">
             <!-- 趋势图 -->
             <div class="chart-card">
               <div class="chart-header">
-                <h3 class="chart-title">📊 近7天数据趋势</h3>
+                <h3 class="chart-title">近7天数据趋势</h3>
                 <div class="chart-legend">
                   <span class="legend-item"><span class="dot lost"></span>失物</span>
                   <span class="legend-item"><span class="dot found"></span>招领</span>
@@ -119,7 +125,7 @@
             <!-- 分类饼图 -->
             <div class="chart-card">
               <div class="chart-header">
-                <h3 class="chart-title">🥧 物品分类分布</h3>
+                <h3 class="chart-title">物品分类分布</h3>
               </div>
               <div class="chart-body">
                 <div class="category-list">
@@ -147,11 +153,11 @@
         </section>
 
         <!-- 实时动态 -->
-        <section class="activity-section">
+        <section v-if="!loading" class="activity-section">
           <div class="section-header">
-            <h3 class="section-title">🔔 实时动态</h3>
+            <h3 class="section-title">实时动态</h3>
             <button class="refresh-btn" @click="refreshData" :class="{ rotating: refreshing }">
-              <span class="refresh-icon">🔄</span>
+              <span class="refresh-icon"></span>
               刷新
             </button>
           </div>
@@ -174,22 +180,22 @@
 
         <!-- 快捷操作 -->
         <section class="quick-actions-section">
-          <h3 class="section-title">⚡ 快捷操作</h3>
+          <h3 class="section-title">快捷操作</h3>
           <div class="action-buttons">
             <button class="action-btn primary" @click="quickNavigate('/system-admin/notices')">
-              <span class="btn-icon">📢</span>
+              <span class="btn-icon"></span>
               <span>发布公告</span>
             </button>
             <button class="action-btn success" @click="quickNavigate('/item-admin/pending')">
-              <span class="btn-icon">✓</span>
+              <span class="btn-icon"></span>
               <span>审核物品</span>
             </button>
             <button class="action-btn warning" @click="quickNavigate('/system-admin/accounts')">
-              <span class="btn-icon">➕</span>
+              <span class="btn-icon"></span>
               <span>新增管理员</span>
             </button>
             <button class="action-btn info" @click="quickNavigate('/system-admin/data')">
-              <span class="btn-icon">💾</span>
+              <span class="btn-icon"></span>
               <span>数据备份</span>
             </button>
           </div>
@@ -231,77 +237,56 @@ const maxDailyCount = computed(() => {
 })
 
 /* ================= 数据加载 ================= */
-// 获取用户统计数据
-const loadUserStatistics = async () => {
+// 加载所有数据
+const loadAllData = async () => {
+  loading.value = true
   try {
-    const res = await axios.get('/api/user/list', {
-      params: {
-        page: 1,
-        size: 1  // 只需要获取总数，不需要具体数据
-      }
-    })
-    if (res.data.code === 0) {
-      return {
-        totalUsers: res.data.data?.total || 0
-      }
-    }
-  } catch (error) {
-    console.error('加载用户统计数据失败:', error)
-  }
-  return { totalUsers: 0 }
-}
-
-// 获取今日新增用户数
-const loadTodayNewUsers = async () => {
-  try {
-    const today = new Date().toISOString().split('T')[0]
-    const res = await axios.get('/api/user/list', {
-      params: {
-        page: 1,
-        size: 1,
-        startDate: today,
-        endDate: today
-      }
-    })
-    if (res.data.code === 0) {
-      return res.data.data?.total || 0
-    }
-  } catch (error) {
-    console.error('加载今日新增用户数失败:', error)
-  }
-  return 0
-}
-
-// 使用现有接口 /api/item/statistics/overview 获取物品统计数据
-const loadStatistics = async () => {
-  try {
-    const [userStatsRes, todayUsersRes, itemStatsRes] = await Promise.all([
-      loadUserStatistics(),
-      loadTodayNewUsers(),
-      axios.get('/api/item/statistics/overview', {
-        params: {
-          startDate: getDateDaysAgo(30),
-          endDate: currentDate.value
-        }
-      })
+    // 并行加载所有数据
+    const [userStatsRes, itemStatsRes] = await Promise.all([
+      // 加载用户统计
+      axios.get('/api/user/statistics'),
+      // 加载物品统计
+      axios.get('/api/item/statistics/overview')
     ])
     
-    const userStats = userStatsRes || {}
-    const itemData = itemStatsRes.data?.data || {}
-    
-    if (itemStatsRes.data?.code === 200) {
-      overview.value = {
-        totalUsers: userStats.totalUsers || 0,
-        newUsersToday: todayUsersRes || 0,
-        totalItems: itemData.overview?.totalPublished || 0,
-        resolvedItems: (itemData.overview?.claimed || 0) + (itemData.overview?.archived || 0),
-        monthlyResolved: itemData.overview?.claimed || 0,
-        archivedItems: itemData.overview?.archived || 0
-      }
+    // 处理用户统计数据
+    console.log('用户统计数据:', userStatsRes.data)
+    if (userStatsRes.data.code === 0) {
+      overview.value.totalUsers = userStatsRes.data.data.total || 0
+      overview.value.newUsersToday = userStatsRes.data.data.newToday || 0
     }
+    
+    // 处理物品统计数据
+    console.log('物品统计数据:', itemStatsRes.data)
+    if (itemStatsRes.data.code === 200) {
+      const itemData = itemStatsRes.data.data
+      overview.value.totalItems = itemData.overview?.totalPublished || 0
+      overview.value.resolvedItems = (itemData.overview?.claimed || 0) + (itemData.overview?.archived || 0)
+      overview.value.monthlyResolved = itemData.overview?.claimed || 0
+      overview.value.archivedItems = itemData.overview?.archived || 0
+      
+      // 设置待审核数量
+      pendingAudit.value = itemData.overview?.pendingAudit || 0
+      
+      // 设置今日新增物品
+      todayNewItems.value = itemData.overview?.newToday || 0
+      
+      // 生成近7天趋势数据
+      generateWeeklyDataFromStats(itemData.trend || [])
+      
+      // 生成分类统计数据（暂时使用模拟数据）
+      generateCategoryStats()
+      
+      // 生成实时动态（暂时使用模拟数据）
+      generateActivities()
+    }
+    
+    // 待处理投诉暂时设为0
+    pendingComplaints.value = 0
+    
   } catch (error) {
-    console.error('加载统计数据失败:', error)
-    // 使用模拟数据
+    console.error('加载数据失败:', error)
+    // 加载失败时使用默认值
     overview.value = {
       totalUsers: 0,
       newUsersToday: 0,
@@ -310,111 +295,61 @@ const loadStatistics = async () => {
       monthlyResolved: 0,
       archivedItems: 0
     }
+  } finally {
+    loading.value = false
   }
 }
 
-// 获取今日新增物品数
-const loadTodayNewItems = async () => {
-  try {
-    const today = new Date().toISOString().split('T')[0]
-    const res = await axios.get('/api/item/admin/list', {
-      params: {
-        page: 1,
-        size: 1,
-        startDate: today,
-        endDate: today
-      }
-    })
+// 从后端统计数据生成近7天趋势数据
+const generateWeeklyDataFromStats = (trendData: any[]) => {
+  const weekDays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+  
+  if (trendData.length === 0) {
+    // 没有数据时使用模拟数据
+    weeklyData.value = weekDays.map(day => ({
+      date: day,
+      lost: 0,
+      found: 0
+    }))
+    return
+  }
+  
+  // 将后端数据转换为前端需要的格式
+  weeklyData.value = trendData.map((item, index) => {
+    const date = new Date(item.date)
+    const dayIndex = date.getDay() // 0=周日, 1=周一, ..., 6=周六
+    const displayDay = dayIndex === 0 ? '周日' : weekDays[dayIndex - 1]
     
-    if (res.data.code === 200) {
-      return res.data.data.total || 0
+    return {
+      date: displayDay,
+      lost: Math.floor(item.count / 2), // 简单分配失物和招领
+      found: Math.ceil(item.count / 2)
     }
-  } catch (error) {
-    console.error('加载今日新增物品数失败:', error)
-  }
-  return 0
+  })
 }
 
-// 使用现有接口 /api/item/admin/list 获取待审核数量
-const loadPendingAudit = async () => {
-  try {
-    const [todayItemsRes, pendingRes] = await Promise.all([
-      loadTodayNewItems(),
-      axios.get('/api/item/admin/list', {
-        params: {
-          page: 1,
-          size: 1,
-          status: 1  // 待审核状态
-        }
-      })
-    ])
-    
-    if (pendingRes.data.code === 200) {
-      pendingAudit.value = pendingRes.data.data.statistics?.['待审核'] || 0
-      todayNewItems.value = todayItemsRes
-    }
-  } catch (error) {
-    console.error('加载待审核数据失败:', error)
-    pendingAudit.value = 0
-    todayNewItems.value = 0
-  }
-}
-
-// 使用现有接口 /api/item/claim/list 获取待处理投诉（复用认领申请接口模拟）
-const loadPendingComplaints = async () => {
-  try {
-    const res = await axios.get('/api/item/claim/list', {
-      params: {
-        page: 1,
-        size: 1,
-        status: 0  // 待审核状态模拟投诉
-      }
-    })
-    
-    if (res.data.code === 200) {
-      pendingComplaints.value = res.data.data.statistics?.pending || 5
-    }
-  } catch (error) {
-    console.error('加载投诉数据失败:', error)
-    pendingComplaints.value = 5
-  }
-}
-
-// 生成近7天数据（使用现有接口数据模拟）
-const generateWeeklyData = () => {
-  const days = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
-  weeklyData.value = days.map(day => ({
-    date: day,
-    lost: Math.floor(Math.random() * 20) + 5,
-    found: Math.floor(Math.random() * 15) + 3
-  }))
-}
-
-// 生成分类统计数据
+// 生成分类统计数据（暂时使用模拟数据，需要后端接口支持）
 const generateCategoryStats = () => {
   const categories = [
-    { name: '证件', color: '#ff9a9e', count: 45 },
-    { name: '电子设备', color: '#a1c4fd', count: 78 },
-    { name: '日用品', color: '#c2e9fb', count: 56 },
-    { name: '学习用品', color: '#d4fc79', count: 34 },
-    { name: '其他', color: '#f6d365', count: 23 }
+    { name: '证件', color: '#ff9a9e', count: 0 },
+    { name: '电子设备', color: '#a1c4fd', count: 0 },
+    { name: '日用品', color: '#c2e9fb', count: 0 },
+    { name: '学习用品', color: '#d4fc79', count: 0 },
+    { name: '其他', color: '#f6d365', count: 0 }
   ]
   
-  const total = categories.reduce((sum, cat) => sum + cat.count, 0)
+  const total = categories.reduce((sum, cat) => sum + cat.count, 0) || 1
   categoryStats.value = categories.map(cat => ({
     ...cat,
     percentage: Math.round((cat.count / total) * 100)
   }))
 }
 
-// 生成实时动态
+// 生成实时动态（暂时使用模拟数据，需要后端接口支持）
 const generateActivities = () => {
   const activities = [
-    { type: 'publish', icon: '📝', text: '张三发布了新的失物信息：黑色钱包', time: '2分钟前' },
-    { type: 'audit', icon: '✓', text: '管理员审核通过了"校园卡"招领信息', time: '5分钟前' },
-    { type: 'claim', icon: '🤝', text: '李四成功认领了"蓝牙耳机"', time: '10分钟前' },
-    { type: 'register', icon: '👤', text: '新用户王五注册了账号', time: '15分钟前' },
-    { type: 'archive', icon: '📁', text: '系统自动归档了3条长期未认领信息', time: '30分钟前' }
+    { type: 'publish', icon: '📝', text: '系统运行正常', time: '刚刚' },
+    { type: 'audit', icon: '✓', text: '数据加载完成', time: '刚刚' }
   ]
   recentActivities.value = activities
 }
@@ -429,14 +364,7 @@ const getDateDaysAgo = (days: number) => {
 /* ================= 交互操作 ================= */
 const refreshData = async () => {
   refreshing.value = true
-  await Promise.all([
-    loadStatistics(),
-    loadPendingAudit(),
-    loadPendingComplaints()
-  ])
-  generateWeeklyData()
-  generateCategoryStats()
-  generateActivities()
+  await loadAllData()
   setTimeout(() => {
     refreshing.value = false
   }, 500)
@@ -452,17 +380,11 @@ const handleLogout = () => {
 
 /* ================= 生命周期 ================= */
 onMounted(() => {
-  loadStatistics()
-  loadPendingAudit()
-  loadPendingComplaints()
-  generateWeeklyData()
-  generateCategoryStats()
-  generateActivities()
+  loadAllData()
   
   // 定时刷新（每5分钟）
   const timer = setInterval(() => {
-    loadPendingAudit()
-    loadPendingComplaints()
+    loadAllData()
   }, 300000)
   
   onBeforeUnmount(() => {
@@ -515,6 +437,44 @@ onMounted(() => {
   margin-left: 288px;
   max-width: calc(100vw - 288px);
   box-sizing: border-box;
+  position: relative;
+}
+
+/* 加载遮罩 */
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.8);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  border-radius: 20px;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(166, 124, 82, 0.2);
+  border-top-color: #a67c52;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-overlay p {
+  font-family: "Comic Sans MS", cursive;
+  color: #a67c52;
+  font-size: 16px;
+  margin: 0;
 }
 
 /* 页面标题 */

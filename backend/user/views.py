@@ -492,12 +492,16 @@ def get_user_statistics(request):
     # 获取全部用户数据
     all_users = User.objects.all()
     
+    # 获取今日日期
+    today = timezone.now().date()
+    
     # 统计数据
     total = all_users.count()
     student = all_users.filter(role=1).count()
     teacher = all_users.filter(role=2).count()
     admin = all_users.filter(role__in=[3, 4]).count()
     lostFoundAdmin = all_users.filter(role=3).count()
+    newToday = all_users.filter(create_time__date=today).count()
     
     return JsonResponse({
         "code": 0,
@@ -507,7 +511,8 @@ def get_user_statistics(request):
             "student": student,
             "teacher": teacher,
             "admin": admin,
-            "lostFoundAdmin": lostFoundAdmin
+            "lostFoundAdmin": lostFoundAdmin,
+            "newToday": newToday
         }
     })
 
