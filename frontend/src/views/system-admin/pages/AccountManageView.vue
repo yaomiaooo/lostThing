@@ -455,9 +455,10 @@
             <div class="form-group">
               <label class="form-label">角色 <span class="required">*</span></label>
               <select v-model="userForm.role" class="form-select">
-                <option value="student">学生</option>
-                <option value="teacher">教师</option>
-                <option value="admin">管理员</option>
+                <option value="1">学生</option>
+                <option value="2">教师</option>
+                <option value="3">失物招领管理员</option>
+                <option value="4">系统管理员</option>
               </select>
             </div>
             <div class="form-group">
@@ -954,7 +955,7 @@ const openUserModal = (user?: any) => {
   
   if (user) {
     Object.assign(userForm, {
-      role: user.role === 1 ? 'student' : user.role === 2 ? 'teacher' : user.role === 3 ? 'admin' : 'student',
+      role: String(user.role),
       realName: user.realName,
       roleNo: user.username || '',
       phone: user.phone,
@@ -963,7 +964,7 @@ const openUserModal = (user?: any) => {
     })
   } else {
     Object.assign(userForm, {
-      role: 'student',
+      role: '1',
       realName: '',
       roleNo: '',
       phone: '',
@@ -1020,15 +1021,17 @@ const saveUser = async () => {
   
   submitting.value = true
   try {
-    if (userForm.role === 'admin') {
-      // 管理员角色，调用管理员接口
+    const roleNum = parseInt(userForm.role)
+    
+    if (!editingUser.value && (roleNum === 3 || roleNum === 4)) {
+      // 新增管理员，调用管理员接口
       const adminPayload: any = {
         username: userForm.roleNo,
         realName: userForm.realName,
         phone: userForm.phone,
         permissions: ['review', 'manage', 'user', 'notice', 'data', 'config'], // 默认给全部权限
         status: userForm.status,
-        role: 3 // 3=失物招领管理员
+        role: roleNum
       }
       
       if (userForm.password) {
@@ -1046,7 +1049,7 @@ const saveUser = async () => {
         alert(res.data.msg || '创建管理员失败，请重试')
       }
     } else {
-      // 学生/教师角色，调用用户接口
+      // 编辑用户或新增普通用户
       const url = editingUser.value ? `/api/user/${editingUser.value.userId}` : '/api/user/create'
       const method = editingUser.value ? 'put' : 'post'
       
@@ -1054,7 +1057,7 @@ const saveUser = async () => {
         username: userForm.roleNo,
         realName: userForm.realName,
         phone: userForm.phone,
-        role: userForm.role === 'student' ? 1 : 2,
+        role: roleNum,
         status: userForm.status
       }
       
@@ -1067,6 +1070,9 @@ const saveUser = async () => {
       if (res.data.code === 0) {
         alert(editingUser.value ? '更新成功！' : '创建成功！')
         await loadUsers()
+        if (roleNum === 3 || roleNum === 4) {
+          await loadAdmins()
+        }
         closeUserModal()
       } else {
         alert(res.data.msg || '操作失败，请重试')

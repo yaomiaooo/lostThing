@@ -780,7 +780,7 @@ def create_regular_user(request):
 @require_http_methods(["PUT"])
 def update_regular_user(request, user_id):
     """
-    更新普通用户信息
+    更新用户信息
     URL: PUT /api/user/{user_id}
     """
     # 权限检查
@@ -801,6 +801,9 @@ def update_regular_user(request, user_id):
         password = body.get('password')
         status = body.get('status')
         
+        # 获取当前登录用户的角色
+        current_role = request.session.get('role')
+        
         # 更新字段
         if real_name is not None:
             user.real_name = real_name
@@ -809,12 +812,24 @@ def update_regular_user(request, user_id):
             if User.objects.filter(phone=phone).exclude(id=user_id).exists():
                 return JsonResponse({"code": 1, "msg": "手机号已被其他用户使用"})
             user.phone = phone
-        if new_role is not None and new_role in [1, 2]:
+        if new_role is not None and new_role in [1, 2, 3, 4]:
+            # 安全检查：只有系统管理员(role=4)才能修改角色为系统管理员(4)
+            if new_role == 4 and current_role != 4:
+                return JsonResponse({"code": 403, "msg": "无权限修改为系统管理员角色"})
+            # 安全检查：不能修改自己的角色
+            if user.id == request.session.get('user_id'):
+                return JsonResponse({"code": 1, "msg": "不能修改自己的角色"})
             user.role = new_role
         if password is not None and password:
             user.password = make_password(password)
             user.first_login = 1
         if status is not None and status in [0, 1]:
+            # 不能操作自己的账号状态
+            if user.id == request.session.get('user_id'):
+                return JsonResponse({"code": 1, "msg": "不能操作自己的账号"})
+            # 不能禁用系统管理员（仅系统管理员能操作系统管理员）
+            if user.role == 4 and current_role != 4:
+                return JsonResponse({"code": 403, "msg": "无权限操作系统管理员账号"})
             user.status = status
         
         user.update_time = timezone.now()
