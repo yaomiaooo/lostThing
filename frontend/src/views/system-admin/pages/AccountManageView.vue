@@ -210,75 +210,7 @@
           </div>
         </section>
 
-        <!-- 管理员管理 -->
-        <section v-if="currentTab === 'admins'" class="account-section">
-          <!-- 管理员统计 -->
-          <div class="admin-stats">
-            <div class="admin-stat-card" v-for="stat in adminStats" :key="stat.label">
-              <div class="admin-stat-icon"></div>
-              <div class="admin-stat-value">{{ stat.value }}</div>
-              <div class="admin-stat-label">{{ stat.label }}</div>
-            </div>
-          </div>
 
-          <!-- 管理员列表 -->
-          <div class="admin-list">
-            <div class="section-header">
-              <h3 class="section-title">失物招领管理员</h3>
-              <button class="add-admin-btn" @click="openAdminModal()">
-                新增管理员
-              </button>
-            </div>
-
-            <div class="admin-grid">
-              <div 
-                v-for="admin in adminList" 
-                :key="admin.adminId"
-                class="admin-card"
-                :class="{ disabled: admin.status === 0 }"
-              >
-                <div class="admin-header">
-                  <div class="admin-status" :class="{ active: admin.status === 1 }">
-                    {{ admin.status === 1 ? '在职' : '停用' }}
-                  </div>
-                </div>
-                <div class="admin-body">
-                  <h4 class="admin-name">{{ admin.realName }}</h4>
-                  <p class="admin-account">{{ admin.username }}</p>
-                  <div class="admin-meta">
-                    <span class="meta-item">{{ maskPhone(admin.phone) }}</span>
-                    <span class="meta-item">{{ admin.email || '-' }}</span>
-                  </div>
-                  <div class="admin-permissions">
-                    <span 
-                      v-for="perm in admin.permissions" 
-                      :key="perm"
-                      class="perm-tag"
-                    >
-                      {{ perm }}
-                    </span>
-                  </div>
-                </div>
-                <div class="admin-footer">
-                  <div class="admin-stats-mini">
-                    <span>审核: {{ admin.reviewCount || 0 }}</span>
-                    <span>登录: {{ formatDate(admin.lastLoginTime) }}</span>
-                  </div>
-                  <div class="admin-actions">
-                    <button class="admin-btn" @click="openAdminModal(admin)">编辑</button>
-                    <button 
-                      class="admin-btn"
-                      :class="admin.status === 1 ? 'warning' : 'success'"
-                      @click="toggleAdminStatus(admin)"
-                    >
-                      {{ admin.status === 1 ? '停用' : '启用' }}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
 
         <!-- 系统通知 -->
         <section v-if="currentTab === 'notify'" class="account-section">
@@ -527,89 +459,7 @@
       </div>
     </div>
 
-    <!-- 管理员编辑弹窗 -->
-    <div v-if="showAdminModal" class="modal-overlay" @click.self="closeAdminModal">
-      <div class="edit-modal">
-        <div class="modal-header">
-          <h3 class="modal-title">{{ editingAdmin ? '编辑管理员' : '新增管理员' }}</h3>
-          <button class="modal-close" @click="closeAdminModal">×</button>
-        </div>
-        <div class="modal-body">
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">姓名 <span class="required">*</span></label>
-              <input v-model="adminForm.realName" type="text" class="form-input" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">登录账号 <span class="required">*</span></label>
-              <input v-model="adminForm.username" type="text" class="form-input" :disabled="!!editingAdmin" />
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">手机号 <span class="required">*</span></label>
-              <input v-model="adminForm.phone" type="tel" class="form-input" maxlength="11" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">邮箱</label>
-              <input v-model="adminForm.email" type="email" class="form-input" />
-            </div>
-          </div>
-          <div class="form-group" v-if="!editingAdmin">
-            <label class="form-label">初始密码 <span class="required">*</span></label>
-            <div class="password-input">
-              <input 
-                v-model="adminForm.password" 
-                :type="showAdminPassword ? 'text' : 'password'" 
-                class="form-input"
-              />
-              <button class="toggle-pwd" @click="showAdminPassword = !showAdminPassword">
-                {{ showAdminPassword ? '隐藏' : '查看' }}
-              </button>
-            </div>
-          </div>
-          <div class="form-group">
-            <label class="form-label">管理权限 <span class="required">*</span></label>
-            <div class="permission-grid">
-              <label 
-                v-for="perm in availablePermissions" 
-                :key="perm.value"
-                class="permission-checkbox"
-              >
-                <input 
-                  type="checkbox" 
-                  v-model="adminForm.permissions" 
-                  :value="perm.value"
-                >
-                <span class="custom-checkbox"></span>
-                <span class="perm-name">{{ perm.label }}</span>
-              </label>
-            </div>
-          </div>
-          <div class="form-group">
-            <label class="form-label">状态</label>
-            <div class="switch-wrapper">
-              <label class="switch">
-                <input type="checkbox" v-model="adminForm.status" :true-value="1" :false-value="0">
-                <span class="slider"></span>
-              </label>
-              <span class="switch-label">{{ adminForm.status === 1 ? '在职' : '停用' }}</span>
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button class="modal-btn cancel-btn" @click="closeAdminModal">取消</button>
-          <button 
-            class="modal-btn confirm-btn" 
-            :disabled="!validateAdminForm || submitting"
-            @click="saveAdmin"
-          >
-            <span v-if="submitting" class="loading-spinner-small"></span>
-            <span v-else>保存</span>
-          </button>
-        </div>
-      </div>
-    </div>
+
 
     <!-- 用户详情弹窗 -->
     <div v-if="showUserDetailModal" class="modal-overlay" @click.self="closeUserDetailModal">
@@ -716,7 +566,6 @@ const router = useRouter()
 /* ================= 标签页配置 ================= */
 const tabs = [
   { key: 'users', label: '用户管理', icon: '', badge: null },
-  { key: 'admins', label: '管理员', icon: '', badge: null },
   { key: 'notify', label: '系统通知', icon: '', badge: null }
 ]
 const currentTab = ref('users')
@@ -748,23 +597,7 @@ const isAllSelected = computed(() => {
   return userList.value.length > 0 && selectedUsers.value.length === userList.value.length
 })
 
-/* ================= 管理员管理 ================= */
-const adminStats = computed(() => [
-  { icon: '👤', value: adminList.value.length, label: '管理员总数' },
-  { icon: '✅', value: adminList.value.filter(a => a.status === 1).length, label: '在职' },
-  { icon: '🚫', value: adminList.value.filter(a => a.status === 0).length, label: '停用' },
-  { icon: '📋', value: adminList.value.reduce((sum, a) => sum + (a.reviewCount || 0), 0), label: '总审核数' }
-])
 
-const adminList = ref<any[]>([])
-const availablePermissions = [
-  { value: 'review', label: '信息审核', icon: '✅' },
-  { value: 'manage', label: '物品管理', icon: '📦' },
-  { value: 'user', label: '用户管理', icon: '👥' },
-  { value: 'notice', label: '公告管理', icon: '📢' },
-  { value: 'data', label: '数据导出', icon: '📊' },
-  { value: 'config', label: '系统配置', icon: '⚙️' }
-]
 
 /* ================= 通知管理 ================= */
 const notifyTypes = [
@@ -800,32 +633,19 @@ const canSendNotify = computed(() => {
 
 /* ================= 弹窗状态 ================= */
 const showUserModal = ref(false)
-const showAdminModal = ref(false)
 const showUserDetailModal = ref(false)
 const editingUser = ref<any>(null)
-const editingAdmin = ref<any>(null)
 const detailUser = ref<any>({})
 const submitting = ref(false)
 const showPassword = ref(false)
-const showAdminPassword = ref(false)
 
 /* ================= 表单数据 ================= */
 const userForm = reactive({
-  role: 'student',
+  role: '1',
   realName: '',
   roleNo: '',
   phone: '',
   password: '',
-  status: 1
-})
-
-const adminForm = reactive({
-  realName: '',
-  username: '',
-  phone: '',
-  email: '',
-  password: '',
-  permissions: [] as string[],
   status: 1
 })
 
@@ -838,20 +658,10 @@ const validateUserForm = computed(() => {
          (editingUser.value || userForm.password.trim())
 })
 
-const validateAdminForm = computed(() => {
-  return adminForm.realName.trim() && 
-         adminForm.username.trim() && 
-         adminForm.phone.trim() && 
-         adminForm.phone.length === 11 &&
-         adminForm.permissions.length > 0 &&
-         (editingAdmin.value || adminForm.password.trim())
-})
-
 /* ================= 标签切换 ================= */
 const switchTab = (tab: string) => {
   currentTab.value = tab
   if (tab === 'users') loadUsers()
-  if (tab === 'admins') loadAdmins()
   if (tab === 'notify') loadNotifyHistory()
 }
 
@@ -1023,60 +833,30 @@ const saveUser = async () => {
   try {
     const roleNum = parseInt(userForm.role)
     
-    if (!editingUser.value && (roleNum === 3 || roleNum === 4)) {
-      // 新增管理员，调用管理员接口
-      const adminPayload: any = {
-        username: userForm.roleNo,
-        realName: userForm.realName,
-        phone: userForm.phone,
-        permissions: ['review', 'manage', 'user', 'notice', 'data', 'config'], // 默认给全部权限
-        status: userForm.status,
-        role: roleNum
-      }
-      
-      if (userForm.password) {
-        adminPayload.password = userForm.password
-      }
-      
-      const res = await axios.post('/api/user/admin', adminPayload)
-      
-      if (res.data.code === 0) {
-        alert('创建管理员成功！')
-        await loadAdmins()
-        await loadUsers()
-        closeUserModal()
-      } else {
-        alert(res.data.msg || '创建管理员失败，请重试')
-      }
+    // 编辑用户或新增用户
+    const url = editingUser.value ? `/api/user/${editingUser.value.userId}` : '/api/user/create'
+    const method = editingUser.value ? 'put' : 'post'
+    
+    const payload: any = {
+      username: userForm.roleNo,
+      realName: userForm.realName,
+      phone: userForm.phone,
+      role: roleNum,
+      status: userForm.status
+    }
+    
+    if (userForm.password) {
+      payload.password = userForm.password
+    }
+    
+    const res = await axios[method](url, payload)
+    
+    if (res.data.code === 0) {
+      alert(editingUser.value ? '更新成功！' : '创建成功！')
+      await loadUsers()
+      closeUserModal()
     } else {
-      // 编辑用户或新增普通用户
-      const url = editingUser.value ? `/api/user/${editingUser.value.userId}` : '/api/user/create'
-      const method = editingUser.value ? 'put' : 'post'
-      
-      const payload: any = {
-        username: userForm.roleNo,
-        realName: userForm.realName,
-        phone: userForm.phone,
-        role: roleNum,
-        status: userForm.status
-      }
-      
-      if (userForm.password) {
-        payload.password = userForm.password
-      }
-      
-      const res = await axios[method](url, payload)
-      
-      if (res.data.code === 0) {
-        alert(editingUser.value ? '更新成功！' : '创建成功！')
-        await loadUsers()
-        if (roleNum === 3 || roleNum === 4) {
-          await loadAdmins()
-        }
-        closeUserModal()
-      } else {
-        alert(res.data.msg || '操作失败，请重试')
-      }
+      alert(res.data.msg || '操作失败，请重试')
     }
   } catch (error: any) {
     console.error('保存失败:', error)
@@ -1218,165 +998,7 @@ const batchDeleteUsers = async () => {
   }
 }
 
-/* ================= 管理员管理方法 ================= */
-const loadAdmins = async () => {
-  try {
-    const res = await axios.get('/api/user/list', {
-      params: {
-        size: 1000 // 获取足够多的用户来筛选管理员
-      }
-    })
-    if (res.data.code === 0) {
-      // 过滤出管理员用户(role 3或4)
-      const allUsers = res.data.data.list || []
-      adminList.value = allUsers
-        .filter((user: any) => user.role === 3 || user.role === 4)
-        .map((user: any) => ({
-          adminId: user.userId,
-          realName: user.realName,
-          username: user.username,
-          phone: user.phone,
-          email: '',
-          status: user.status,
-          permissions: ['review', 'manage', 'user', 'notice', 'data', 'config'], // 默认全部权限
-          reviewCount: 0,
-          lastLoginTime: user.lastLoginTime || '',
-          avatar: null
-        }))
-    }
-  } catch (error) {
-    console.error('加载管理员失败:', error)
-    adminList.value = [
-      { adminId: 1, realName: '管理员A', username: 'admin001', phone: '13900139001', email: 'admin1@example.com', status: 1, permissions: ['review', 'manage', 'notice'], reviewCount: 156, lastLoginTime: '2026-03-01 09:30:00', avatar: null },
-      { adminId: 2, realName: '管理员B', username: 'admin002', phone: '13900139002', email: 'admin2@example.com', status: 1, permissions: ['review', 'data'], reviewCount: 89, lastLoginTime: '2026-02-28 16:45:00', avatar: null },
-      { adminId: 3, realName: '管理员C', username: 'admin003', phone: '13900139003', email: null, status: 0, permissions: ['review'], reviewCount: 0, lastLoginTime: '2026-01-15 11:20:00', avatar: null }
-    ]
-  }
-}
 
-const openAdminModal = async (admin?: any) => {
-  if (admin) {
-    // 编辑管理员：先确保用户列表已加载，然后找到该用户并调用用户编辑功能
-    if (userList.value.length === 0) {
-      await loadUsers()
-    }
-    
-    // 找到对应的用户对象
-    const user = userList.value.find((u: any) => u.userId === admin.adminId)
-    if (user) {
-      openUserModal(user)
-      return
-    }
-  }
-  
-  // 新增管理员或找不到用户时，使用原来的管理员弹窗
-  editingAdmin.value = admin || null
-  if (admin) {
-    Object.assign(adminForm, {
-      realName: admin.realName,
-      username: admin.username,
-      phone: admin.phone,
-      email: admin.email || '',
-      password: '',
-      permissions: [...admin.permissions],
-      status: admin.status
-    })
-  } else {
-    Object.assign(adminForm, {
-      realName: '',
-      username: '',
-      phone: '',
-      email: '',
-      password: '',
-      permissions: ['review'],
-      status: 1
-    })
-  }
-  showAdminPassword.value = false
-  showAdminModal.value = true
-}
-
-const closeAdminModal = () => {
-  showAdminModal.value = false
-  editingAdmin.value = null
-}
-
-const saveAdmin = async () => {
-  submitting.value = true
-  try {
-    if (editingAdmin.value) {
-      // 更新管理员，使用用户更新接口
-      const payload: any = {
-        username: adminForm.username,
-        realName: adminForm.realName,
-        phone: adminForm.phone,
-        status: adminForm.status
-      }
-      
-      console.log('更新管理员，发送数据:', payload)
-      console.log('adminForm 数据:', adminForm)
-      
-      const res = await axios.put(`/api/user/${editingAdmin.value.adminId}`, payload)
-      
-      console.log('更新管理员响应:', res.data)
-      
-      if (res.data.code === 0) {
-        alert('更新成功！')
-        await loadAdmins()
-        closeAdminModal()
-      } else {
-        alert(res.data.msg || '操作失败，请重试')
-      }
-    } else {
-      // 新增管理员，使用专门的管理员创建接口
-      const payload: any = {
-        username: adminForm.username,
-        realName: adminForm.realName,
-        phone: adminForm.phone,
-        role: 3 // 默认创建区域管理员
-      }
-      
-      if (adminForm.password) {
-        payload.password = adminForm.password
-      }
-      
-      const res = await axios.post('/api/user/admin', payload)
-      
-      if (res.data.code === 0) {
-        alert('创建管理员成功！')
-        await loadAdmins()
-        await loadUsers()
-        closeAdminModal()
-      } else {
-        alert(res.data.msg || '创建管理员失败，请重试')
-      }
-    }
-  } catch (error: any) {
-    console.error('保存管理员失败:', error)
-    const errorMsg = error.response?.data?.msg || '操作失败，请重试'
-    alert(errorMsg)
-  } finally {
-    submitting.value = false
-  }
-}
-
-const toggleAdminStatus = async (admin: any) => {
-  try {
-    const res = await axios.put(`/api/user/${admin.adminId}/status`, {
-      status: admin.status === 1 ? 0 : 1
-    })
-    
-    if (res.data.code === 0) {
-      admin.status = admin.status === 1 ? 0 : 1
-    } else {
-      alert(res.data.msg || '操作失败')
-    }
-  } catch (error: any) {
-    console.error('切换状态失败:', error)
-    const errorMsg = error.response?.data?.msg || '操作失败'
-    alert(errorMsg)
-  }
-}
 
 /* ================= 通知管理方法 ================= */
 const loadNotifyHistory = async () => {
