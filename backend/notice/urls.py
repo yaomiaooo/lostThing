@@ -29,4 +29,12 @@ urlpatterns = [
     
     # 删除公告
     path('/admin/<int:announcement_id>/delete', views.delete_announcement, name='delete_announcement'),
+    
+    # ==================== 新增：站内通知接口 ====================
+    
+    # 发送站内通知
+    path('/notifications/admin', views.send_system_notification, name='send_system_notification'),
+    
+    # 获取通知发送历史
+    path('/notifications/admin/history', views.get_notification_history, name='get_notification_history'),
 ]

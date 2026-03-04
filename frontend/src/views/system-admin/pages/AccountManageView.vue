@@ -1003,11 +1003,24 @@ const batchDeleteUsers = async () => {
 /* ================= 通知管理方法 ================= */
 const loadNotifyHistory = async () => {
   try {
-    const res = await axios.get('/api/announcements/admin/list')
-    if (res.data.code === 0) {
-      notifyHistory.value = res.data.data || []
+    const res = await axios.get('/api/announcements/notifications/admin/history')
+    if (res.data.code === 200) {
+      // 转换数据格式以适配前端显示
+      notifyHistory.value = (res.data.data?.list || []).map((item: any, index: number) => ({
+        id: index + 1,
+        type: item.type === 1 ? 'system' : item.type === 2 ? 'policy' : item.type === 3 ? 'maintain' : 'urgent',
+        typeName: item.typeName,
+        title: item.title,
+        content: item.content,
+        createTime: item.createTime,
+        receiverCount: item.sendCount,
+        readCount: 0, // 暂时设为0，需要单独接口获取
+        confirmCount: 0,
+        needConfirm: false
+      }))
     }
   } catch (error) {
+    console.error('加载通知历史失败:', error)
     notifyHistory.value = [
       { id: 1, type: 'system', typeName: '系统', title: '系统维护通知', content: '系统将于本周六凌晨 2:00-4:00 进行例行维护...', createTime: '2026-02-28 10:00:00', receiverCount: 1256, readCount: 890, confirmCount: 0, needConfirm: false },
       { id: 2, type: 'policy', typeName: '政策', title: '审核规范更新', content: '请严格按照新的审核标准执行...', createTime: '2026-02-27 14:30:00', receiverCount: 3, readCount: 3, confirmCount: 3, needConfirm: true },
@@ -1056,8 +1069,8 @@ const removeNotifyUser = (userId: number) => {
 const sendNotification = async () => {
   sending.value = true
   try {
-    const res = await axios.post('/api/announcements/admin', notifyForm)
-    if (res.data.code === 0) {
+    const res = await axios.post('/api/announcements/notifications/admin', notifyForm)
+    if (res.data.code === 200) {
       alert('通知发送成功！')
       // 重置表单
       notifyForm.title = ''
@@ -1065,10 +1078,13 @@ const sendNotification = async () => {
       notifyForm.targetUsers = []
       selectedNotifyUsers.value = []
       await loadNotifyHistory()
+    } else {
+      alert(res.data.msg || '发送失败，请重试')
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('发送通知失败:', error)
-    alert('发送失败，请重试')
+    const errorMsg = error.response?.data?.msg || '发送失败，请重试'
+    alert(errorMsg)
   } finally {
     sending.value = false
   }

@@ -545,3 +545,156 @@ def delete_announcement(request, announcement_id):
         })
     except Exception as e:
         return JsonResponse({"code": 500, "msg": f"删除失败: {str(e)}"})
+
+
+@csrf_exempt
+@require_POST
+def send_system_notification(request):
+    """
+    发送站内通知（管理员）
+    URL: POST /api/notifications/admin
+    Body: {
+        "type": "system",        // 通知类型：system, policy, maintain, urgent
+        "targetType": "all",    // 接收对象类型：all, role, specific
+        "targetRoles": ["student", "teacher", "admin"],  // 当 targetType 为 role 时使用
+        "targetUsers": [1, 2, 3],                             // 当 targetType 为 specific 时使用
+        "title": "通知标题",
+        "content": "通知内容",
+        "needConfirm": false       // 是否需要用户确认
+    }
+    """
+    has_perm, error_response = check_admin_permission(request)
+    if not has_perm:
+        return error_response
+    
+    try:
+        body = json.loads(request.body.decode('utf-8'))
+        type_str = body.get('type', 'system')
+        target_type = body.get('targetType', 'all')
+        target_roles = body.get('targetRoles', [])
+        target_users = body.get('targetUsers', [])
+        title = body.get('title', '')
+        content = body.get('content', '')
+        need_confirm = body.get('needConfirm', False)
+        
+        # 类型映射
+        TYPE_MAP = {
+            'system': 1,
+            'policy': 2,
+            'maintain': 3,
+            'urgent': 4
+        }
+        type_num = TYPE_MAP.get(type_str, 1)
+        
+        # 参数校验
+        if not title or not content:
+            return JsonResponse({"code": 400, "msg": "标题和内容不能为空"})
+        
+        # 导入 User 模型
+        from user.models import User
+        
+        # 确定目标用户
+        if target_type == 'all':
+            # 全体用户
+            user_queryset = User.objects.filter(status=1)
+        elif target_type == 'role':
+            # 指定角色
+            ROLE_MAP = {
+                'student': 1,
+                'teacher': 2,
+                'admin': 3
+            }
+            role_nums = [ROLE_MAP.get(r) for r in target_roles if ROLE_MAP.get(r)]
+            user_queryset = User.objects.filter(status=1, role__in=role_nums)
+        elif target_type == 'specific':
+            # 指定用户
+            user_queryset = User.objects.filter(status=1, id__in=target_users)
+        else:
+            return JsonResponse({"code": 400, "msg": "非法的接收对象类型"})
+        
+        # 批量创建通知
+        notification_list = []
+        for user in user_queryset:
+            notification = Notification.objects.create(
+                user_id=user.id,
+                title=title,
+                content=content,
+                type=type_num,
+                is_read=0,
+                related_id=None
+            )
+            notification_list.append({
+                "notificationId": notification.id,
+                "userId": user.id,
+                "userName": user.real_name
+            })
+        
+        return JsonResponse({
+            "code": 200,
+            "msg": "发送成功",
+            "data": {
+                "sentCount": len(notification_list),
+                "notifications": notification_list[:10]  // 只返回前10个作为示例
+            }
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({"code": 400, "msg": "请求数据不是合法的 JSON"})
+    except Exception as e:
+        return JsonResponse({"code": 500, "msg": f"发送失败: {str(e)}"})
+
+
+@require_GET
+def get_notification_history(request):
+    """
+    获取通知发送历史（管理员）
+    URL: GET /api/notifications/admin/history?page=1&size=10
+    """
+    has_perm, error_response = check_admin_permission(request)
+    if not has_perm:
+        return error_response
+    
+    # 获取参数
+    page = int(request.GET.get('page', 1))
+    size = int(request.GET.get('size', 10))
+    
+    # 查询通知（按创建时间分组，获取最新的通知）
+    # 这里简化处理，只返回最近创建的通知，统计发送数量
+    from django.db.models import Max, Count
+    
+    # 按标题和内容分组，获取每个通知的信息
+    notifications = Notification.objects.values(
+        'title', 'content', 'type'
+    ).annotate(
+        max_create_time=Max('create_time'),
+        send_count=Count('id')
+    ).order_by('-max_create_time')
+    
+    # 分页
+    paginator = Paginator(notifications, size)
+    page_obj = paginator.get_page(page)
+    
+    # 组装数据
+    TYPE_NAMES = {1: '系统', 2: '政策', 3: '维护', 4: '紧急'}
+    
+    data_list = []
+    for notif in page_obj:
+        data_list.append({
+            "title": notif['title'],
+            "content": notif['content'],
+            "type": notif['type'],
+            "typeName": TYPE_NAMES.get(notif['type'], '未知'),
+            "sendCount": notif['send_count'],
+            "createTime": notif['max_create_time'].strftime('%Y-%m-%d %H:%M:%S')
+        })
+    
+    return JsonResponse({
+        "code": 200,
+        "msg": "success",
+        "data": {
+            "list": data_list,
+            "page": page_obj.number,
+            "size": size,
+            "total": paginator.count
+        }
+    })
