@@ -16,6 +16,9 @@ urlpatterns = [
      # 获取用户列表（支持分页、筛选、搜索）
     path('/list', views.get_user_list, name='get_user_list'),
     
+    # 获取用户统计数据
+    path('/statistics', views.get_user_statistics, name='get_user_statistics'),
+    
     # 新增普通用户（学生/教师）
     path('/create', views.create_regular_user, name='create_regular_user'),  # POST /api/user/create
     

@@ -478,6 +478,40 @@ def get_user_list(request):
     })
 
 
+@require_GET
+def get_user_statistics(request):
+    """
+    获取全部用户统计数据（管理员）
+    URL: GET /api/user/statistics
+    """
+    # 权限检查
+    has_perm, error_response = check_admin_permission(request)
+    if not has_perm:
+        return error_response
+    
+    # 获取全部用户数据
+    all_users = User.objects.all()
+    
+    # 统计数据
+    total = all_users.count()
+    student = all_users.filter(role=1).count()
+    teacher = all_users.filter(role=2).count()
+    admin = all_users.filter(role__in=[3, 4]).count()
+    active = all_users.filter(status=1).count()
+    
+    return JsonResponse({
+        "code": 0,
+        "msg": "success",
+        "data": {
+            "total": total,
+            "student": student,
+            "teacher": teacher,
+            "admin": admin,
+            "active": active
+        }
+    })
+
+
 @csrf_exempt
 @require_POST
 def create_admin_user(request):

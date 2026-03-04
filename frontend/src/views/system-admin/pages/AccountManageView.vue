@@ -229,7 +229,7 @@
                     :class="{ active: notifyForm.type === type.value }"
                     @click="notifyForm.type = type.value"
                   >
-                    {{ type.icon }} {{ type.label }}
+                    {{ type.label }}
                   </button>
                 </div>
               </div>
@@ -340,9 +340,9 @@
               <div class="form-actions">
                 <button class="submit-btn" :disabled="!canSendNotify || sending" @click="sendNotification">
                   <span v-if="sending" class="loading-spinner-small"></span>
-                  <span v-else>📤 发送通知</span>
+                  <span v-else>发送通知</span>
                 </button>
-                <button class="draft-btn" @click="saveDraft">💾 保存草稿</button>
+                <button class="draft-btn" @click="saveDraft">保存草稿</button>
               </div>
             </div>
 
@@ -362,9 +362,9 @@
                   <h4 class="history-title">{{ item.title }}</h4>
                   <p class="history-content">{{ truncateText(item.content, 50) }}</p>
                   <div class="history-stats">
-                    <span>👥 接收: {{ item.receiverCount }}</span>
-                    <span>👁️ 已读: {{ item.readCount }}</span>
-                    <span v-if="item.needConfirm">✅ 确认: {{ item.confirmCount }}</span>
+                    <span>接收: {{ item.receiverCount }}</span>
+                    <span>已读: {{ item.readCount }}</span>
+                    <span v-if="item.needConfirm">确认: {{ item.confirmCount }}</span>
                   </div>
                 </div>
               </div>
@@ -438,10 +438,10 @@
                 autocomplete="new-password"
               />
               <button class="toggle-pwd" @click="showPassword = !showPassword">
-                {{ showPassword ? '🙈' : '👁️' }}
+                {{ showPassword ? '隐藏' : '显示' }}
               </button>
             </div>
-            <button class="gen-pwd" @click="generatePassword">🎲 生成随机密码</button>
+            <button class="gen-pwd" @click="generatePassword">生成随机密码</button>
             <span v-if="userFormErrors.password" class="error-text">{{ userFormErrors.password }}</span>
           </div>
         </div>
@@ -601,10 +601,10 @@ const isAllSelected = computed(() => {
 
 /* ================= 通知管理 ================= */
 const notifyTypes = [
-  { value: 'system', label: '系统通知', icon: '🔔' },
-  { value: 'policy', label: '政策更新', icon: '📋' },
-  { value: 'maintain', label: '维护公告', icon: '🔧' },
-  { value: 'urgent', label: '紧急通知', icon: '⚠️' }
+  { value: 'system', label: '系统通知' },
+  { value: 'policy', label: '政策更新' },
+  { value: 'maintain', label: '维护公告' },
+  { value: 'urgent', label: '紧急通知' }
 ]
 
 const notifyForm = reactive({
@@ -658,10 +658,28 @@ const validateUserForm = computed(() => {
          (editingUser.value || userForm.password.trim())
 })
 
+/* ================= 加载统计数据 ================= */
+const loadUserStatistics = async () => {
+  try {
+    const res = await axios.get('/api/user/statistics')
+    if (res.data.code === 0) {
+      userStats.total = res.data.data.total
+      userStats.student = res.data.data.student
+      userStats.teacher = res.data.data.teacher
+      userStats.active = res.data.data.active
+    }
+  } catch (error) {
+    console.error('加载统计数据失败:', error)
+  }
+}
+
 /* ================= 标签切换 ================= */
 const switchTab = (tab: string) => {
   currentTab.value = tab
-  if (tab === 'users') loadUsers()
+  if (tab === 'users') {
+    loadUsers()
+    loadUserStatistics()
+  }
   if (tab === 'notify') loadNotifyHistory()
 }
 
@@ -682,12 +700,6 @@ const loadUsers = async () => {
       userList.value = res.data.data.list || []
       userPagination.total = res.data.data.total || 0
       userPagination.totalPages = Math.ceil(userPagination.total / userPagination.size)
-      
-      // 更新统计
-      userStats.total = userList.value.length
-      userStats.student = userList.value.filter(u => u.role === 1).length
-      userStats.teacher = userList.value.filter(u => u.role === 2).length
-      userStats.active = userList.value.filter(u => u.status === 1).length
     }
   } catch (error) {
     console.error('加载用户失败:', error)
@@ -854,6 +866,7 @@ const saveUser = async () => {
     if (res.data.code === 0) {
       alert(editingUser.value ? '更新成功！' : '创建成功！')
       await loadUsers()
+      await loadUserStatistics()
       closeUserModal()
     } else {
       alert(res.data.msg || '操作失败，请重试')
@@ -875,6 +888,7 @@ const toggleUserStatus = async (user: any) => {
     
     if (res.data.code === 0) {
       user.status = user.status === 1 ? 0 : 1
+      await loadUserStatistics()
     }
   } catch (error) {
     console.error('切换状态失败:', error)
@@ -955,6 +969,7 @@ const batchEnableUsers = async () => {
     if (res.data.code === 0) {
       selectedUsers.value = []
       await loadUsers()
+      await loadUserStatistics()
     } else {
       alert(res.data.msg || '批量操作失败')
     }
@@ -975,6 +990,7 @@ const batchDisableUsers = async () => {
     if (res.data.code === 0) {
       selectedUsers.value = []
       await loadUsers()
+      await loadUserStatistics()
     } else {
       alert(res.data.msg || '批量操作失败')
     }
@@ -993,6 +1009,7 @@ const batchDeleteUsers = async () => {
     })
     selectedUsers.value = []
     await loadUsers()
+    await loadUserStatistics()
   } catch (error) {
     alert('批量删除失败')
   }
@@ -1124,6 +1141,7 @@ const handleLogout = () => {
 /* ================= 生命周期 ================= */
 onMounted(() => {
   loadUsers()
+  loadUserStatistics()
   
   // 加载草稿
   const draft = localStorage.getItem('notifyDraft')
