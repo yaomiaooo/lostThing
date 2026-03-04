@@ -274,8 +274,9 @@ const loadAllData = async () => {
       // 生成近7天趋势数据
       generateWeeklyDataFromStats(itemData.trend || [])
       
-      // 生成分类统计数据（暂时使用模拟数据）
-      generateCategoryStats()
+      // 生成分类统计数据
+      console.log('后端分类数据:', itemData.categories)
+      generateCategoryStats(itemData.categories || [])
       
       // 生成实时动态（暂时使用模拟数据）
       generateActivities()
@@ -328,19 +329,34 @@ const generateWeeklyDataFromStats = (trendData: any[]) => {
   })
 }
 
-// 生成分类统计数据（暂时使用模拟数据，需要后端接口支持）
-const generateCategoryStats = () => {
-  const categories = [
-    { name: '证件', color: '#ff9a9e', count: 0 },
-    { name: '电子设备', color: '#a1c4fd', count: 0 },
-    { name: '日用品', color: '#c2e9fb', count: 0 },
-    { name: '学习用品', color: '#d4fc79', count: 0 },
-    { name: '其他', color: '#f6d365', count: 0 }
-  ]
+// 生成分类统计数据
+const generateCategoryStats = (backendCategories: any[] = []) => {
+  const defaultColors = ['#ff9a9e', '#a1c4fd', '#c2e9fb', '#d4fc79', '#f6d365', '#ffecd2', '#a8edea', '#fed6e3']
   
-  const total = categories.reduce((sum, cat) => sum + cat.count, 0) || 1
-  categoryStats.value = categories.map(cat => ({
-    ...cat,
+  if (backendCategories.length === 0) {
+    // 如果没有后端数据，使用默认分类
+    const categories = [
+      { name: '证件', color: '#ff9a9e', count: 0 },
+      { name: '电子设备', color: '#a1c4fd', count: 0 },
+      { name: '日用品', color: '#c2e9fb', count: 0 },
+      { name: '学习用品', color: '#d4fc79', count: 0 },
+      { name: '其他', color: '#f6d365', count: 0 }
+    ]
+    
+    const total = categories.reduce((sum, cat) => sum + cat.count, 0) || 1
+    categoryStats.value = categories.map(cat => ({
+      ...cat,
+      percentage: Math.round((cat.count / total) * 100)
+    }))
+    return
+  }
+  
+  // 使用后端数据
+  const total = backendCategories.reduce((sum, cat) => sum + cat.count, 0) || 1
+  categoryStats.value = backendCategories.map((cat, index) => ({
+    name: cat.name,
+    color: defaultColors[index % defaultColors.length],
+    count: cat.count,
     percentage: Math.round((cat.count / total) * 100)
   }))
 }
