@@ -634,7 +634,7 @@ def send_system_notification(request):
             "msg": "发送成功",
             "data": {
                 "sentCount": len(notification_list),
-                "notifications": notification_list[:10]  // 只返回前10个作为示例
+                "notifications": notification_list[:10]  # 只返回前10个作为示例
             }
         })
         
