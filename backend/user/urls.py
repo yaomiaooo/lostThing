@@ -19,14 +19,11 @@ urlpatterns = [
     # 获取用户统计数据
     path('/statistics', views.get_user_statistics, name='get_user_statistics'),
     
-    # 新增普通用户（学生/教师）
-    path('/create', views.create_regular_user, name='create_regular_user'),  # POST /api/user/create
+    # 新增用户（统一接口）
+    path('/create', views.create_user, name='create_user'),  # POST /api/user/create
     
-    # 更新普通用户信息
+    # 更新用户信息
     path('/<int:user_id>', views.update_regular_user, name='update_regular_user'),  # PUT /api/user/{user_id}
-    
-    # 新增管理员账号
-    path('/admin', views.create_admin_user, name='create_admin_user'),  # POST /api/user/admin
     
     # 获取用户详情
     path('/<int:user_id>/detail', views.get_user_detail, name='get_user_detail'),  # GET /api/user/{user_id}/detail

@@ -514,27 +514,25 @@ def get_user_statistics(request):
 
 @csrf_exempt
 @require_POST
-def create_admin_user(request):
+def create_user(request):
     """
-    新增管理员账号
-    URL: POST /api/user/admin
+    新增用户（统一接口）
+    URL: POST /api/user/create
     Body: {
-        "username": "admin001",
+        "username": "2023001",
         "password": "123456",
-        "realName": "管理员",
-        "phone": "13800000000",
-        "role": 3  // 3=区域管理员, 4=系统管理员
+        "realName": "张三",
+        "phone": "13800138000",
+        "role": 1  // 1=学生, 2=教师, 3=失物招领管理员, 4=系统管理员
     }
     """
-    # 权限检查（仅系统管理员可创建）
-    user_id = request.session.get('user_id')
-    role = request.session.get('role')
+    # 权限检查
+    has_perm, error_response = check_admin_permission(request)
+    if not has_perm:
+        return error_response
     
-    if not user_id:
-        return JsonResponse({"code": 401, "msg": "未登录"})
-    
-    if role != 4:  # 仅系统管理员
-        return JsonResponse({"code": 403, "msg": "仅系统管理员可创建管理员账号"})
+    # 获取当前用户角色
+    current_role = request.session.get('role')
     
     try:
         body = json.loads(request.body.decode('utf-8'))
@@ -546,14 +544,26 @@ def create_admin_user(request):
         
         # 参数校验
         if not all([username, password, real_name, phone, new_role]):
-            return JsonResponse({"code": 1, "msg": "参数不能为空"})
+            return JsonResponse({"code": 1, "msg": "必填参数不能为空"})
         
-        if new_role not in [3, 4]:
-            return JsonResponse({"code": 1, "msg": "角色只能是3(区域管理员)或4(系统管理员)"})
+        if new_role not in [1, 2, 3, 4]:
+            return JsonResponse({"code": 1, "msg": "角色只能是1(学生)、2(教师)、3(失物招领管理员)、4(系统管理员)"})
+        
+        # 权限检查：只有系统管理员才能创建系统管理员
+        if new_role == 4 and current_role != 4:
+            return JsonResponse({"code": 403, "msg": "无权限创建系统管理员账号"})
+        
+        # 验证手机号格式
+        if len(phone) != 11 or not phone.isdigit():
+            return JsonResponse({"code": 1, "msg": "手机号格式不正确"})
         
         # 检查用户名是否已存在
         if User.objects.filter(username=username).exists():
             return JsonResponse({"code": 1, "msg": "用户名已存在"})
+        
+        # 检查手机号是否已存在
+        if User.objects.filter(phone=phone).exists():
+            return JsonResponse({"code": 1, "msg": "手机号已存在"})
         
         # 创建用户
         user = User.objects.create(
@@ -574,6 +584,7 @@ def create_admin_user(request):
             "data": {
                 "userId": user.id,
                 "username": user.username,
+                "realName": user.real_name,
                 "role": user.role
             }
         })
@@ -734,80 +745,7 @@ def delete_user(request, user_id):
         return JsonResponse({"code": 1, "msg": f"删除失败: {str(e)}"})
 
 
-@csrf_exempt
-@require_POST
-def create_regular_user(request):
-    """
-    新增普通用户（学生/教师）
-    URL: POST /api/user/create
-    Body: {
-        "username": "2023001",
-        "password": "123456",
-        "realName": "张三",
-        "phone": "13800138000",
-        "role": 1  // 1=学生, 2=教师
-    }
-    """
-    # 权限检查
-    has_perm, error_response = check_admin_permission(request)
-    if not has_perm:
-        return error_response
-    
-    try:
-        body = json.loads(request.body.decode('utf-8'))
-        username = body.get('username')
-        password = body.get('password')
-        real_name = body.get('realName')
-        phone = body.get('phone')
-        new_role = body.get('role')
-        
-        # 参数校验
-        if not all([username, password, real_name, phone, new_role]):
-            return JsonResponse({"code": 1, "msg": "必填参数不能为空"})
-        
-        if new_role not in [1, 2]:
-            return JsonResponse({"code": 1, "msg": "角色只能是1(学生)或2(教师)"})
-        
-        # 验证手机号格式
-        if len(phone) != 11 or not phone.isdigit():
-            return JsonResponse({"code": 1, "msg": "手机号格式不正确"})
-        
-        # 检查用户名是否已存在
-        if User.objects.filter(username=username).exists():
-            return JsonResponse({"code": 1, "msg": "用户名已存在"})
-        
-        # 检查手机号是否已存在
-        if User.objects.filter(phone=phone).exists():
-            return JsonResponse({"code": 1, "msg": "手机号已存在"})
-        
-        # 创建用户
-        user = User.objects.create(
-            username=username,
-            password=make_password(password),
-            real_name=real_name,
-            phone=phone,
-            role=new_role,
-            status=1,
-            first_login=1,
-            create_time=timezone.now(),
-            update_time=timezone.now()
-        )
-        
-        return JsonResponse({
-            "code": 0,
-            "msg": "创建成功",
-            "data": {
-                "userId": user.id,
-                "username": user.username,
-                "realName": user.real_name,
-                "role": user.role
-            }
-        })
-        
-    except json.JSONDecodeError:
-        return JsonResponse({"code": 1, "msg": "请求数据不是合法的 JSON"})
-    except Exception as e:
-        return JsonResponse({"code": 1, "msg": f"创建失败: {str(e)}"})
+
 
 
 @csrf_exempt

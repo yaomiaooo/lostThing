@@ -300,9 +300,8 @@
                         :key="user.userId"
                         class="dropdown-item"
                         @click="addNotifyUser(user)"
-                      >
-                        <img :src="user.avatar || '/default-avatar.png'" />
-                        <span>{{ user.realName }} ({{ user.studentNo || user.teacherNo }})</span>
+                      >                
+                        <span>{{ user.realName }} ({{ user.username }})</span>
                       </div>
                     </div>
                   </div>
