@@ -122,12 +122,41 @@
               <div class="chart-header">
                 <h3 class="chart-title">物品分类分布</h3>
               </div>
-              <div class="chart-body">
+              <div class="chart-body pie-chart-container">
+                <!-- 标准圆形饼图 -->
+                <div class="pie-chart-wrapper" @mouseleave="hoveredCategory = null">
+                  <svg viewBox="0 0 200 200" class="pie-chart">
+                    <path
+                      v-for="(slice, index) in piePathSlices"
+                      :key="index"
+                      :d="slice.path"
+                      :fill="slice.color"
+                      :class="{ 'pie-slice-hovered': hoveredCategory === index }"
+                      @mouseenter="hoveredCategory = index"
+                      @mousemove="updateTooltip($event, slice)"
+                    />
+                  </svg>
+                  
+                  <!-- Tooltip -->
+                  <div 
+                    v-if="hoveredCategory !== null && hoveredSliceInfo"
+                    class="pie-tooltip"
+                    :style="{ left: hoveredSliceInfo.x + 'px', top: hoveredSliceInfo.y + 'px' }"
+                  >
+                    <div class="tooltip-name">{{ hoveredSliceInfo.name }}</div>
+                    <div class="tooltip-percentage">{{ hoveredSliceInfo.percentage }}%</div>
+                  </div>
+                </div>
+                
+                <!-- 分类列表 -->
                 <div class="category-list">
                   <div 
                     v-for="(cat, index) in categoryStats" 
                     :key="index"
                     class="category-item"
+                    :class="{ 'category-item-hovered': hoveredCategory === index }"
+                    @mouseenter="hoveredCategory = index"
+                    @mouseleave="hoveredCategory = null"
                   >
                     <div class="category-color" :style="{ background: cat.color }"></div>
                     <div class="category-info">
@@ -171,6 +200,8 @@ const recentActivities = ref<any[]>([])
 const pendingAudit = ref(0)
 const todayNewItems = ref(0)
 const pendingComplaints = ref(0)
+const hoveredCategory = ref<number | null>(null)
+const hoveredSliceInfo = ref<any>(null)
 
 /* ================= 计算属性 ================= */
 const currentDate = computed(() => {
@@ -183,6 +214,59 @@ const maxDailyCount = computed(() => {
   const max = Math.max(...weeklyData.value.map(d => d.lost + d.found))
   return max > 0 ? max : 1
 })
+
+// 计算标准饼图路径
+const piePathSlices = computed(() => {
+  const cx = 100
+  const cy = 100
+  const r = 80
+  let currentAngle = 0
+  
+  return categoryStats.value.map((cat, index) => {
+    const percentage = cat.percentage || 0
+    const angle = (percentage / 100) * 360
+    const startAngle = currentAngle
+    const endAngle = currentAngle + angle
+    
+    const startRad = (startAngle - 90) * Math.PI / 180
+    const endRad = (endAngle - 90) * Math.PI / 180
+    
+    const x1 = cx + r * Math.cos(startRad)
+    const y1 = cy + r * Math.sin(startRad)
+    const x2 = cx + r * Math.cos(endRad)
+    const y2 = cy + r * Math.sin(endRad)
+    
+    const largeArc = angle > 180 ? 1 : 0
+    
+    let path = ''
+    if (percentage === 100) {
+      path = `M ${cx} ${cy - r} A ${r} ${r} 0 1 1 ${cx} ${cy + r} A ${r} ${r} 0 1 1 ${cx} ${cy - r} Z`
+    } else if (percentage > 0) {
+      path = `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`
+    }
+    
+    currentAngle = endAngle
+    
+    return {
+      path,
+      color: cat.color,
+      name: cat.name,
+      percentage,
+      index
+    }
+  })
+})
+
+// 更新 tooltip 位置
+const updateTooltip = (event: MouseEvent, slice: any) => {
+  const rect = (event.currentTarget as SVGElement).getBoundingClientRect()
+  hoveredSliceInfo.value = {
+    x: event.clientX - rect.left + 10,
+    y: event.clientY - rect.top + 10,
+    name: slice.name,
+    percentage: slice.percentage
+  }
+}
 
 /* ================= 数据加载 ================= */
 // 加载所有数据
@@ -634,8 +718,76 @@ onMounted(() => {
   color: rgba(166, 124, 82, 0.7);
 }
 
+/* 饼图容器 */
+.pie-chart-container {
+  display: flex;
+  gap: 25px;
+  align-items: center;
+}
+
+.pie-chart-wrapper {
+  flex-shrink: 0;
+  width: 180px;
+  height: 180px;
+  position: relative;
+}
+
+.pie-chart {
+  width: 100%;
+  height: 100%;
+}
+
+.pie-chart path {
+  transition: all 0.3s ease;
+  cursor: pointer;
+  transform-origin: 100px 100px;
+}
+
+.pie-chart path:hover,
+.pie-slice-hovered {
+  transform: scale(1.05);
+  filter: brightness(1.1);
+}
+
+/* Tooltip 样式 */
+.pie-tooltip {
+  position: absolute;
+  background: rgba(166, 124, 82, 0.95);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-family: "Comic Sans MS", cursive;
+  font-size: 13px;
+  pointer-events: none;
+  z-index: 10;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.tooltip-name {
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.tooltip-percentage {
+  font-size: 12px;
+  opacity: 0.9;
+}
+
 /* 分类列表 */
 .category-list {
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 15px;
@@ -645,6 +797,16 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.category-item:hover,
+.category-item-hovered {
+  background: rgba(166, 124, 82, 0.1);
+  transform: translateX(5px);
 }
 
 .category-color {
@@ -866,6 +1028,16 @@ onMounted(() => {
   
   .chart-grid {
     grid-template-columns: 1fr;
+  }
+  
+  .pie-chart-container {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .category-list {
+    width: 100%;
+    max-width: 400px;
   }
 }
 
