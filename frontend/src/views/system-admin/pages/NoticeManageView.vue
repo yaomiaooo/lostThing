@@ -79,13 +79,13 @@
               <div class="form-section">
                 <label class="form-label">公告内容 <span class="required">*</span></label>
                 <div class="editor-toolbar">
-                  <button class="tool-btn" @click="insertTag('【重要】')" title="重要标记">🔴</button>
-                  <button class="tool-btn" @click="insertTag('【提示】')" title="提示标记">🔵</button>
-                  <button class="tool-btn" @click="insertTag('【注意】')" title="注意标记">🟡</button>
+                  <button class="tool-btn" @click="insertTag('【重要】')" title="重要标记"></button>
+                  <button class="tool-btn" @click="insertTag('【提示】')" title="提示标记"></button>
+                  <button class="tool-btn" @click="insertTag('【注意】')" title="注意标记"></button>
                   <div class="divider"></div>
-                  <button class="tool-btn" @click="insertTag('📅')" title="日期">📅</button>
-                  <button class="tool-btn" @click="insertTag('⏰')" title="时间">⏰</button>
-                  <button class="tool-btn" @click="insertTag('📍')" title="地点">📍</button>
+                  <button class="tool-btn" @click="insertTag('【日期】')" title="日期"></button>
+                  <button class="tool-btn" @click="insertTag('【时间】')" title="时间"></button>
+                  <button class="tool-btn" @click="insertTag('【地点】')" title="地点"></button>
                 </div>
                 <textarea 
                   v-model="publishForm.content"
@@ -141,7 +141,7 @@
 
               <div class="form-actions">
                 <button class="preview-btn" @click="previewNotice">
-                  👁️ 预览
+                  预览
                 </button>
                 <button 
                   class="submit-btn" 
@@ -149,7 +149,7 @@
                   @click="publishNotice"
                 >
                   <span v-if="publishing" class="loading-spinner-small"></span>
-                  <span v-else>📤 立即发布</span>
+                  <span v-else>立即发布</span>
                 </button>
               </div>
             </div>
@@ -157,7 +157,7 @@
             <!-- 右侧：公告管理 -->
             <div class="notice-list-panel">
               <div class="panel-header">
-                <h3 class="panel-title">📜 已发布公告</h3>
+                <h3 class="panel-title">已发布公告</h3>
                 <div class="filter-tabs">
                   <button 
                     class="filter-tab"
@@ -200,30 +200,30 @@
                       {{ getTypeLabel(notice.type) }}
                     </span>
                     <div class="notice-actions">
-                      <button class="action-icon" @click="editNotice(notice)" title="编辑">✏️</button>
+                      <button class="action-icon" @click="editNotice(notice)" title="编辑"></button>
                       <button class="action-icon" @click="toggleTop(notice)" :title="notice.isTop ? '取消置顶' : '置顶'">
-                        {{ notice.isTop ? '📌' : '📍' }}
+                        {{ notice.isTop ? '置顶' : '置顶' }}
                       </button>
-                      <button class="action-icon danger" @click="confirmDeleteNotice(notice)" title="删除">🗑️</button>
+                      <button class="action-icon danger" @click="confirmDeleteNotice(notice)" title="删除"></button>
                     </div>
                   </div>
                   <h4 class="notice-title">{{ notice.title }}</h4>
                   <p class="notice-content">{{ truncateText(notice.content, 60) }}</p>
                   <div class="notice-meta">
-                    <span class="meta-time">📅 {{ formatDate(notice.createTime) }}</span>
+                    <span class="meta-time">{{ formatDate(notice.createTime) }}</span>
                     <span class="meta-status" :class="getNoticeStatus(notice)">
                       {{ getStatusText(notice) }}
                     </span>
                   </div>
                   <div class="notice-stats" v-if="notice.needConfirm">
-                    <span>👁️ {{ notice.readCount || 0 }} 已读</span>
-                    <span>✅ {{ notice.confirmCount || 0 }} 已确认</span>
+                    <span>{{ notice.readCount || 0 }} 已读</span>
+                    <span>{{ notice.confirmCount || 0 }} 已确认</span>
                   </div>
                 </div>
               </div>
 
               <div v-if="filteredNotices.length === 0" class="empty-state">
-                <div class="empty-icon">📭</div>
+                <div class="empty-icon"></div>
                 <p>暂无公告</p>
               </div>
             </div>
@@ -235,28 +235,28 @@
           <!-- 统计卡片 -->
           <div class="violation-stats">
             <div class="vio-stat-card warning">
-              <div class="vio-icon">⚠️</div>
+              <div class="vio-icon"></div>
               <div class="vio-info">
                 <span class="vio-value">{{ violationStats.pending }}</span>
                 <span class="vio-label">待处理举报</span>
               </div>
             </div>
             <div class="vio-stat-card info">
-              <div class="vio-icon">📋</div>
+              <div class="vio-icon"></div>
               <div class="vio-info">
                 <span class="vio-value">{{ violationStats.today }}</span>
                 <span class="vio-label">今日举报</span>
               </div>
             </div>
             <div class="vio-stat-card success">
-              <div class="vio-icon">✅</div>
+              <div class="vio-icon"></div>
               <div class="vio-info">
                 <span class="vio-value">{{ violationStats.resolved }}</span>
                 <span class="vio-label">已处理</span>
               </div>
             </div>
             <div class="vio-stat-card danger">
-              <div class="vio-icon">🗑️</div>
+              <div class="vio-icon"></div>
               <div class="vio-info">
                 <span class="vio-value">{{ violationStats.deleted }}</span>
                 <span class="vio-label">已删除内容</span>
@@ -284,7 +284,7 @@
             </div>
             <div class="toolbar-right">
               <button class="refresh-btn" @click="loadViolations">
-                <span :class="{ rotating: loading }">🔄</span> 刷新
+                <span :class="{ rotating: loading }"></span> 刷新
               </button>
             </div>
           </div>
@@ -314,8 +314,8 @@
                     <h4 class="item-title">{{ item.itemTitle }}</h4>
                     <p class="item-desc">{{ truncateText(item.itemDesc, 80) }}</p>
                     <div class="item-meta">
-                      <span>👤 {{ item.publisherName }}</span>
-                      <span>📅 {{ formatDate(item.publishTime) }}</span>
+                      <span>{{ item.publisherName }}</span>
+                      <span>{{ formatDate(item.publishTime) }}</span>
                     </div>
                   </div>
                 </div>
@@ -346,16 +346,16 @@
               <div class="vio-actions">
                 <template v-if="item.status === 'pending' || item.status === 'processing'">
                   <button class="action-btn view" @click="viewItemDetail(item)">
-                    🔍 查看原帖
+                    查看原帖
                   </button>
                   <button class="action-btn warn" @click="handleWarn(item)">
-                    ⚠️ 警告用户
+                    警告用户
                   </button>
                   <button class="action-btn delete" @click="confirmDeleteItem(item)">
-                    🗑️ 删除内容
+                    删除内容
                   </button>
                   <button class="action-btn ban" @click="confirmBanUser(item)">
-                    🚫 封禁用户
+                    封禁用户
                   </button>
                 </template>
                 <template v-else>
@@ -371,7 +371,7 @@
 
           <!-- 空状态 -->
           <div v-if="violationList.length === 0 && !loading" class="empty-state large">
-            <div class="empty-icon">🛡️</div>
+            <div class="empty-icon"></div>
             <h3>暂无违规举报</h3>
             <p>系统运行良好，未发现违规内容</p>
           </div>
@@ -409,8 +409,8 @@
             <div class="preview-badge" v-if="publishForm.isTop">置顶</div>
             <h2 class="preview-title">{{ publishForm.title || '公告标题' }}</h2>
             <div class="preview-meta">
-              <span>📅 {{ currentDate }}</span>
-              <span>👤 系统管理员</span>
+              <span>{{ currentDate }}</span>
+              <span>系统管理员</span>
             </div>
             <div class="preview-content">
               {{ publishForm.content || '公告内容预览...' }}
@@ -436,7 +436,7 @@
         </div>
         <div class="modal-body">
           <div class="confirm-content">
-            <div class="confirm-icon">⚠️</div>
+            <div class="confirm-icon"></div>
             <p class="confirm-text">确定要删除这条公告吗？</p>
             <p class="confirm-detail">「{{ deletingNotice?.title }}」</p>
             <p class="confirm-hint">删除后无法恢复，已读用户记录也将清除</p>
@@ -514,7 +514,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import SysAdminNavigation from '../components/SysAdminNavigation.vue'
@@ -523,17 +523,17 @@ const router = useRouter()
 
 /* ================= 标签页配置 ================= */
 const tabs = [
-  { key: 'publish', label: '发布公告', icon: '📝' },
-  { key: 'violation', label: '违规处置', icon: '🛡️', badge: null }
+  { key: 'publish', label: '发布公告', icon: '' },
+  { key: 'violation', label: '违规处置', icon: '', badge: null }
 ]
 const currentTab = ref('publish')
 
 /* ================= 公告发布 ================= */
 const noticeTypes = [
-  { value: 'system', label: '系统', icon: '🔔', desc: '系统维护、更新通知' },
-  { value: 'policy', label: '政策', icon: '📋', desc: '规则变更、政策调整' },
-  { value: 'activity', label: '活动', icon: '🎉', desc: '校园活动、促销信息' },
-  { value: 'urgent', label: '紧急', icon: '⚠️', desc: '安全提醒、紧急通知' }
+  { value: 'system', label: '系统', icon: '', desc: '系统维护、更新通知' },
+  { value: 'policy', label: '政策', icon: '', desc: '规则变更、政策调整' },
+  { value: 'activity', label: '活动', icon: '', desc: '校园活动、促销信息' },
+  { value: 'urgent', label: '紧急', icon: '', desc: '安全提醒、紧急通知' }
 ]
 
 const publishForm = reactive({
@@ -619,16 +619,26 @@ const switchTab = (tab: string) => {
 /* ================= 公告管理方法 ================= */
 const loadNotices = async () => {
   try {
-    const res = await axios.get('/api/admin/announcements')
+    const res = await axios.get('/api/announcements/admin/list')
     if (res.data.code === 200) {
-      noticeList.value = res.data.data || []
+      // 转换数据格式以适配前端
+      noticeList.value = (res.data.data?.list || []).map((item: any) => ({
+        id: item.noticeId,
+        type: 'system',
+        title: item.title,
+        content: item.content,
+        createTime: item.createTime,
+        isTop: item.priority === 1,
+        needConfirm: item.priority === 1,
+        readCount: 0,
+        confirmCount: 0,
+        startTime: item.startTime,
+        endTime: item.endTime
+      }))
     }
   } catch (error) {
-    noticeList.value = [
-      { id: 1, type: 'system', title: '系统维护通知', content: '系统将于本周六凌晨2:00-4:00进行例行维护...', createTime: '2026-02-28 10:00:00', isTop: true, needConfirm: false, readCount: 1256 },
-      { id: 2, type: 'policy', title: '审核规范更新', content: '请严格按照新的审核标准执行...', createTime: '2026-02-27 14:30:00', isTop: false, needConfirm: true, readCount: 890, confirmCount: 850 },
-      { id: 3, type: 'urgent', title: '安全漏洞修复', content: '发现安全漏洞，请立即更新密码...', createTime: '2026-02-25 09:15:00', isTop: true, needConfirm: true, readCount: 1200, confirmCount: 1150, endTime: '2026-03-01 00:00:00' }
-    ]
+    console.error('加载公告列表失败:', error)
+    noticeList.value = []
   }
 }
 
@@ -664,7 +674,20 @@ const confirmAndPublish = () => {
 const publishNotice = async () => {
   publishing.value = true
   try {
-    const res = await axios.post('/api/admin/announcements', publishForm)
+    // 准备请求数据
+    const requestData: any = {
+      title: publishForm.title,
+      content: publishForm.content,
+      priority: publishForm.isTop ? 1 : 2,
+      startTime: formatDateTimeForBackend(publishForm.startTime) || getDefaultStartTime(),
+      endTime: formatDateTimeForBackend(publishForm.endTime) || getDefaultEndTime()
+    }
+    
+    console.log('发布公告请求数据:', requestData)
+    
+    const res = await axios.post('/api/announcements/admin', requestData)
+    console.log('发布公告响应:', res.data)
+    
     if (res.data.code === 200) {
       // 重置表单
       Object.assign(publishForm, {
@@ -678,13 +701,45 @@ const publishNotice = async () => {
       })
       await loadNotices()
       alert('公告发布成功！')
+    } else {
+      alert(`发布失败: ${res.data.msg || '未知错误'}`)
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('发布失败:', error)
-    alert('发布失败，请重试')
+    alert(`发布失败: ${error.message || '请重试'}`)
   } finally {
     publishing.value = false
   }
+}
+
+// 格式化时间为后端需要的格式：YYYY-MM-DD HH:MM:SS
+const formatDateTimeForBackend = (dateTimeStr: string) => {
+  if (!dateTimeStr) return ''
+  
+  // 如果是 datetime-local 格式（YYYY-MM-DDTHH:MM），转换为 YYYY-MM-DD HH:MM:SS
+  if (dateTimeStr.includes('T')) {
+    return dateTimeStr.replace('T', ' ') + ':00'
+  }
+  
+  // 如果已经是 YYYY-MM-DD HH:MM:SS 格式，直接返回
+  if (dateTimeStr.includes(' ') && dateTimeStr.includes(':')) {
+    return dateTimeStr
+  }
+  
+  return dateTimeStr
+}
+
+// 获取默认开始时间（现在）
+const getDefaultStartTime = () => {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:00`
+}
+
+// 获取默认结束时间（30天后）
+const getDefaultEndTime = () => {
+  const now = new Date()
+  now.setDate(now.getDate() + 30)
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} 23:59:59`
 }
 
 const editNotice = (notice: any) => {
