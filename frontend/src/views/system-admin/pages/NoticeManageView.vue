@@ -413,19 +413,20 @@
     <!-- 删除确认弹窗 -->
     <div v-if="showDeleteModal" class="modal-overlay" @click.self="closeDeleteModal">
       <div class="confirm-modal">
-        <div class="modal-header">
-          <h3 class="modal-title">确认删除</h3>
+        <div class="preview-header">
+          <h3>确认删除</h3>
           <button class="modal-close" @click="closeDeleteModal">×</button>
         </div>
-        <div class="modal-body">
+        <div class="preview-body">
           <div class="confirm-content">
-            <div class="confirm-icon"></div>
             <p class="confirm-text">确定要删除这条公告吗？</p>
-            <p class="confirm-detail">「{{ deletingNotice?.title }}」</p>
+            <div class="confirm-detail-box">
+              <p class="confirm-detail">「{{ deletingNotice?.title }}」</p>
+            </div>
             <p class="confirm-hint">删除后无法恢复，已读用户记录也将清除</p>
           </div>
         </div>
-        <div class="modal-footer">
+        <div class="preview-footer-actions">
           <button class="modal-btn cancel-btn" @click="closeDeleteModal">取消</button>
           <button class="modal-btn delete-btn" @click="executeDeleteNotice">确认删除</button>
         </div>
@@ -2215,37 +2216,44 @@ onMounted(() => {
   background: white;
   border-radius: 20px;
   width: 90%;
-  max-width: 400px;
+  max-width: 450px;
+  max-height: 90vh;
+  overflow: hidden;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
 }
 
 .confirm-content {
   text-align: center;
-  padding: 20px;
-}
-
-.confirm-icon {
-  font-size: 48px;
-  margin-bottom: 15px;
+  padding: 10px 0;
 }
 
 .confirm-text {
   font-family: "Comic Sans MS", cursive;
-  font-size: 16px;
+  font-size: 18px;
   color: #a67c52;
-  margin-bottom: 10px;
+  margin: 0 0 20px 0;
+}
+
+.confirm-detail-box {
+  padding: 20px;
+  border-radius: 12px;
+  background: rgba(244, 67, 54, 0.08);
+  border: 2px solid rgba(244, 67, 54, 0.2);
+  margin-bottom: 20px;
 }
 
 .confirm-detail {
-  font-size: 14px;
+  font-size: 15px;
   color: #f44336;
   font-weight: 600;
-  margin-bottom: 10px;
+  margin: 0;
+  word-break: break-all;
 }
 
 .confirm-hint {
   font-size: 13px;
   color: rgba(166, 124, 82, 0.7);
+  margin: 0;
 }
 
 .action-modal {
