@@ -25,5 +25,5 @@ urlpatterns = [
     path('api/user', include('user.urls')),    # 用户接口
     path('api/chat', include('chat.urls')),    # 聊天接口
     path('api/announcements', include('notice.urls')),    # 通知接口
+    path('api/admin/', include('system.urls')),  # 系统管理接口
 ]
-

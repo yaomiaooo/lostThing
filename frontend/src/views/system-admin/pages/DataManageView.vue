@@ -919,28 +919,32 @@ const startManualBackup = async () => {
   backupProgress.status = '准备中...'
   
   try {
-    // 模拟进度
-    const tables = ['users', 'items', 'records', 'images', 'logs']
-    backupProgress.total = tables.length
-    
-    for (let i = 0; i < tables.length; i++) {
-      backupProgress.currentTable = tables[i]
-      backupProgress.processed = i
-      backupProgress.status = `正在备份 ${tables[i]}...`
+    const res = await axios.post('/api/admin/backups/create', { type: 'full' })
+    if (res.data.code === 200) {
+      // 模拟进度更新
+      const tables = ['users', 'items', 'records', 'images', 'logs']
+      backupProgress.total = tables.length
       
-      await new Promise(resolve => setTimeout(resolve, 800))
-      backupProgress.percent = Math.round(((i + 1) / tables.length) * 100)
+      for (let i = 0; i < tables.length; i++) {
+        backupProgress.currentTable = tables[i]
+        backupProgress.processed = i
+        backupProgress.status = `正在备份 ${tables[i]}...`
+        
+        await new Promise(resolve => setTimeout(resolve, 800))
+        backupProgress.percent = Math.round(((i + 1) / tables.length) * 100)
+      }
+      
+      backupProgress.status = '备份完成'
+      await loadBackups()
+      showMessage('备份成功！')
+      
+      setTimeout(() => {
+        backupProgress.show = false
+        backingUp.value = false
+      }, 1000)
     }
-    
-    backupProgress.status = '备份完成'
-    await loadBackups()
-    
-    setTimeout(() => {
-      backupProgress.show = false
-      backingUp.value = false
-    }, 1000)
-  } catch (error) {
-    alert('备份失败')
+  } catch (error: any) {
+    showMessage(error.response?.data?.message || '备份失败', 'error')
     backingUp.value = false
   }
 }
@@ -984,15 +988,16 @@ const deleteBackup = async (backup: any) => {
 const startExport = async () => {
   exporting.value = true
   try {
-    const res = await axios.post('/api/admin/exports', exportForm)
+    const res = await axios.post('/api/admin/exports/create', exportForm)
     if (res.data.code === 200) {
       await loadExportHistory()
       // 重置表单
       exportForm.types = ['items', 'users']
       exportForm.includeImages = false
+      showMessage('导出任务已创建！')
     }
-  } catch (error) {
-    alert('导出失败')
+  } catch (error: any) {
+    showMessage(error.response?.data?.message || '导出失败', 'error')
   } finally {
     exporting.value = false
   }
@@ -1176,6 +1181,13 @@ const closeImagePreview = () => {
 const cleanupPreviewTotal = computed(() => {
   return cleanupPreview.value.reduce((sum, item) => sum + item.size, 0)
 })
+
+
+
+// 简单的通知函数
+const showMessage = (msg: string, type: 'success' | 'error' | 'warning' = 'success') => {
+  alert(`${type.toUpperCase()}: ${msg}`)
+}
 
 /* ================= 退出登录 ================= */
 const handleLogout = () => {

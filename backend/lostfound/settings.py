@@ -46,6 +46,8 @@ INSTALLED_APPS = [
     'chat',
     # 通知应用
     'notice',
+    # 系统管理应用
+    'system',
 ]
 
 MIDDLEWARE = [
