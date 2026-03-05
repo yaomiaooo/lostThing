@@ -48,23 +48,6 @@
               <h3 class="panel-title">发布公告</h3>
               
               <div class="form-section">
-                <label class="form-label">公告类型 <span class="required">*</span></label>
-                <div class="type-cards">
-                  <div 
-                    v-for="type in noticeTypes" 
-                    :key="type.value"
-                    class="type-card"
-                    :class="{ active: publishForm.type === type.value }"
-                    @click="publishForm.type = type.value"
-                  >
-                    <span class="type-icon">{{ type.icon }}</span>
-                    <span class="type-name">{{ type.label }}</span>
-                    <span class="type-desc">{{ type.desc }}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div class="form-section">
                 <label class="form-label">公告标题 <span class="required">*</span></label>
                 <input 
                   v-model="publishForm.title"
@@ -529,15 +512,7 @@ const tabs = [
 const currentTab = ref('publish')
 
 /* ================= 公告发布 ================= */
-const noticeTypes = [
-  { value: 'system', label: '系统', icon: '', desc: '系统维护、更新通知' },
-  { value: 'policy', label: '政策', icon: '', desc: '规则变更、政策调整' },
-  { value: 'activity', label: '活动', icon: '', desc: '校园活动、促销信息' },
-  { value: 'urgent', label: '紧急', icon: '', desc: '安全提醒、紧急通知' }
-]
-
 const publishForm = reactive({
-  type: 'system',
   title: '',
   content: '',
   startTime: '',
@@ -755,7 +730,6 @@ const getDefaultEndTime = () => {
 const editNotice = (notice: any) => {
   editingNoticeId.value = notice.id
   Object.assign(publishForm, {
-    type: notice.type || 'system',
     title: notice.title,
     content: notice.content,
     startTime: notice.startTime || '',
@@ -1525,7 +1499,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 15px;
-  max-height: 600px;
+  max-height: 800px;
   overflow-y: auto;
 }
 
