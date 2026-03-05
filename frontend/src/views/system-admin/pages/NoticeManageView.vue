@@ -149,7 +149,7 @@
                   @click="publishNotice"
                 >
                   <span v-if="publishing" class="loading-spinner-small"></span>
-                  <span v-else>立即发布</span>
+                  <span v-else>{{ editingNoticeId ? '更新公告' : '立即发布' }}</span>
                 </button>
               </div>
             </div>
@@ -194,7 +194,7 @@
                     pending: isPending(notice.startTime)
                   }"
                 >
-                  <div class="notice-badge" v-if="notice.isTop">置顶</div>
+
                   <div class="notice-header">
                     <span class="notice-type" :class="'type-' + notice.type">
                       {{ getTypeLabel(notice.type) }}
@@ -406,7 +406,7 @@
         </div>
         <div class="preview-body">
           <div class="preview-notice" :class="'preview-' + publishForm.type">
-            <div class="preview-badge" v-if="publishForm.isTop">置顶</div>
+
             <h2 class="preview-title">{{ publishForm.title || '公告标题' }}</h2>
             <div class="preview-meta">
               <span>{{ currentDate }}</span>
@@ -549,6 +549,7 @@ const publishForm = reactive({
 const publishing = ref(false)
 const noticeList = ref<any[]>([])
 const noticeFilter = ref('all')
+const editingNoticeId = ref<string | null>(null)
 
 const canPublish = computed(() => {
   return publishForm.title.trim() && publishForm.content.trim()
@@ -683,10 +684,18 @@ const publishNotice = async () => {
       endTime: formatDateTimeForBackend(publishForm.endTime) || getDefaultEndTime()
     }
     
-    console.log('发布公告请求数据:', requestData)
-    
-    const res = await axios.post('/api/announcements/admin', requestData)
-    console.log('发布公告响应:', res.data)
+    let res
+    if (editingNoticeId.value) {
+      // 编辑模式 - 更新公告
+      console.log('更新公告请求数据:', requestData, 'ID:', editingNoticeId.value)
+      res = await axios.put(`/api/announcements/admin/${editingNoticeId.value}`, requestData)
+      console.log('更新公告响应:', res.data)
+    } else {
+      // 新建模式 - 发布公告
+      console.log('发布公告请求数据:', requestData)
+      res = await axios.post('/api/announcements/admin', requestData)
+      console.log('发布公告响应:', res.data)
+    }
     
     if (res.data.code === 200) {
       // 重置表单
@@ -699,14 +708,15 @@ const publishNotice = async () => {
         isTop: false,
         needConfirm: false
       })
+      editingNoticeId.value = null
       await loadNotices()
-      alert('公告发布成功！')
+      alert(editingNoticeId.value ? '公告更新成功！' : '公告发布成功！')
     } else {
-      alert(`发布失败: ${res.data.msg || '未知错误'}`)
+      alert(`${editingNoticeId.value ? '更新' : '发布'}失败: ${res.data.msg || '未知错误'}`)
     }
   } catch (error: any) {
-    console.error('发布失败:', error)
-    alert(`发布失败: ${error.message || '请重试'}`)
+    console.error(`${editingNoticeId.value ? '更新' : '发布'}失败:`, error)
+    alert(`${editingNoticeId.value ? '更新' : '发布'}失败: ${error.message || '请重试'}`)
   } finally {
     publishing.value = false
   }
@@ -743,14 +753,15 @@ const getDefaultEndTime = () => {
 }
 
 const editNotice = (notice: any) => {
+  editingNoticeId.value = notice.id
   Object.assign(publishForm, {
-    type: notice.type,
+    type: notice.type || 'system',
     title: notice.title,
     content: notice.content,
     startTime: notice.startTime || '',
     endTime: notice.endTime || '',
-    isTop: notice.isTop,
-    needConfirm: notice.needConfirm
+    isTop: notice.isTop || false,
+    needConfirm: notice.needConfirm || false
   })
   // 滚动到顶部
   window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -758,14 +769,27 @@ const editNotice = (notice: any) => {
 
 const toggleTop = async (notice: any) => {
   try {
-    const res = await axios.post(`/api/admin/announcements/${notice.id}/top`, {
-      isTop: !notice.isTop
+    // 先乐观更新UI
+    const oldIsTop = notice.isTop
+    notice.isTop = !notice.isTop
+    
+    // 使用更新接口修改 priority 字段（1=置顶，2=普通）
+    const res = await axios.put(`/api/announcements/admin/${notice.id}`, {
+      priority: notice.isTop ? 1 : 2
     })
-    if (res.data.code === 200) {
-      notice.isTop = !notice.isTop
+    
+    if (res.data.code !== 200) {
+      // 如果失败，回滚
+      notice.isTop = oldIsTop
+      alert('操作失败: ' + (res.data.msg || '未知错误'))
+    } else {
+      alert(notice.isTop ? '置顶成功！' : '取消置顶成功！')
     }
-  } catch (error) {
-    alert('操作失败')
+  } catch (error: any) {
+    // 如果失败，回滚
+    notice.isTop = !notice.isTop
+    console.error('置顶操作失败:', error)
+    alert('操作失败: ' + (error.message || '网络错误'))
   }
 }
 
@@ -782,13 +806,17 @@ const closeDeleteModal = () => {
 const executeDeleteNotice = async () => {
   if (!deletingNotice.value) return
   try {
-    const res = await axios.delete(`/api/admin/announcements/${deletingNotice.value.id}`)
+    const res = await axios.delete(`/api/announcements/admin/${deletingNotice.value.id}/delete`)
     if (res.data.code === 200) {
       noticeList.value = noticeList.value.filter(n => n.id !== deletingNotice.value.id)
       closeDeleteModal()
+      alert('删除成功！')
+    } else {
+      alert('删除失败: ' + (res.data.msg || '未知错误'))
     }
-  } catch (error) {
-    alert('删除失败')
+  } catch (error: any) {
+    console.error('删除失败:', error)
+    alert('删除失败: ' + (error.message || '网络错误'))
   }
 }
 
@@ -1508,6 +1536,7 @@ onMounted(() => {
   border-radius: 12px;
   border: 1.6px solid rgba(166, 124, 82, 0.15);
   transition: all 0.3s ease;
+  pointer-events: auto;
 }
 
 .notice-item:hover {
@@ -1565,6 +1594,8 @@ onMounted(() => {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  z-index: 1;
+  position: relative;
 }
 
 .action-icon {
@@ -1600,6 +1631,9 @@ onMounted(() => {
   font-weight: 500;
   transition: all 0.2s ease;
   white-space: nowrap;
+  pointer-events: auto;
+  user-select: none;
+  z-index: 2;
 }
 
 .action-btn.edit {
