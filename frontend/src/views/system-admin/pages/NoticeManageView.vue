@@ -79,13 +79,13 @@
               <div class="form-section">
                 <label class="form-label">公告内容 <span class="required">*</span></label>
                 <div class="editor-toolbar">
-                  <button class="tool-btn" @click="insertTag('【重要】')" title="重要标记"></button>
-                  <button class="tool-btn" @click="insertTag('【提示】')" title="提示标记"></button>
-                  <button class="tool-btn" @click="insertTag('【注意】')" title="注意标记"></button>
+                  <button class="tool-btn" @click="insertTag('【重要】')" title="重要标记">🔴</button>
+                  <button class="tool-btn" @click="insertTag('【提示】')" title="提示标记">🔵</button>
+                  <button class="tool-btn" @click="insertTag('【注意】')" title="注意标记">🟡</button>
                   <div class="divider"></div>
-                  <button class="tool-btn" @click="insertTag('【日期】')" title="日期"></button>
-                  <button class="tool-btn" @click="insertTag('【时间】')" title="时间"></button>
-                  <button class="tool-btn" @click="insertTag('【地点】')" title="地点"></button>
+                  <button class="tool-btn" @click="insertTag('【日期】')" title="日期">📅</button>
+                  <button class="tool-btn" @click="insertTag('【时间】')" title="时间">🕒</button>
+                  <button class="tool-btn" @click="insertTag('【地点】')" title="地点">📍</button>
                 </div>
                 <textarea 
                   v-model="publishForm.content"
@@ -200,11 +200,11 @@
                       {{ getTypeLabel(notice.type) }}
                     </span>
                     <div class="notice-actions">
-                      <button class="action-icon" @click="editNotice(notice)" title="编辑"></button>
-                      <button class="action-icon" @click="toggleTop(notice)" :title="notice.isTop ? '取消置顶' : '置顶'">
-                        {{ notice.isTop ? '置顶' : '置顶' }}
+                      <button class="action-btn edit" @click="editNotice(notice)" title="编辑">编辑</button>
+                      <button class="action-btn top" @click="toggleTop(notice)" :title="notice.isTop ? '取消置顶' : '置顶'">
+                        {{ notice.isTop ? '取消置顶' : '置顶' }}
                       </button>
-                      <button class="action-icon danger" @click="confirmDeleteNotice(notice)" title="删除"></button>
+                      <button class="action-btn delete" @click="confirmDeleteNotice(notice)" title="删除">删除</button>
                     </div>
                   </div>
                   <h4 class="notice-title">{{ notice.title }}</h4>
@@ -1530,14 +1530,16 @@ onMounted(() => {
 
 .notice-badge {
   position: absolute;
-  top: -8px;
-  right: 10px;
-  padding: 4px 12px;
+  top: -12px;
+  right: 15px;
+  padding: 5px 14px;
   background: linear-gradient(to right, #f38181, #f77d5f);
   color: white;
   font-size: 11px;
   font-weight: 600;
-  border-radius: 10px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(243, 129, 129, 0.3);
+  z-index: 10;
 }
 
 .notice-header {
@@ -1562,6 +1564,7 @@ onMounted(() => {
 .notice-actions {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .action-icon {
@@ -1585,6 +1588,48 @@ onMounted(() => {
 
 .action-icon.danger:hover {
   background: rgba(244, 67, 54, 0.15);
+}
+
+/* 新的按钮样式 */
+.action-btn {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.action-btn.edit {
+  background: rgba(33, 150, 243, 0.1);
+  color: #2196f3;
+}
+
+.action-btn.edit:hover {
+  background: rgba(33, 150, 243, 0.2);
+  transform: translateY(-1px);
+}
+
+.action-btn.top {
+  background: rgba(243, 129, 129, 0.1);
+  color: #f38181;
+}
+
+.action-btn.top:hover {
+  background: rgba(243, 129, 129, 0.2);
+  transform: translateY(-1px);
+}
+
+.action-btn.delete {
+  background: rgba(244, 67, 54, 0.1);
+  color: #f44336;
+}
+
+.action-btn.delete:hover {
+  background: rgba(244, 67, 54, 0.2);
+  transform: translateY(-1px);
 }
 
 .notice-title {
