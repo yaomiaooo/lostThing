@@ -721,7 +721,7 @@ const exportForm = reactive({
 
 const exportHistory = ref<any[]>([])
 const exporting = ref(false)
-const exportPollingMap = ref<Map<number, number>>(new Map())
+const exportPollingMap = ref<Map<number, ReturnType<typeof setInterval>>>(new Map())
 
 const canExport = computed(() => {
   return exportForm.types.length > 0 && 

@@ -98,7 +98,7 @@ const hasCustomContent = computed(() => props.customContent)
 // 导航项配置 - 系统管理员专用
 const navItems = ref<NavItem[]>([
   {
-    name: '数据驾驶舱',
+    name: '全局总览',
     icon: '/home/发现.svg',
     handler: () => router.push('/system-admin/dashboard')
   },

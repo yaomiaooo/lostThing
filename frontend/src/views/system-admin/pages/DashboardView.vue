@@ -11,7 +11,7 @@
       <!-- 左侧导航 -->
       <SysAdminNavigation 
         subtitle="数据概览"
-        active-nav="数据驾驶舱"
+        active-nav="全局总览"
         :pending-complaints="pendingComplaints"
         @logout="handleLogout"
       >
@@ -32,7 +32,7 @@
       <main class="main-content">
         <!-- 页面标题 -->
         <section class="page-header">
-          <h1 class="page-title">数据驾驶舱</h1>
+          <h1 class="page-title">全局总览</h1>
           <p class="page-subtitle">全校失物招领数据实时监控与统计分析</p>
         </section>
 
@@ -69,12 +69,7 @@
               <div class="stat-label">待处理投诉</div>
               <div class="stat-trend">点击查看详情</div>
             </div>
-            <div class="stat-card secondary" @click="quickNavigate('/item-admin/history')">
-              <div class="stat-icon"></div>
-              <div class="stat-value">{{ overview.resolvedItems || 0 }}</div>
-              <div class="stat-label">已解决</div>
-              <div class="stat-trend">本月 {{ overview.monthlyResolved || 0 }}</div>
-            </div>
+           
             <div class="stat-card danger" @click="quickNavigate('/system-admin/data')">
               <div class="stat-icon"></div>
               <div class="stat-value">{{ overview.archivedItems || 0 }}</div>
@@ -152,54 +147,7 @@
           </div>
         </section>
 
-        <!-- 实时动态 -->
-        <section v-if="!loading" class="activity-section">
-          <div class="section-header">
-            <h3 class="section-title">实时动态</h3>
-            <button class="refresh-btn" @click="refreshData" :class="{ rotating: refreshing }">
-              <span class="refresh-icon"></span>
-              刷新
-            </button>
-          </div>
-          <div class="activity-list">
-            <div 
-              v-for="(activity, index) in recentActivities" 
-              :key="index"
-              class="activity-item"
-            >
-              <div class="activity-icon" :class="activity.type">
-                {{ activity.icon }}
-              </div>
-              <div class="activity-content">
-                <div class="activity-text">{{ activity.text }}</div>
-                <div class="activity-time">{{ activity.time }}</div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- 快捷操作 -->
-        <section class="quick-actions-section">
-          <h3 class="section-title">快捷操作</h3>
-          <div class="action-buttons">
-            <button class="action-btn primary" @click="quickNavigate('/system-admin/notices')">
-              <span class="btn-icon"></span>
-              <span>发布公告</span>
-            </button>
-            <button class="action-btn success" @click="quickNavigate('/item-admin/pending')">
-              <span class="btn-icon"></span>
-              <span>审核物品</span>
-            </button>
-            <button class="action-btn warning" @click="quickNavigate('/system-admin/accounts')">
-              <span class="btn-icon"></span>
-              <span>新增管理员</span>
-            </button>
-            <button class="action-btn info" @click="quickNavigate('/system-admin/data')">
-              <span class="btn-icon"></span>
-              <span>数据备份</span>
-            </button>
-          </div>
-        </section>
+     
       </main>
     </div>
   </div>
