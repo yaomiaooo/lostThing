@@ -437,7 +437,10 @@
                 autocomplete="new-password"
               />
               <button class="toggle-pwd" @click="showPassword = !showPassword">
-                {{ showPassword ? '隐藏' : '显示' }}
+                <img v-if="showPassword" src="/home/隐藏.svg" alt="隐藏" class="pwd-icon" />
+                <svg v-else class="pwd-icon" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M512 160C256 160 64 512 64 512s192 352 448 352 448-352 448-352S768 160 512 160z m0 576c-123.7 0-224-100.3-224-224s100.3-224 224-224 224 100.3 224 224-100.3 224-224 224z m0-320c-53 0-96 43-96 96s43 96 96 96 96-43 96-96-43-96-96-96z" fill="#a67c52"/>
+                </svg>
               </button>
             </div>
             <button class="gen-pwd" @click="generatePassword">生成随机密码</button>
@@ -2520,7 +2523,23 @@ onMounted(() => {
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 16px;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.toggle-pwd:hover {
+  opacity: 0.8;
+  transform: translateY(-50%) scale(1.1);
+}
+
+.pwd-icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  filter: brightness(0.7);
 }
 
 .gen-pwd {
