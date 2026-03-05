@@ -449,10 +449,11 @@ def get_cleanup_stats(request):
         
         # 未激活账号（365天未登录且无发布内容）
         user_cutoff = timezone.now() - timedelta(days=365)
+        active_user_ids = Item.objects.values_list('user_id', flat=True)
         inactive_users = User.objects.filter(
             last_login_time__lt=user_cutoff,
             create_time__lt=user_cutoff
-        ).exclude(id__in=Item.objects.values('user_id'))
+        ).exclude(id__in=active_user_ids)
         users_count = inactive_users.count()
         users_size = users_count * 1024 * 5  # 估算每条5KB
         
@@ -497,7 +498,8 @@ def get_cleanup_stats(request):
                         pass
         
         # 孤儿图片文件
-        orphan_images = ItemImage.objects.filter(item_id__not_in=Item.objects.values('id'))
+        item_ids = Item.objects.values_list('id', flat=True)
+        orphan_images = ItemImage.objects.exclude(item_id__in=item_ids)
         orphan_count = orphan_images.count()
         orphan_size = orphan_count * 1024 * 100  # 估算每条100KB
         
@@ -616,14 +618,14 @@ def execute_cleanup(request):
         if old_exports.count() > 0:
             cleanup_details.append(f"删除 {old_exports.count()} 个过期导出文件")
         
-        # 清理孤儿图片文件（数据库中不存在的图片）
-        orphan_images = ItemImage.objects.filter(item_id__not_in=Item.objects.values('id'))
-        orphan_count = 0
-        for image in orphan_images:
-            # 这里简化处理，实际需要检查文件是否存在
-            orphan_count += 1
+        # 清理孤儿图片文件（修复__not_in问题）
+        item_ids = Item.objects.values_list('id', flat=True)
+        orphan_images = ItemImage.objects.exclude(item_id__in=item_ids)
+        orphan_count = orphan_images.count()
         if orphan_count > 0:
-            cleanup_details.append(f"发现 {orphan_count} 个孤儿图片记录")
+            orphan_images.delete()
+            total_cleaned += orphan_count
+            cleanup_details.append(f"删除 {orphan_count} 个孤儿图片记录")
         
         log_operation(request, 'cleanup', f"执行数据清理: {', '.join(cleanup_details)}")
         
