@@ -383,7 +383,7 @@
           <button class="modal-close" @click="closePreviewModal">×</button>
         </div>
         <div class="preview-body">
-          <div class="preview-notice" :class="'preview-' + publishForm.type">
+          <div class="preview-notice">
 
             <h2 class="preview-title">{{ publishForm.title || '公告标题' }}</h2>
             <div class="preview-meta">
@@ -502,7 +502,7 @@ const router = useRouter()
 
 /* ================= 标签页配置 ================= */
 const tabs = [
-  { key: 'publish', label: '发布公告', icon: '' },
+  { key: 'publish', label: '发布公告', icon: '', badge: null },
   { key: 'violation', label: '违规处置', icon: '', badge: null }
 ]
 const currentTab = ref('publish')
@@ -936,16 +936,6 @@ const closeImagePreview = () => {
 }
 
 /* ================= 工具函数 ================= */
-const getTypeLabel = (type: string) => {
-  const map: Record<string, string> = {
-    system: '系统',
-    policy: '政策',
-    activity: '活动',
-    urgent: '紧急'
-  }
-  return map[type] || '其他'
-}
-
 const getNoticeStatus = (notice: any) => {
   if (isExpired(notice.endTime)) return 'expired'
   if (isPending(notice.startTime)) return 'pending'
@@ -2123,11 +2113,6 @@ onMounted(() => {
   background: rgba(166, 124, 82, 0.05);
   border: 2px solid rgba(166, 124, 82, 0.2);
 }
-
-.preview-notice.preview-system { border-color: rgba(33, 150, 243, 0.3); background: rgba(33, 150, 243, 0.05); }
-.preview-notice.preview-policy { border-color: rgba(156, 39, 176, 0.3); background: rgba(156, 39, 176, 0.05); }
-.preview-notice.preview-activity { border-color: rgba(76, 175, 80, 0.3); background: rgba(76, 175, 80, 0.05); }
-.preview-notice.preview-urgent { border-color: rgba(244, 67, 54, 0.3); background: rgba(244, 67, 54, 0.05); }
 
 .preview-badge {
   display: inline-block;
