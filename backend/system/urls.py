@@ -21,6 +21,7 @@ urlpatterns = [
     path('exports/<int:task_id>', views.delete_export, name='delete_export'),
     
     # 清理相关
+    path('cleanup/stats', views.get_cleanup_stats, name='get_cleanup_stats'),
     path('cleanup', views.execute_cleanup, name='execute_cleanup'),
     
     # 反馈相关

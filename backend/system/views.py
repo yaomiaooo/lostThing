@@ -422,13 +422,220 @@ def delete_export(request, task_id):
         return JsonResponse({'code': 500, 'message': str(e)})
 
 
+def get_cleanup_stats(request):
+    """获取清理统计数据"""
+    try:
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        # 已删除物品（超过30天的已删除物品）
+        items_cutoff = timezone.now() - timedelta(days=30)
+        deleted_items = Item.objects.filter(current_status=0, update_time__lt=items_cutoff)  # 假设状态0为已删除
+        items_count = deleted_items.count()
+        items_size = items_count * 1024 * 50  # 估算每条50KB
+        
+        # 过期日志（超过90天的操作日志）
+        log_cutoff = timezone.now() - timedelta(days=90)
+        old_logs = ItemOperationLog.objects.filter(operation_time__lt=log_cutoff)
+        logs_count = old_logs.count()
+        logs_size = logs_count * 1024 * 40  # 估算每条40KB
+        
+        # 失效备份（超过7天的备份）
+        backup_cutoff = timezone.now() - timedelta(days=7)
+        from .models import BackupRecord
+        old_backups = BackupRecord.objects.filter(status='completed', created_time__lt=backup_cutoff)
+        backups_count = old_backups.count()
+        backups_size = sum(b.file_size for b in old_backups if b.file_size)
+        
+        # 未激活账号（365天未登录且无发布内容）
+        user_cutoff = timezone.now() - timedelta(days=365)
+        inactive_users = User.objects.filter(
+            last_login_time__lt=user_cutoff,
+            create_time__lt=user_cutoff
+        ).exclude(id__in=Item.objects.values('user_id'))
+        users_count = inactive_users.count()
+        users_size = users_count * 1024 * 5  # 估算每条5KB
+        
+        # 临时文件（从文件系统查询）
+        import os
+        temp_dir = os.path.join(settings.BASE_DIR, 'temp')
+        temp_files = 0
+        temp_size = 0
+        if os.path.exists(temp_dir):
+            for root, dirs, files in os.walk(temp_dir):
+                temp_files += len(files)
+                for file in files:
+                    try:
+                        temp_size += os.path.getsize(os.path.join(root, file))
+                    except Exception:
+                        pass
+        
+        # 缓存数据（从文件系统查询）
+        cache_dir = os.path.join(settings.BASE_DIR, 'cache')
+        cache_data = 0
+        cache_size = 0
+        if os.path.exists(cache_dir):
+            for root, dirs, files in os.walk(cache_dir):
+                cache_data += len(files)
+                for file in files:
+                    try:
+                        cache_size += os.path.getsize(os.path.join(root, file))
+                    except Exception:
+                        pass
+        
+        # 错误日志（从文件系统查询）
+        log_dir = os.path.join(settings.BASE_DIR, 'logs')
+        error_logs = 0
+        error_size = 0
+        if os.path.exists(log_dir):
+            for root, dirs, files in os.walk(log_dir):
+                error_logs += len(files)
+                for file in files:
+                    try:
+                        error_size += os.path.getsize(os.path.join(root, file))
+                    except Exception:
+                        pass
+        
+        # 孤儿图片文件
+        orphan_images = ItemImage.objects.filter(item_id__not_in=Item.objects.values('id'))
+        orphan_count = orphan_images.count()
+        orphan_size = orphan_count * 1024 * 100  # 估算每条100KB
+        
+        stats = {
+            'cleanupRules': [
+                {
+                    'id': 1,
+                    'name': '已删除物品',
+                    'description': '用户已删除或管理员已移除的物品数据',
+                    'enabled': True,
+                    'retentionDays': 30,
+                    'estimatedCount': items_count,
+                    'estimatedSize': items_size
+                },
+                {
+                    'id': 2,
+                    'name': '过期日志',
+                    'description': '系统操作日志和审计日志',
+                    'enabled': True,
+                    'retentionDays': 90,
+                    'estimatedCount': logs_count,
+                    'estimatedSize': logs_size
+                },
+                {
+                    'id': 3,
+                    'name': '失效备份',
+                    'description': '超出保留策略的旧备份文件',
+                    'enabled': True,
+                    'retentionDays': 7,
+                    'estimatedCount': backups_count,
+                    'estimatedSize': backups_size
+                },
+                {
+                    'id': 4,
+                    'name': '未激活账号',
+                    'description': '长期未登录且未发布内容的用户',
+                    'enabled': False,
+                    'retentionDays': 365,
+                    'estimatedCount': users_count,
+                    'estimatedSize': users_size
+                }
+            ],
+            'cleanupCategories': [
+                {'key': 'temp', 'name': '临时文件', 'count': temp_files, 'size': temp_size},
+                {'key': 'cache', 'name': '缓存数据', 'count': cache_data, 'size': cache_size},
+                {'key': 'log', 'name': '错误日志', 'count': error_logs, 'size': error_size}
+            ],
+            'orphanFiles': {
+                'count': orphan_count,
+                'size': orphan_size
+            }
+        }
+        
+        return JsonResponse({'code': 200, 'data': stats})
+    except Exception as e:
+        return JsonResponse({'code': 500, 'message': str(e)})
+
+
 @csrf_exempt
 @require_http_methods(["POST"])
 def execute_cleanup(request):
     """执行数据清理"""
     try:
-        log_operation(request, 'cleanup', "执行数据清理")
-        return JsonResponse({'code': 200, 'message': '清理任务已启动'})
+        import json
+        data = json.loads(request.body) if request.body else {}
+        rules = data.get('rules', [])
+        
+        total_cleaned = 0
+        total_size = 0
+        cleanup_details = []
+        
+        # 清理已删除的物品（状态为已删除且超过30天）
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        # 清理过期日志（超过90天的操作日志）
+        log_cutoff = timezone.now() - timedelta(days=90)
+        old_logs = ItemOperationLog.objects.filter(operation_time__lt=log_cutoff)
+        log_count = old_logs.count()
+        if log_count > 0:
+            old_logs.delete()
+            total_cleaned += log_count
+            cleanup_details.append(f"删除 {log_count} 条过期操作日志")
+        
+        # 清理过期的备份文件（超过保留策略的备份）
+        from .models import BackupRecord
+        backup_cutoff = timezone.now() - timedelta(days=7)
+        old_backups = BackupRecord.objects.filter(created_time__lt=backup_cutoff, status='completed')
+        for backup in old_backups:
+            if backup.file_path and os.path.exists(backup.file_path):
+                try:
+                    file_size = os.path.getsize(backup.file_path)
+                    os.remove(backup.file_path)
+                    total_size += file_size
+                except Exception:
+                    pass
+            backup.delete()
+            total_cleaned += 1
+        if old_backups.count() > 0:
+            cleanup_details.append(f"删除 {old_backups.count()} 个过期备份")
+        
+        # 清理过期的导出文件（超过30天）
+        export_cutoff = timezone.now() - timedelta(days=30)
+        from .models import ExportTask
+        old_exports = ExportTask.objects.filter(completed_time__lt=export_cutoff, status='completed')
+        for export_task in old_exports:
+            if export_task.file_path and os.path.exists(export_task.file_path):
+                try:
+                    file_size = os.path.getsize(export_task.file_path)
+                    os.remove(export_task.file_path)
+                    total_size += file_size
+                except Exception:
+                    pass
+            export_task.delete()
+            total_cleaned += 1
+        if old_exports.count() > 0:
+            cleanup_details.append(f"删除 {old_exports.count()} 个过期导出文件")
+        
+        # 清理孤儿图片文件（数据库中不存在的图片）
+        orphan_images = ItemImage.objects.filter(item_id__not_in=Item.objects.values('id'))
+        orphan_count = 0
+        for image in orphan_images:
+            # 这里简化处理，实际需要检查文件是否存在
+            orphan_count += 1
+        if orphan_count > 0:
+            cleanup_details.append(f"发现 {orphan_count} 个孤儿图片记录")
+        
+        log_operation(request, 'cleanup', f"执行数据清理: {', '.join(cleanup_details)}")
+        
+        return JsonResponse({
+            'code': 200, 
+            'message': f'清理完成',
+            'data': {
+                'cleaned': total_cleaned,
+                'size': total_size,
+                'details': cleanup_details
+            }
+        })
     except Exception as e:
         return JsonResponse({'code': 500, 'message': str(e)})
 

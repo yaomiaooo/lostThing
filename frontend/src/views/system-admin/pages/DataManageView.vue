@@ -170,8 +170,7 @@
                   <div class="backup-info">
                     <div class="backup-name">{{ backup.name }}</div>
                     <div class="backup-meta">
-                      <span>📅 {{ formatDate(backup.createTime) }}</span>
-                      <span>💾 {{ formatSize(backup.size) }}</span>
+
                       <span :class="['backup-status', backup.status]">{{ getBackupStatus(backup.status) }}</span>
                     </div>
                     <div class="backup-tables">
@@ -274,13 +273,13 @@
               </div>
 
               <div class="export-section">
-                <label class="checkbox-label">
+                <label class="type-checkbox">
                   <input type="checkbox" v-model="exportForm.includeImages">
                   <span class="custom-checkbox"></span>
-                  <span class="checkbox-text">
-                    <strong>包含图片资源</strong>
-                    <small>将导出相关图片文件（会显著增加导出时间和文件大小）</small>
-                  </span>
+                  <div class="type-info">
+                    <span class="type-name">包含图片资源</span>
+                    <span class="type-desc">将导出相关图片文件（会显著增加导出时间和文件大小）</span>
+                  </div>
                 </label>
               </div>
 
@@ -812,6 +811,7 @@ const switchTab = (tab: string) => {
   currentTab.value = tab
   if (tab === 'backup') loadBackups()
   if (tab === 'export') loadExportHistory()
+  if (tab === 'cleanup') loadCleanupStats()
   if (tab === 'feedback') loadFeedback()
 }
 
@@ -900,6 +900,66 @@ const loadFeedback = async () => {
         createTime: '2026-02-28 14:20:00'
       }
     ]
+  }
+}
+
+const loadCleanupStats = async () => {
+  try {
+    const res = await axios.get('/api/admin/cleanup/stats')
+    if (res.data.code === 200) {
+      const data = res.data.data
+      cleanupRules.value = data.cleanupRules
+      cleanupCategories.value = data.cleanupCategories
+      orphanFiles.count = data.orphanFiles.count
+      orphanFiles.size = data.orphanFiles.size
+    }
+  } catch (error) {
+    // 模拟数据
+    cleanupRules.value = [
+      { 
+        id: 1, 
+        name: '已删除物品', 
+        description: '用户已删除或管理员已移除的物品数据',
+        enabled: true,
+        retentionDays: 30,
+        estimatedCount: 156,
+        estimatedSize: 1024 * 1024 * 50
+      },
+      { 
+        id: 2, 
+        name: '过期日志', 
+        description: '系统操作日志和审计日志',
+        enabled: true,
+        retentionDays: 90,
+        estimatedCount: 5000,
+        estimatedSize: 1024 * 1024 * 200
+      },
+      { 
+        id: 3, 
+        name: '失效备份', 
+        description: '超出保留策略的旧备份文件',
+        enabled: true,
+        retentionDays: 7,
+        estimatedCount: 3,
+        estimatedSize: 1024 * 1024 * 1024 * 2
+      },
+      { 
+        id: 4, 
+        name: '未激活账号', 
+        description: '长期未登录且未发布内容的用户',
+        enabled: false,
+        retentionDays: 365,
+        estimatedCount: 23,
+        estimatedSize: 1024 * 1024 * 5
+      }
+    ]
+    cleanupCategories.value = [
+      { key: 'temp', name: '临时文件', count: 128, size: 1024 * 1024 * 10 },
+      { key: 'cache', name: '缓存数据', count: 56, size: 1024 * 1024 * 25 },
+      { key: 'log', name: '错误日志', count: 342, size: 1024 * 1024 * 80 }
+    ]
+    orphanFiles.count = 45
+    orphanFiles.size = 1024 * 1024 * 120
   }
 }
 
@@ -1245,6 +1305,7 @@ const handleLogout = () => {
 onMounted(() => {
   loadDataStats()
   loadBackups()
+  loadCleanupStats()
 })
 
 onUnmounted(() => {
