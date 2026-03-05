@@ -310,7 +310,7 @@ def export_to_csv(task, export_path):
     data_type_map = {
         'items': Item,
         'users': User,
-        'records': ItemOperationLog,
+        'claims': Claim,
         'images': ItemImage,
     }
     
@@ -351,7 +351,7 @@ def export_to_json(task, export_path):
     data_type_map = {
         'items': Item,
         'users': User,
-        'records': ItemOperationLog,
+        'claims': Claim,
         'images': ItemImage,
     }
     

@@ -199,7 +199,7 @@
           <div class="export-layout">
             <!-- 导出选项 -->
             <div class="export-options-panel">
-              <h3 class="panel-title">📤 数据导出</h3>
+              <h3 class="panel-title">数据导出</h3>
               
               <div class="export-section">
                 <label class="section-label">选择数据范围</label>
@@ -290,13 +290,13 @@
                 @click="startExport"
               >
                 <span v-if="exporting" class="loading-spinner-small"></span>
-                <span v-else>📥 开始导出</span>
+                <span v-else>开始导出</span>
               </button>
             </div>
 
             <!-- 导出历史 -->
             <div class="export-history-panel">
-              <h3 class="panel-title">📜 导出记录</h3>
+              <h3 class="panel-title">导出记录</h3>
               
               <div class="export-list">
                 <div 
@@ -312,7 +312,7 @@
                     <div class="export-title">{{ task.name }}</div>
                     <div class="export-meta">
                       <span>{{ formatDate(task.createTime) }}</span>
-                      <span>{{ task.recordCount }} 条记录</span>
+                      <span v-if="task.recordCount && task.recordCount > 0">{{ task.recordCount }} 条记录</span>
                       <span v-if="task.size">{{ formatSize(task.size) }}</span>
                     </div>
                     <div v-if="task.status === 'processing'" class="export-progress">
@@ -660,7 +660,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import SysAdminNavigation from '../components/SysAdminNavigation.vue'
@@ -707,7 +707,7 @@ const backupProgress = reactive({
 const exportDataTypes = [
   { value: 'items', label: '物品数据', desc: '失物招领物品信息' },
   { value: 'users', label: '用户数据', desc: '注册用户基本信息' },
-  { value: 'records', label: '操作记录', desc: '审核、认领等操作日志' },
+  { value: 'claims', label: '认领记录', desc: '物品认领申请记录' },
   { value: 'images', label: '图片资源', desc: '所有上传的图片文件' }
 ]
 
@@ -722,6 +722,7 @@ const exportForm = reactive({
 
 const exportHistory = ref<any[]>([])
 const exporting = ref(false)
+const exportPollingMap = ref<Map<number, number>>(new Map())
 
 const canExport = computed(() => {
   return exportForm.types.length > 0 && 
@@ -991,6 +992,11 @@ const startExport = async () => {
     const res = await axios.post('/api/admin/exports/create', exportForm)
     if (res.data.code === 200) {
       await loadExportHistory()
+      // 开始轮询最新任务的进度
+      const latestTask = exportHistory.value[0]
+      if (latestTask && latestTask.status === 'processing') {
+        startExportPolling(latestTask.id)
+      }
       // 重置表单
       exportForm.types = ['items', 'users']
       exportForm.includeImages = false
@@ -1003,6 +1009,45 @@ const startExport = async () => {
   }
 }
 
+const startExportPolling = (taskId: number) => {
+  const pollInterval = setInterval(async () => {
+    try {
+      const res = await axios.get('/api/admin/exports')
+      if (res.data.code === 200) {
+        const task = res.data.data.find((t: any) => t.id === taskId)
+        if (task) {
+          // 更新进度
+          const existingTask = exportHistory.value.find((t: any) => t.id === taskId)
+          if (existingTask) {
+            existingTask.progress = task.progress
+            existingTask.status = task.status
+            existingTask.recordCount = task.recordCount
+            if (task.file_size) {
+              existingTask.size = task.file_size
+            }
+          }
+          
+          // 完成或失败则停止轮询
+          if (task.status === 'completed' || task.status === 'failed') {
+            clearInterval(pollInterval)
+            exportPollingMap.value.delete(taskId)
+            if (task.status === 'completed') {
+              showMessage('导出完成！')
+            } else {
+              showMessage('导出失败', 'error')
+            }
+          }
+        }
+      }
+    } catch (error) {
+      clearInterval(pollInterval)
+      exportPollingMap.value.delete(taskId)
+    }
+  }, 1000)
+  
+  exportPollingMap.value.set(taskId, pollInterval)
+}
+
 const downloadExport = (task: any) => {
   window.open(`/api/admin/exports/${task.id}/download`, '_blank')
 }
@@ -1011,6 +1056,8 @@ const retryExport = async (task: any) => {
   try {
     await axios.post(`/api/admin/exports/${task.id}/retry`)
     await loadExportHistory()
+    // 重试后开始轮询进度
+    startExportPolling(task.id)
   } catch (error) {
     alert('重试失败')
   }
@@ -1198,6 +1245,14 @@ const handleLogout = () => {
 onMounted(() => {
   loadDataStats()
   loadBackups()
+})
+
+onUnmounted(() => {
+  // 清理所有轮询定时器
+  exportPollingMap.value.forEach((intervalId) => {
+    clearInterval(intervalId)
+  })
+  exportPollingMap.value.clear()
 })
 </script>
 
@@ -2870,7 +2925,7 @@ input:checked + .slider:before {
 
 /* 表单元素 */
 .form-input {
-  width: 100%;
+  width: 80%;
   padding: 12px 15px;
   border: 1.6px solid rgba(166, 124, 82, 0.3);
   border-radius: 10px;
