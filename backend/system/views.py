@@ -94,6 +94,32 @@ def get_data_stats(request):
         }
         return JsonResponse({'code': 200, 'data': stats})
     except Exception as e:
+        return JsonResponse({'code': 200, 'message': str(e)})
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def cleanup_orphan_files(request):
+    """清理孤儿文件"""
+    try:
+        # 清理孤儿图片文件
+        item_ids = Item.objects.values_list('id', flat=True)
+        orphan_images = ItemImage.objects.exclude(item_id__in=item_ids)
+        orphan_count = orphan_images.count()
+        
+        if orphan_count > 0:
+            orphan_images.delete()
+        
+        log_operation(request, 'cleanup', f"清理孤儿图片: {orphan_count} 个")
+        
+        return JsonResponse({
+            'code': 200, 
+            'message': '清理完成',
+            'data': {
+                'count': orphan_count
+            }
+        })
+    except Exception as e:
         return JsonResponse({'code': 500, 'message': str(e)})
 
 

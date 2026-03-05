@@ -23,6 +23,7 @@ urlpatterns = [
     # 清理相关
     path('cleanup/stats', views.get_cleanup_stats, name='get_cleanup_stats'),
     path('cleanup', views.execute_cleanup, name='execute_cleanup'),
+    path('cleanup/orphan-files', views.cleanup_orphan_files, name='cleanup_orphan_files'),
     
     # 反馈相关
     path('feedback', views.get_feedback, name='get_feedback'),
