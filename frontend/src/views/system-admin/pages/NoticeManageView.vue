@@ -179,9 +179,7 @@
                 >
 
                   <div class="notice-header">
-                    <span class="notice-type" :class="'type-' + notice.type">
-                      {{ getTypeLabel(notice.type) }}
-                    </span>
+
                     <div class="notice-actions">
                       <button class="action-btn edit" @click="editNotice(notice)" title="编辑">编辑</button>
                       <button class="action-btn top" @click="toggleTop(notice)" :title="notice.isTop ? '取消置顶' : '置顶'">
@@ -198,10 +196,7 @@
                       {{ getStatusText(notice) }}
                     </span>
                   </div>
-                  <div class="notice-stats" v-if="notice.needConfirm">
-                    <span>{{ notice.readCount || 0 }} 已读</span>
-                    <span>{{ notice.confirmCount || 0 }} 已确认</span>
-                  </div>
+
                 </div>
               </div>
 
@@ -1501,7 +1496,7 @@ onMounted(() => {
   flex-direction: column;
   gap: 15px;
   max-height: 800px;
-  overflow-y: auto;
+
 }
 
 .notice-item {
@@ -1548,22 +1543,14 @@ onMounted(() => {
 
 .notice-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   margin-bottom: 10px;
 }
 
-.notice-type {
-  padding: 4px 10px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 600;
-}
 
-.notice-type.type-system { background: rgba(33, 150, 243, 0.15); color: #2196f3; }
-.notice-type.type-policy { background: rgba(156, 39, 176, 0.15); color: #9c27b0; }
-.notice-type.type-activity { background: rgba(76, 175, 80, 0.15); color: #4caf50; }
-.notice-type.type-urgent { background: rgba(244, 67, 54, 0.15); color: #f44336; }
+
+
 
 .notice-actions {
   display: flex;
@@ -1571,6 +1558,7 @@ onMounted(() => {
   flex-wrap: wrap;
   z-index: 1;
   position: relative;
+
 }
 
 .action-icon {
@@ -1675,15 +1663,7 @@ onMounted(() => {
 .meta-status.expired { background: rgba(158, 158, 158, 0.15); color: #9e9e9e; }
 .meta-status.pending { background: rgba(255, 152, 0, 0.15); color: #ff9800; }
 
-.notice-stats {
-  display: flex;
-  gap: 15px;
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid rgba(166, 124, 82, 0.1);
-  font-size: 12px;
-  color: rgba(166, 124, 82, 0.7);
-}
+
 
 .empty-state {
   text-align: center;
