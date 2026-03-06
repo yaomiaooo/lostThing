@@ -236,32 +236,30 @@ const loadNotices = async () => {
 }
 
 /* ================= 标记已读 ================= */
-const markNoticeRead = async (noticeId: number) => {
+const markNoticeRead = async (noticeId: any) => {
   try {
     const res = await axios.post('/api/announcements/read', {
       noticeIds: [noticeId],
       notificationIds: []
     })
     if (res.data.code === 200) {
-      // 更新前端状态
-      const notice = notices.value.find(n => n.id === noticeId)
+      // 更新前端状态，使用宽松比较避免类型不匹配
+      const notice = notices.value.find(n => String(n.id) === String(noticeId))
       if (notice) notice.read = true
       
       // 重新计算未读数
-      const unreadCount = totalUnread.value - 1
-      if (unreadCount <= 0) {
+      if (totalUnread.value === 0) {
         hasReadAll.value = true
       }
     }
   } catch (error) {
     console.error('标记已读失败:', error)
     // 前端模拟
-    const notice = notices.value.find(n => n.id === noticeId)
+    const notice = notices.value.find(n => String(n.id) === String(noticeId))
     if (notice) notice.read = true
     
     // 重新计算未读数
-    const unreadCount = totalUnread.value - 1
-    if (unreadCount <= 0) {
+    if (totalUnread.value === 0) {
       hasReadAll.value = true
     }
   }
@@ -281,32 +279,30 @@ const enterHome = () => {
   router.push('/home')
 }
 
-const markNotificationRead = async (notificationId: number) => {
+const markNotificationRead = async (notificationId: any) => {
   try {
     const res = await axios.post('/api/announcements/read', {
       noticeIds: [],
       notificationIds: [notificationId]
     })
     if (res.data.code === 200) {
-      // 更新前端状态
-      const notification = notifications.value.find(n => n.id === notificationId)
+      // 更新前端状态，使用宽松比较避免类型不匹配
+      const notification = notifications.value.find(n => String(n.id) === String(notificationId))
       if (notification) notification.read = true
       
       // 重新计算未读数
-      const unreadCount = totalUnread.value - 1
-      if (unreadCount <= 0) {
+      if (totalUnread.value === 0) {
         hasReadAll.value = true
       }
     }
   } catch (error) {
     console.error('标记已读失败:', error)
     // 前端模拟
-    const notification = notifications.value.find(n => n.id === notificationId)
+    const notification = notifications.value.find(n => String(n.id) === String(notificationId))
     if (notification) notification.read = true
     
     // 重新计算未读数
-    const unreadCount = totalUnread.value - 1
-    if (unreadCount <= 0) {
+    if (totalUnread.value === 0) {
       hasReadAll.value = true
     }
   }

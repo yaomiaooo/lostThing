@@ -172,8 +172,25 @@ const loadNotices = async () => {
   try {
     const res = await axios.get('/api/announcements')
     if (res.data.code === 200) {
-      notices.value = res.data.data.announcements || []
-      notifications.value = res.data.data.unreadNotifications || []
+      // 统一转换数据结构
+      notices.value = (res.data.data.announcements || []).map((notice: any) => ({
+        id: notice.noticeId || notice.id,
+        type: notice.type || 'system',
+        title: notice.title,
+        content: notice.content,
+        createTime: notice.createTime,
+        read: false
+      }))
+      
+      notifications.value = (res.data.data.unreadNotifications || []).map((notif: any) => ({
+        id: notif.notificationId || notif.id,
+        type: notif.type,
+        title: notif.title,
+        content: notif.content,
+        relatedItem: notif.relatedId ? `物品ID: ${notif.relatedId}` : '',
+        createTime: notif.createTime,
+        read: false
+      }))
       
       // 检查是否需要强制确认
       if (!res.data.data.needConfirm && totalUnread.value === 0) {
@@ -207,7 +224,7 @@ const loadNotices = async () => {
     notifications.value = [
       {
         id: 1,
-        type: 'claim',
+        type: 3,
         title: '新的认领申请',
         content: '有新的认领申请需要您审核，请及时处理。',
         relatedItem: '待审核申请',
@@ -221,39 +238,61 @@ const loadNotices = async () => {
 }
 
 /* ================= 标记已读 ================= */
-const markNoticeRead = async (noticeId: number) => {
+const markNoticeRead = async (noticeId: any) => {
   try {
     const res = await axios.post('/api/announcements/read', {
       noticeIds: [noticeId],
       notificationIds: []
     })
     if (res.data.code === 200) {
-      const notice = notices.value.find(n => n.id === noticeId)
+      // 使用宽松比较避免类型不匹配
+      const notice = notices.value.find(n => String(n.id) === String(noticeId))
       if (notice) notice.read = true
+      
+      // 检查是否所有都已读
+      if (totalUnread.value === 0) {
+        hasReadAll.value = true
+      }
     }
   } catch (error) {
     console.error('标记已读失败:', error)
     // 前端模拟
-    const notice = notices.value.find(n => n.id === noticeId)
+    const notice = notices.value.find(n => String(n.id) === String(noticeId))
     if (notice) notice.read = true
+    
+    // 检查是否所有都已读
+    if (totalUnread.value === 0) {
+      hasReadAll.value = true
+    }
   }
 }
 
-const markNotificationRead = async (notificationId: number) => {
+const markNotificationRead = async (notificationId: any) => {
   try {
     const res = await axios.post('/api/announcements/read', {
       noticeIds: [],
       notificationIds: [notificationId]
     })
     if (res.data.code === 200) {
-      const notification = notifications.value.find(n => n.id === notificationId)
+      // 使用宽松比较避免类型不匹配
+      const notification = notifications.value.find(n => String(n.id) === String(notificationId))
       if (notification) notification.read = true
+      
+      // 检查是否所有都已读
+      if (totalUnread.value === 0) {
+        hasReadAll.value = true
+      }
     }
   } catch (error) {
     console.error('标记已读失败:', error)
     // 前端模拟
-    const notification = notifications.value.find(n => n.id === notificationId)
+    const notification = notifications.value.find(n => String(n.id) === String(notificationId))
     if (notification) notification.read = true
+    
+    // 检查是否所有都已读
+    if (totalUnread.value === 0) {
+      hasReadAll.value = true
+    }
   }
 }
 
