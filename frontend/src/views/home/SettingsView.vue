@@ -433,15 +433,23 @@ const handleContactSubmit = async () => {
   contactLoading.value = true
 
   try {
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    successMessage.value = '留言发送成功！管理员将在24小时内回复'
-    showSuccessModal.value = true
-    
-    contactForm.type = ''
-    contactForm.message = ''
-  } catch (error) {
+    const res = await axios.post('/api/admin/feedback/submit', {
+      type: contactForm.type,
+      message: contactForm.message
+    })
+
+    if (res.data.code === 200) {
+      successMessage.value = res.data.message || '留言发送成功！管理员将在24小时内回复'
+      showSuccessModal.value = true
+      
+      contactForm.type = ''
+      contactForm.message = ''
+    } else {
+      console.error('发送留言失败:', res.data.msg)
+    }
+  } catch (error: any) {
     console.error('发送留言失败:', error)
+    alert(error.response?.data?.message || '网络错误，请重试')
   } finally {
     contactLoading.value = false
   }

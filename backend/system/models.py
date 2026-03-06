@@ -1,4 +1,37 @@
 from django.db import models
+from user.models import User
+
+
+class Feedback(models.Model):
+    """
+    用户反馈表
+    """
+    TYPE_CHOICES = [
+        ('technical', '技术问题'),
+        ('usage', '使用问题'),
+        ('suggestion', '意见建议'),
+        ('other', '其他'),
+    ]
+    STATUS_CHOICES = [
+        ('pending', '待处理'),
+        ('processing', '处理中'),
+        ('resolved', '已解决'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='feedbacks', verbose_name='用户')
+    feedback_type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='other', verbose_name='问题类型')
+    content = models.TextField(verbose_name='反馈内容')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', verbose_name='状态')
+    reply = models.TextField(blank=True, null=True, verbose_name='管理员回复')
+    reply_time = models.DateTimeField(blank=True, null=True, verbose_name='回复时间')
+    create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
+    update_time = models.DateTimeField(auto_now=True, verbose_name='更新时间')
+
+    class Meta:
+        db_table = 'feedback'
+        verbose_name = '用户反馈'
+        verbose_name_plural = '用户反馈'
+        ordering = ['-create_time']
 
 
 class BackupRecord(models.Model):

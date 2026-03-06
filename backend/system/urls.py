@@ -27,6 +27,7 @@ urlpatterns = [
     
     # 反馈相关
     path('feedback', views.get_feedback, name='get_feedback'),
+    path('feedback/submit', views.submit_feedback, name='submit_feedback'),
     path('feedback/<int:feedback_id>/reply', views.reply_feedback, name='reply_feedback'),
     path('feedback/<int:feedback_id>/resolve', views.resolve_feedback, name='resolve_feedback'),
 ]

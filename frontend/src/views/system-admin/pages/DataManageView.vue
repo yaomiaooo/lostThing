@@ -444,10 +444,9 @@
                 <div class="filter-group">
                   <select v-model="feedbackFilter.type" class="filter-select">
                     <option value="">全部类型</option>
-                    <option value="bug">系统故障</option>
-                    <option value="feature">功能建议</option>
-                    <option value="complaint">投诉举报</option>
-                    <option value="other">其他</option>
+                    <option value="bug">技术问题</option>
+                    <option value="feature">意见建议</option>
+                    <option value="other">使用问题/其他</option>
                   </select>
                   <select v-model="feedbackFilter.status" class="filter-select">
                     <option value="">全部状态</option>
@@ -659,7 +658,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import SysAdminNavigation from '../components/SysAdminNavigation.vue'
@@ -781,8 +780,8 @@ const orphanFiles = reactive({
 
 /* ================= 投诉反馈 ================= */
 const feedbackStats = ref([
-  { value: 12, label: '待处理', change: '+3', trend: 'up' },
-  { value: 89, label: '本周处理', change: '+12%', trend: 'up' },
+  { value: 0, label: '待处理', change: '0', trend: 'up' },
+  { value: 0, label: '总反馈', change: '0', trend: 'up' },
   { value: 4.8, label: '满意度', change: '+0.2', trend: 'up' },
   { value: 2.5, label: '平均响应(小时)', change: '-0.5', trend: 'down' }
 ])
@@ -814,6 +813,13 @@ const switchTab = (tab: string) => {
   if (tab === 'cleanup') loadCleanupStats()
   if (tab === 'feedback') loadFeedback()
 }
+
+// 监听反馈过滤器变化
+watch([() => feedbackFilter.type, () => feedbackFilter.status], () => {
+  if (currentTab.value === 'feedback') {
+    loadFeedback()
+  }
+})
 
 /* ================= 数据加载 ================= */
 const loadDataStats = async () => {
@@ -870,36 +876,15 @@ const loadFeedback = async () => {
     })
     if (res.data.code === 200) {
       feedbackList.value = res.data.data.list || []
+      // 更新统计数据
+      if (res.data.data.stats) {
+        feedbackStats.value[0].value = res.data.data.stats.pending || 0
+        feedbackStats.value[1].value = res.data.data.stats.total || 0
+      }
     }
   } catch (error) {
-    feedbackList.value = [
-      {
-        id: 1,
-        type: 'bug',
-        priority: 'high',
-        status: 'pending',
-        userName: '张三',
-        userPhone: '13800138001',
-        userAvatar: null,
-        title: '无法上传图片',
-        content: '发布物品时选择图片后一直显示加载中，无法完成上传...',
-        images: [],
-        createTime: '2026-03-01 09:15:00'
-      },
-      {
-        id: 2,
-        type: 'feature',
-        priority: 'normal',
-        status: 'pending',
-        userName: '李四',
-        userPhone: '13800138002',
-        userAvatar: null,
-        title: '建议增加物品标签功能',
-        content: '希望能给物品添加标签，方便分类查找，比如"贵重"、"急需"等...',
-        images: [],
-        createTime: '2026-02-28 14:20:00'
-      }
-    ]
+    console.error('加载反馈数据失败:', error)
+    feedbackList.value = []
   }
 }
 
@@ -1264,8 +1249,8 @@ const getBackupStatus = (status: string) => {
 
 const getFeedbackType = (type: string) => {
   const map: Record<string, string> = {
-    bug: '系统故障',
-    feature: '功能建议',
+    bug: '技术问题',
+    feature: '意见建议',
     complaint: '投诉举报',
     other: '其他'
   }
@@ -1306,6 +1291,7 @@ onMounted(() => {
   loadDataStats()
   loadBackups()
   loadCleanupStats()
+  loadFeedback()
 })
 
 onUnmounted(() => {

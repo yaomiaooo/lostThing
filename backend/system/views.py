@@ -8,11 +8,11 @@ from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django.db import connection, models
 from django.conf import settings
-from .models import BackupRecord, ExportTask, OperationLog
+from .models import BackupRecord, ExportTask, OperationLog, Feedback
 from items.models import Item, ItemImage, ItemStatusHistory, Category, Location, Claim, OperationLog as ItemOperationLog
 from user.models import User
 from chat.models import Conversation, Message
-from notice.models import Notice
+from notice.models import Notice, Notification
 
 # 确保备份和导出目录存在
 BACKUP_DIR = os.path.join(settings.BASE_DIR, 'backups')
@@ -669,21 +669,134 @@ def execute_cleanup(request):
 
 
 @csrf_exempt
+@require_http_methods(["POST"])
+def submit_feedback(request):
+    """用户提交反馈"""
+    try:
+        data = json.loads(request.body)
+        user_id = request.session.get('user_id')
+        if not user_id:
+            return JsonResponse({'code': 401, 'message': '请先登录'})
+        
+        user = User.objects.get(id=user_id)
+        Feedback.objects.create(
+            user=user,
+            feedback_type=data.get('type', 'other'),
+            content=data.get('message', '')
+        )
+        return JsonResponse({'code': 200, 'message': '留言发送成功！管理员将在24小时内回复'})
+    except User.DoesNotExist:
+        return JsonResponse({'code': 401, 'message': '用户不存在'})
+    except Exception as e:
+        return JsonResponse({'code': 500, 'message': str(e)})
+
+
+@csrf_exempt
 @require_http_methods(["GET"])
 def get_feedback(request):
-    """获取反馈列表（临时实现）"""
-    return JsonResponse({'code': 200, 'data': {'list': []}})
+    """获取反馈列表"""
+    try:
+        feedback_type = request.GET.get('type', '')
+        status = request.GET.get('status', '')
+        
+        queryset = Feedback.objects.select_related('user').all()
+        
+        if feedback_type:
+            queryset = queryset.filter(feedback_type=feedback_type)
+        if status:
+            queryset = queryset.filter(status=status)
+        
+        feedback_list = []
+        for fb in queryset:
+            # 映射类型名称
+            type_map = {
+                'technical': 'bug',
+                'usage': 'other',
+                'suggestion': 'feature',
+                'other': 'other'
+            }
+            feedback_list.append({
+                'id': fb.id,
+                'type': type_map.get(fb.feedback_type, 'other'),
+                'priority': 'normal',
+                'status': fb.status,
+                'userName': fb.user.real_name or fb.user.username,
+                'userPhone': fb.user.phone or '',
+                'userAvatar': None,
+                'title': fb.content[:50] + '...' if len(fb.content) > 50 else fb.content,
+                'content': fb.content,
+                'images': [],
+                'createTime': fb.create_time.strftime('%Y-%m-%d %H:%M:%S'),
+                'reply': fb.reply,
+                'replyTime': fb.reply_time.strftime('%Y-%m-%d %H:%M:%S') if fb.reply_time else None
+            })
+        
+        # 统计数据
+        pending_count = Feedback.objects.filter(status='pending').count()
+        total_count = Feedback.objects.count()
+        
+        return JsonResponse({
+            'code': 200, 
+            'data': {
+                'list': feedback_list,
+                'stats': {
+                    'pending': pending_count,
+                    'total': total_count
+                }
+            }
+        })
+    except Exception as e:
+        return JsonResponse({'code': 500, 'message': str(e)})
 
 
 @csrf_exempt
 @require_http_methods(["POST"])
 def reply_feedback(request, feedback_id):
     """回复反馈"""
-    return JsonResponse({'code': 200, 'message': '回复成功'})
+    try:
+        data = json.loads(request.body)
+        content = data.get('content', '')
+        resolve = data.get('resolve', False)
+        
+        fb = Feedback.objects.get(id=feedback_id)
+        fb.reply = content
+        fb.reply_time = datetime.now()
+        if resolve:
+            fb.status = 'resolved'
+        else:
+            fb.status = 'processing'
+        fb.save()
+        
+        # 给用户发送站内通知
+        Notification.objects.create(
+            user_id=fb.user.id,
+            title='您的反馈已收到回复',
+            content=f'管理员已回复您的反馈：\n{content}',
+            type=1,  # 系统通知
+            is_read=0,
+            related_id=feedback_id
+        )
+        
+        log_operation(request, 'feedback', f'回复反馈 #{feedback_id}')
+        return JsonResponse({'code': 200, 'message': '回复成功，已通知用户'})
+    except Feedback.DoesNotExist:
+        return JsonResponse({'code': 404, 'message': '反馈不存在'})
+    except Exception as e:
+        return JsonResponse({'code': 500, 'message': str(e)})
 
 
 @csrf_exempt
 @require_http_methods(["POST"])
 def resolve_feedback(request, feedback_id):
     """解决反馈"""
-    return JsonResponse({'code': 200, 'message': '已标记为已解决'})
+    try:
+        fb = Feedback.objects.get(id=feedback_id)
+        fb.status = 'resolved'
+        fb.save()
+        
+        log_operation(request, 'feedback', f'标记反馈 #{feedback_id} 为已解决')
+        return JsonResponse({'code': 200, 'message': '已标记为已解决'})
+    except Feedback.DoesNotExist:
+        return JsonResponse({'code': 404, 'message': '反馈不存在'})
+    except Exception as e:
+        return JsonResponse({'code': 500, 'message': str(e)})
