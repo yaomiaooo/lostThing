@@ -63,10 +63,10 @@
               <div class="stat-label">待审核</div>
               <div class="stat-trend">需尽快处理</div>
             </div>
-            <div class="stat-card info" @click="quickNavigate('/system-admin/complaints')">
+            <div class="stat-card info" @click="quickNavigate('/system-admin/data')">
               <div class="stat-icon"></div>
               <div class="stat-value">{{ pendingComplaints }}</div>
-              <div class="stat-label">待处理投诉</div>
+              <div class="stat-label">待处理反馈</div>
               <div class="stat-trend">点击查看详情</div>
             </div>
            
@@ -314,8 +314,16 @@ const loadAllData = async () => {
       generateActivities()
     }
     
-    // 待处理投诉暂时设为0
-    pendingComplaints.value = 0
+    // 加载待处理反馈数量
+    try {
+      const feedbackRes = await axios.get('/api/admin/feedback')
+      if (feedbackRes.data.code === 200 && feedbackRes.data.data.stats) {
+        pendingComplaints.value = feedbackRes.data.data.stats.pending || 0
+      }
+    } catch (error) {
+      console.error('加载待处理反馈失败:', error)
+      pendingComplaints.value = 0
+    }
     
   } catch (error) {
     console.error('加载数据失败:', error)
