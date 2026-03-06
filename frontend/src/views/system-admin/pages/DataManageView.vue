@@ -475,11 +475,10 @@
                   <div class="feedback-user">
                     <div class="user-info">
                       <span class="user-name">{{ item.userName }}</span>
-                      <span class="user-contact">{{ maskPhone(item.userPhone) }}</span>
+                      <span class="user-contact">{{ item.userPhone }}</span>
                     </div>
                   </div>
 
-                  <h4 class="feedback-title">{{ item.title }}</h4>
                   <p class="feedback-content">{{ item.content }}</p>
 
                   <div v-if="item.images?.length" class="feedback-images">
@@ -508,9 +507,6 @@
                         标记解决
                       </button>
                     </template>
-                    <button class="action-btn contact" @click="contactUser(item)">
-                        联系用户
-                      </button>
                   </div>
                 </div>
               </div>
@@ -1203,10 +1199,7 @@ const resolveFeedback = async (item: any) => {
   }
 }
 
-const contactUser = (item: any) => {
-  // 打开用户详情或发起会话
-  window.open(`tel:${item.userPhone}`)
-}
+
 
 /* ================= 工具函数 ================= */
 const formatSize = (bytes: number) => {
@@ -2088,26 +2081,56 @@ input:checked + .slider:before {
 
 .checkbox-label {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
   cursor: pointer;
+  padding: 12px 15px;
+  background: rgba(166, 124, 82, 0.05);
+  border-radius: 10px;
+  transition: all 0.3s ease;
+  margin-top: 15px;
 }
 
-.checkbox-text {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+.checkbox-label:hover {
+  background: rgba(166, 124, 82, 0.1);
 }
 
-.checkbox-text strong {
+.checkbox-label input {
+  display: none;
+}
+
+.checkbox-label .custom-checkbox {
+  width: 22px;
+  height: 22px;
+  border: 2px solid rgba(166, 124, 82, 0.4);
+  border-radius: 6px;
+  position: relative;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+  background: white;
+}
+
+.checkbox-label input:checked + .custom-checkbox {
+  background: linear-gradient(to right, #f38181, #f77d5f);
+  border-color: #f38181;
+}
+
+.checkbox-label input:checked + .custom-checkbox::after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.checkbox-label span:last-child {
   font-family: "Comic Sans MS", cursive;
   font-size: 14px;
   color: #a67c52;
-}
-
-.checkbox-text small {
-  font-size: 12px;
-  color: rgba(166, 124, 82, 0.6);
+  font-weight: 500;
 }
 
 .export-btn {
@@ -2989,7 +3012,7 @@ input:checked + .slider:before {
 }
 
 .form-textarea {
-  width: 100%;
+  width: 90%;
   padding: 12px 15px;
   border: 1.6px solid rgba(166, 124, 82, 0.3);
   border-radius: 10px;

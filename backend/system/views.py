@@ -702,7 +702,16 @@ def get_feedback(request):
         queryset = Feedback.objects.select_related('user').all()
         
         if feedback_type:
-            queryset = queryset.filter(feedback_type=feedback_type)
+            # 前端类型到后端类型的映射
+            frontend_to_backend_type = {
+                'bug': 'technical',
+                'feature': 'suggestion',
+                'other': ['usage', 'other']  # other 包含 usage 和 other
+            }
+            if feedback_type == 'other':
+                queryset = queryset.filter(feedback_type__in=frontend_to_backend_type[feedback_type])
+            else:
+                queryset = queryset.filter(feedback_type=frontend_to_backend_type.get(feedback_type, feedback_type))
         if status:
             queryset = queryset.filter(status=status)
         
