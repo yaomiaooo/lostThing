@@ -122,11 +122,7 @@ const navItems = ref<NavItem[]>([
     icon: '/home/发布.svg',
     handler: () => router.push('/system-admin/data')
   },
-  {
-    name: '投诉处理',
-    icon: '/home/消息.svg',
-    handler: () => router.push('/system-admin/complaints')
-  }
+
 ])
 
 // 判断导航项是否激活

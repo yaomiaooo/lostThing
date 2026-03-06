@@ -208,18 +208,8 @@ const routes: Array<RouteRecordRaw> = [
       activeNav: '数据管理'
     }
   },
-  // 投诉管理 - 复用 /api/item/claim/list 等现有接口模拟投诉数据
-  {
-    path: '/system-admin/complaints',
-    name: 'SystemComplaints',
-    component: () => import('../views/system-admin/pages/ComplaintManageView.vue'),
-    meta: {
-      requiresAuth: true,
-      allowedRoles: [4],
-      title: '投诉处理',
-      activeNav: '投诉处理'
-    }
-  },
+
+
 
   // 404 页面
   {
