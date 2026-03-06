@@ -491,7 +491,7 @@ onMounted(() => {
   min-height: 100vh;
   padding: 24px 28px;
   margin-left: 288px;
-  max-width: calc(100vw - 288px);
+  width: calc(100vw - 288px);
   box-sizing: border-box;
   position: relative;
 }
@@ -559,8 +559,70 @@ onMounted(() => {
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 15px;
+  width: 100%;
+}
+
+.stat-card {
+  background: rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(15px);
+  border-radius: 16px;
+  padding: 20px 15px;
+  border: 2px solid rgba(166, 124, 82, 0.2);
+  text-align: center;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* 横屏响应式优化 */
+@media (min-aspect-ratio: 1/1) {
+  .main-content {
+    padding: 24px 20px;
+    width: calc(100vw - 288px);
+    max-width: none;
+  }
+  
+  .stats-grid {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+  }
+  
+  .stat-card {
+    padding: 18px 12px;
+  }
+}
+
+/* 超宽屏优化 */
+@media (min-width: 1600px) {
+  .stats-grid {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 20px;
+  }
+  
+  .stat-card {
+    padding: 24px 20px;
+  }
+}
+
+/* 中等宽度屏幕优化 */
+@media (max-width: 1300px) and (min-aspect-ratio: 1/1) {
+  .stats-grid {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+  }
+  
+  .stat-card {
+    padding: 15px 10px;
+  }
+}
+
+/* 确保完全填充宽度 */
+.stats-section {
+  width: 100%;
+  margin-bottom: 25px;
 }
 
 .stat-card {
