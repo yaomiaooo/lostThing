@@ -473,7 +473,6 @@
                   </div>
                   
                   <div class="feedback-user">
-                    <img :src="item.userAvatar || '/default-avatar.png'" class="user-avatar-small">
                     <div class="user-info">
                       <span class="user-name">{{ item.userName }}</span>
                       <span class="user-contact">{{ maskPhone(item.userPhone) }}</span>
