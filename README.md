@@ -370,7 +370,7 @@
 | ----------- | ------------ | ---- | ------------------------------ |
 | id          | BIGINT       | 是    | 自增主键                           |
 | item_id     | BIGINT       | 否    | 关联物品 ID（关联 item 表 id）          |
-| image_data  | LONGBLOB     | 否    | 图片二进制数据（存储图片的二进制内容）         |
+| image_data  | BINARY       | 否    | 图片二进制数据（存储图片的二进制内容）         |
 | image_url   | VARCHAR(255) | 否    | 原始文件名（可为空）                     |
 | image_type  | SMALLINT     | 否    | 图片类型：1 - 失物图片，2 - 招领图片         |
 | sort        | SMALLINT     | 否    | 图片排序                           |
@@ -477,23 +477,24 @@
 | 字段名          | 字段类型      | 是否主键 | 字段说明                     |
 | ------------ | --------- | ---- | ------------------------ |
 | id           | BIGINT    | 是    | 自增主键                     |
-| item_id      | BIGINT    | 否    | 关联物品 ID（关联 item 表 id）    |
-| owner_id     | BIGINT    | 否    | 失主 ID（关联 user 表 id）     |
-| finder_id    | BIGINT    | 否    | 拾主 ID（关联 user 表 id）     |
+| item_id      | BIGINT    | 否    | 关联物品 ID（关联 item 表 id，外键） |
+| owner_id     | BIGINT    | 否    | 失主 ID（关联 user 表 id，外键） |
+| finder_id    | BIGINT    | 否    | 拾主 ID（关联 user 表 id，外键） |
 | created_at   | DATETIME  | 否    | 创建时间                     |
 
 **表结构说明**：
-- 会话由：物品 + 失主 + 拾主 唯一确定
+- 会话由：物品 + 失主 + 拾主 唯一确定（唯一约束）
 - 角色在创建时确定，后续不可变
 - 即使物品状态变化，会话仍可查看（但可能只读）
+- 使用外键关联，删除级联
 
 #### （12）消息表（message）
 
 | 字段名             | 字段类型      | 是否主键 | 字段说明            |
 | --------------- | --------- | ---- | --------------- |
 | id              | BIGINT    | 是    | 自增主键            |
-| conversation_id | BIGINT    | 否    | 所属会话 ID（关联 conversation 表 id） |
-| sender_id       | BIGINT    | 否    | 发送者 ID（关联 user 表 id） |
+| conversation_id | BIGINT    | 否    | 所属会话 ID（关联 conversation 表 id，外键） |
+| sender_id       | BIGINT    | 否    | 发送者 ID（关联 user 表 id，外键） |
 | content         | TEXT      | 否    | 消息内容            |
 | created_at      | DATETIME  | 否    | 发送时间            |
 
@@ -501,8 +502,99 @@
 - 当前仅支持文本消息
 - 后续可扩展为图片 / 证明材料
 - 消息按创建时间排序
+- 使用外键关联，删除级联
+
+#### （13）用户反馈表（feedback）
+
+| 字段名          | 字段类型         | 是否主键 | 字段说明                     |
+| ------------ | ------------ | ---- | ------------------------ |
+| id           | BIGINT       | 是    | 自增主键                     |
+| user_id      | BIGINT       | 否    | 用户 ID（关联 user 表 id，外键） |
+| feedback_type| VARCHAR(20)  | 否    | 问题类型：technical-技术问题，usage-使用问题，suggestion-意见建议，other-其他 |
+| content      | TEXT         | 否    | 反馈内容                     |
+| status       | VARCHAR(20)  | 否    | 状态：pending-待处理，processing-处理中，resolved-已解决 |
+| reply        | TEXT         | 否    | 管理员回复（可为空）               |
+| reply_time   | DATETIME     | 否    | 回复时间（可为空）               |
+| create_time  | DATETIME     | 否    | 创建时间                     |
+| update_time  | DATETIME     | 否    | 更新时间                     |
+
+**表结构说明**：
+- 用户可以提交技术问题、使用问题、意见建议或其他反馈
+- 管理员可以查看并回复用户反馈
+- 状态跟踪反馈处理进度
+
+#### （14）数据备份记录表（backup_record）
+
+| 字段名           | 字段类型         | 是否主键 | 字段说明                     |
+| ------------- | ------------ | ---- | ------------------------ |
+| id            | BIGINT       | 是    | 自增主键                     |
+| name          | VARCHAR(255) | 否    | 备份名称                     |
+| backup_type   | VARCHAR(20)  | 否    | 备份类型：full-全量备份，incremental-增量备份 |
+| file_path     | VARCHAR(500) | 否    | 文件路径                     |
+| file_size     | BIGINT       | 否    | 文件大小（字节）                 |
+| tables        | JSON         | 否    | 包含的表列表                   |
+| status        | VARCHAR(20)  | 否    | 状态：pending-待执行，processing-执行中，completed-已完成，failed-失败 |
+| error_message | TEXT         | 否    | 错误信息（可为空）               |
+| created_by    | BIGINT       | 否    | 创建人 ID                   |
+| created_time  | DATETIME     | 否    | 创建时间                     |
+| completed_time| DATETIME     | 否    | 完成时间（可为空）               |
+
+**表结构说明**：
+- 记录数据库备份操作的详细信息
+- 支持全量备份和增量备份
+- 跟踪备份任务的执行状态
+
+#### （15）数据导出任务表（export_task）
+
+| 字段名              | 字段类型         | 是否主键 | 字段说明                     |
+| ---------------- | ------------ | ---- | ------------------------ |
+| id               | BIGINT       | 是    | 自增主键                     |
+| name             | VARCHAR(255) | 否    | 任务名称                     |
+| data_types       | JSON         | 否    | 数据类型列表                   |
+| export_format    | VARCHAR(20)  | 否    | 导出格式：excel-Excel，csv-CSV，json-JSON |
+| date_range_start | DATETIME     | 否    | 开始日期（可为空）               |
+| date_range_end   | DATETIME     | 否    | 结束日期（可为空）               |
+| include_images   | BOOLEAN      | 否    | 是否包含图片                   |
+| file_path        | VARCHAR(500) | 否    | 文件路径（可为空）               |
+| file_size        | BIGINT       | 否    | 文件大小（字节）                 |
+| record_count     | INT          | 否    | 记录数                      |
+| status           | VARCHAR(20)  | 否    | 状态：pending-待执行，processing-执行中，completed-已完成，failed-失败 |
+| progress         | INT          | 否    | 进度（%）                    |
+| error_message    | TEXT         | 否    | 错误信息（可为空）               |
+| created_by       | BIGINT       | 否    | 创建人 ID                   |
+| created_time     | DATETIME     | 否    | 创建时间                     |
+| completed_time   | DATETIME     | 否    | 完成时间（可为空）               |
+
+**表结构说明**：
+- 记录数据导出任务的详细信息
+- 支持多种导出格式
+- 跟踪导出任务的执行状态和进度
+
+#### （16）系统操作日志表（system_operation_log）
+
+| 字段名             | 字段类型         | 是否主键 | 字段说明                     |
+| --------------- | ------------ | ---- | ------------------------ |
+| id              | BIGINT       | 是    | 自增主键                     |
+| operation_type  | VARCHAR(50)  | 否    | 操作类型：backup-数据备份，restore-数据恢复，export-数据导出，cleanup-数据清理 |
+| operation_detail| TEXT         | 否    | 操作详情                     |
+| ip_address      | VARCHAR(50)  | 否    | IP 地址                     |
+| user_id         | BIGINT       | 否    | 用户 ID                    |
+| user_name       | VARCHAR(100) | 否    | 用户名                      |
+| operation_time  | DATETIME     | 否    | 操作时间                     |
+
+**表结构说明**：
+- 记录系统级别的关键操作（与 items 模块中的 operation_log 不同）
+- 用于审计和追踪系统管理操作
 
 ### 5.2 版本更新记录
+
+#### v5.3 - 2026-03-07
+- **新增**：用户反馈表（feedback）- 用于收集用户反馈和意见
+- **新增**：数据备份记录表（backup_record）- 用于管理数据库备份操作
+- **新增**：数据导出任务表（export_task）- 用于管理数据导出任务
+- **新增**：系统操作日志表（system_operation_log）- 用于记录系统级别的关键操作
+- **优化**：完善了系统管理模块的数据库结构
+- **说明**：items 模块的 operation_log 与 system 模块的 system_operation_log 是两个不同的表，分别用于业务操作日志和系统操作日志
 
 #### v5.2 - 2026-03-02
 - **新增**：会话表（conversation）- 用于记录失主与拾主之间的沟通会话
