@@ -1,6 +1,9 @@
 校园失物招领系统
 =======================
 
+系统演示视频：
+【校园失物招领系统】 https://www.bilibili.com/video/BV1KHNwzyEtg/?share_source=copy_web&vd_source=3c36984389e93926780c19850f1f7a6a
+
 一、项目背景与建设意义
 -----------
 
